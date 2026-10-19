@@ -10,6 +10,11 @@ name: Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      public_url:
+        description: 'Deployed HTTPS web-app URL (used when the repository variable is unavailable)'
+        required: false
+        type: string
   push:
     branches: [main]
     paths:
@@ -44,7 +49,7 @@ jobs:
 
       - name: Copy the web app into the Android project source
         env:
-          PRINTNEST_PUBLIC_URL: ${{ vars.PRINTNEST_PUBLIC_URL }}
+          PRINTNEST_PUBLIC_URL: ${{ inputs.public_url || vars.PRINTNEST_PUBLIC_URL }}
         run: |
           test -n "$PRINTNEST_PUBLIC_URL" || {
             echo 'PRINTNEST_PUBLIC_URL is required. Set it as a repository Actions variable to the deployed HTTPS web-app URL.' >&2
