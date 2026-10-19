@@ -7,7 +7,7 @@
 import { apiError, readJson } from './http.js';
 import { checkPaymentQrFile, PAYMENT_QR_TYPES } from './logic.js';
 
-const SHOP_FIELDS = ['name', 'phone', 'address', 'is_open'];
+const SHOP_FIELDS = ['name', 'phone', 'address', 'is_open', 'cash_payment_timing', 'minimum_order_paise'];
 const SERVICE_FIELDS = ['name', 'pricing_unit', 'bw_price_paise', 'colour_price_paise', 'is_active'];
 const ORDER_SELECT =
   'id,tracking_code,status,total_paise,customer_note,created_at,' +
@@ -97,7 +97,7 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
       const rows = await request(
         'GET',
         `shop_memberships?user_id=eq.${enc(userId)}` +
-          '&select=role,shop:shops(id,slug,name,phone,address,is_open,features,payment_qr_path)'
+          '&select=role,shop:shops(id,slug,name,phone,address,is_open,features,payment_qr_path,cash_payment_timing,minimum_order_paise)'
       );
       return rows
         .filter((row) => row.shop)

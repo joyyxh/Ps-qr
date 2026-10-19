@@ -149,6 +149,18 @@ export function validateShopDetails({ name, phone, address }) {
 
 const MAX_PRICE_PAISE = 100000; // ₹1,000, the database limit for one price
 
+export function validateCashPolicy({ timing, minimumRupees }) {
+  const cleanTiming = String(timing ?? 'counter');
+  if (!['counter', 'collection'].includes(cleanTiming)) {
+    throw new Error('Choose whether cash is due at the counter or on collection.');
+  }
+  const text = String(minimumRupees ?? '').trim();
+  if (text === '') return { cash_payment_timing: cleanTiming, minimum_order_paise: 0 };
+  const minimum = rupeesToPaise(text);
+  if (minimum === null || minimum < 0) throw new Error('Enter a valid minimum order amount.');
+  return { cash_payment_timing: cleanTiming, minimum_order_paise: minimum };
+}
+
 // Turns a rupee amount typed by the owner ("2", "2.5", "12.50") into whole
 // paise. Blank means "not offered" and returns null. The text is parsed as
 // digits, never as a float, so no rounding error can creep in.

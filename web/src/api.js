@@ -78,7 +78,7 @@ export function createApi(config, fetchImpl = globalThis.fetch) {
 
     async getShop(slug) {
       const rows = await select(
-        `shops?slug=eq.${encodeURIComponent(slug)}&select=id,slug,name,phone,address,is_open,features,payment_qr_path`
+        `shops?slug=eq.${encodeURIComponent(slug)}&select=id,slug,name,phone,address,is_open,features,payment_qr_path,cash_payment_timing,minimum_order_paise`
       );
       return rows[0] ?? null;
     },

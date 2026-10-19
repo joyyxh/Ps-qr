@@ -26,7 +26,7 @@ let config = await readFile(path.join(source, 'config.js'), 'utf8');
 if (publicUrl) {
   const replaced = config.replace(/publicBaseUrl:\s*'[^']*'/, `publicBaseUrl: '${publicUrl}'`);
   const withAuth = replaced.replace(/authRedirectUrl:\s*'[^']*'/, `authRedirectUrl: '${publicUrl}'`);
-  if (withAuth === config) {
+  if (!/publicBaseUrl:\s*'[^']*'/.test(config) || !/authRedirectUrl:\s*'[^']*'/.test(config)) {
     console.error('config.js has no publicBaseUrl/authRedirectUrl lines to set. Check web/config.js.');
     process.exit(1);
   }

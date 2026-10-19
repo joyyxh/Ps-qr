@@ -56,7 +56,7 @@ async function startApp(auth) {
       window.addEventListener('hashchange', route);
       return;
     }
-    window.location.hash = '#/owner';
+    window.location.hash = callback.type === 'recovery' ? '#/owner/reset' : '#/owner';
   }
   window.addEventListener('hashchange', route);
   route();
@@ -233,6 +233,10 @@ async function renderShop(slug) {
 
 function shopTemplate() {
   const details = [shop.address, shop.phone].filter(Boolean).map(escapeHtml).join(' · ');
+  const minimumNotice = Number(shop.minimum_order_paise ?? 0) > 0
+    ? `<p class="notice">Minimum order: <strong>${formatPaise(shop.minimum_order_paise)}</strong>.</p>`
+    : '';
+  const cashTiming = shop.cash_payment_timing === 'collection' ? 'Cash is due when you collect the printed order.' : 'Cash is due at the counter before collection.';
   const options = services
     .map((service) => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)}</option>`)
     .join('');
@@ -274,6 +278,7 @@ function shopTemplate() {
       <label>Note for the shop (optional)
         <textarea id="note" rows="2" maxlength="300"></textarea>
       </label>
+      ${minimumNotice}
       <label>Payment method
         <select id="payment-method">
           <option value="cash">Cash at the counter</option>
@@ -284,7 +289,7 @@ function shopTemplate() {
       <p class="muted small">${
         shop.payment_qr_path
           ? 'Cash is verified by the shop. UPI remains pending until the shop verifies the receipt. QRquick does not take any payment.'
-          : 'Pay at the shop counter after your order is approved. The shop must verify cash before printing.'
+          : `${cashTiming} The shop must verify cash before printing.`
       }</p>
       <p id="order-error" class="error" role="alert"></p>
     </section>`
@@ -346,6 +351,7 @@ function bindShop() {
   document.getElementById('file-input').addEventListener('change', onFileChosen);
   document.getElementById('cart').addEventListener('click', onCartClick);
   document.getElementById('place').addEventListener('click', onPlaceOrder);
+  document.getElementById('payment-method')?.addEventListener('change', refreshQuote);
 }
 
 function updateServiceHint() {
@@ -510,6 +516,7 @@ async function refreshQuote() {
 }
 
 function quoteTemplate(quote) {
+  const paymentMethod = document.getElementById('payment-method')?.value === 'upi' ? 'UPI' : 'cash';
   const rows = quote.items
     .map(
       (line) => `
@@ -527,7 +534,7 @@ function quoteTemplate(quote) {
       <thead><tr><th>Item</th><th class="num">Billed</th><th class="num">Amount</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot>
-        <tr><th colspan="2">Total, pay at counter</th><th class="num">${formatPaise(quote.total_paise)}</th></tr>
+        <tr><th colspan="2">Total · ${paymentMethod}</th><th class="num">${formatPaise(quote.total_paise)}</th></tr>
       </tfoot>
     </table>
     <p class="muted small">The shop's system recalculates this when you place the order.</p>`;

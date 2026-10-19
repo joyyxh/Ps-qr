@@ -29,6 +29,7 @@ export function parseAuthCallbackHash(hash) {
   }
   return {
     handled: true,
+    type: params.get('type') || '',
     tokenResponse: {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -133,6 +134,29 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
       return remember(toSession(data, nowMs()));
     },
 
+    async recoverPassword(email) {
+      const redirect = authRedirectUrl(config);
+      const body = { email };
+      if (redirect) body.redirect_to = redirect;
+      return call('recover', body);
+    },
+
+    async updatePassword(password) {
+      if (!session?.access_token) throw new Error('Your recovery link has expired. Request a new one.');
+      const response = await fetchImpl(`${base}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          apikey: config.publishableKey,
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+      const data = await readJson(response);
+      if (!response.ok) throw apiError(response, data, 'Password update failed');
+      return data;
+    },
+
     async consumeCallback(hash) {
       const parsed = parseAuthCallbackHash(hash);
       if (!parsed.handled || parsed.error) return parsed;
@@ -140,6 +164,7 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
         const user = await currentUser(parsed.tokenResponse.access_token);
         return {
           handled: true,
+          type: parsed.type,
           session: remember(toSession({ ...parsed.tokenResponse, user }, nowMs())),
         };
       } catch (error) {

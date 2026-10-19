@@ -28,6 +28,7 @@ import {
   shopAddress,
   unitLabel,
   validateService,
+  validateCashPolicy,
   validateShopDetails,
   validateSlug,
 } from './logic.js';
@@ -118,6 +119,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     try {
       const session = await auth.getSession();
       if (!session) return renderSignIn('signin');
+      if (page === 'reset') return renderResetPassword();
       if (page === 'new') return renderNewShop();
       if (page === 'shop' && value) return await renderShopManager(session.user, value, section);
       return await renderShopList(session.user);
@@ -145,27 +147,30 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   function renderSignIn(mode, notice = '') {
     const isSignUp = mode === 'signup';
+    const isForgot = mode === 'forgot';
+    const heading = isSignUp ? 'Create a shop owner account' : isForgot ? 'Reset your password' : 'Shop owner sign in';
+    const action = isSignUp ? 'Create account' : isForgot ? 'Send reset link' : 'Sign in';
+    const password = isForgot ? '' : `<label>Password${isSignUp ? ' (at least 8 characters)' : ''}
+            <input name="password" type="password" required
+                   autocomplete="${isSignUp ? 'new-password' : 'current-password'}"
+                   ${isSignUp ? 'minlength="8"' : ''} />
+          </label>`;
     show(
       `<section class="card">
-        <h1>${isSignUp ? 'Create a shop owner account' : 'Shop owner sign in'}</h1>
+        <h1>${heading}</h1>
         <p class="muted small">Only shop owners sign in here. Customers do not need an account.</p>
         <form id="auth-form" class="grid">
           <label>Email
             <input name="email" type="email" autocomplete="email" required />
           </label>
-          <label>Password${isSignUp ? ' (at least 8 characters)' : ''}
-            <input name="password" type="password" required
-                   autocomplete="${isSignUp ? 'new-password' : 'current-password'}"
-                   ${isSignUp ? 'minlength="8"' : ''} />
-          </label>
-          <button type="submit" data-label="${isSignUp ? 'Create account' : 'Sign in'}">
-            ${isSignUp ? 'Create account' : 'Sign in'}
-          </button>
+          ${password}
+          <button type="submit" data-label="${action}">${action}</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
         </form>
-        <p><button type="button" class="link" data-switch="${isSignUp ? 'signin' : 'signup'}">
-          ${isSignUp ? 'Already have an account? Sign in' : 'New here? Create an owner account'}
+        <p><button type="button" class="link" data-switch="${isForgot ? 'signin' : isSignUp ? 'signin' : 'signup'}">
+          ${isForgot ? 'Back to sign in' : isSignUp ? 'Already have an account? Sign in' : 'New here? Create an owner account'}
         </button></p>
+        ${!isSignUp && !isForgot ? '<p><button type="button" class="link" data-switch="forgot">Forgot password?</button></p>' : ''}
       </section>`
     );
     on('#auth-form', 'submit', (event) => onAuthSubmit(event, mode));
@@ -181,6 +186,10 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     setError(form, '');
     setBusy(form, true);
     try {
+      if (mode === 'forgot') {
+        await auth.recoverPassword(email);
+        return showConfirmationNeeded(email, 'If the account exists, check your email');
+      }
       if (mode === 'signup') {
         const result = await auth.signUp(email, password);
         if (result.confirmationNeeded) return showConfirmationNeeded(email);
@@ -194,10 +203,10 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     }
   }
 
-  function showConfirmationNeeded(email) {
+  function showConfirmationNeeded(email, heading = 'Check your email') {
     show(
       `<section class="card">
-        <h1>Check your email</h1>
+        <h1>${escapeHtml(heading)}</h1>
         <p>We sent a confirmation link to <strong>${escapeHtml(email)}</strong>.
            Open it on this device. QRquick will establish your owner session;
            if the link opens in another browser, return here and sign in.</p>
@@ -205,6 +214,35 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       </section>`
     );
     on('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+  }
+
+  function renderResetPassword(notice = '') {
+    show(`<section class="card">
+      <h1>Choose a new password</h1>
+      <p class="muted small">Use at least 8 characters. This recovery link is short-lived.</p>
+      <form id="reset-form" class="grid">
+        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <button type="submit">Save new password</button>
+        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+      </form>
+    </section>`);
+    on('#reset-form', 'submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const password = String(data.get('password') ?? '');
+      if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
+      setBusy(form, true);
+      try {
+        await auth.updatePassword(password);
+        await auth.signOut();
+        renderSignIn('signin', 'Password changed. Sign in with your new password.');
+      } catch (err) {
+        setError(form, friendlyAuthError(err));
+        setBusy(form, false);
+      }
+    });
   }
 
   function friendlyAuthError(err) {
@@ -338,8 +376,16 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   function managerHtml(shop, services, editing, notice, error, catalog) {
     const address = customerAddress(shop.slug);
+    const qrContent = address.problem
+      ? `<p class="banner" role="alert">${escapeHtml(address.problem)} QR generation is disabled until a verified HTTPS customer URL is configured.</p>`
+      : `<div class="qr-box">${qrSvg(address.url)}</div>
+         <div class="qr-text">
+           <p class="muted small">Print this code and place it at your counter. Customers scan it to open their page, upload files and place an order.</p>
+           <button type="button" data-action="download-qr">Download QR as PNG</button>
+         </div>`;
     const featuresBlock = featuresCard(shop, catalog);
     const paymentBlock = paymentQrCard(shop);
+    const cashBlock = cashPolicyCard(shop);
     const rows = services
       .map((service) => {
         const bw = service.bw_price_paise === null ? '–' : formatPaise(service.bw_price_paise);
@@ -394,14 +440,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
           <input readonly value="${escapeHtml(address.url)}" />
         </label>
         ${address.problem ? `<p class="banner" role="alert">${escapeHtml(address.problem)}</p>` : ''}
-        <div class="qr-row">
-          <div class="qr-box">${qrSvg(address.url)}</div>
-          <div class="qr-text">
-            <p class="muted small">Print this code and place it at your counter. Customers scan it to open your
-               page, upload their files and place an order.</p>
-            <button type="button" data-action="download-qr">Download QR as PNG</button>
-          </div>
-        </div>
+        <div class="qr-row">${qrContent}</div>
       </section>
 
       <section class="card">
@@ -424,6 +463,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       ${featuresBlock}
 
       ${paymentBlock}
+
+      ${cashBlock}
 
       <section class="card">
         <h2>Services and prices</h2>
@@ -507,10 +548,32 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       </section>`;
   }
 
+  function cashPolicyCard(shop) {
+    return `<section class="card">
+      <h2>Cash and order rules</h2>
+      <form id="cash-policy-form" class="grid">
+        <label>Cash is due
+          <select name="cashTiming">
+            <option value="counter"${shop.cash_payment_timing !== 'collection' ? ' selected' : ''}>At the counter before collection</option>
+            <option value="collection"${shop.cash_payment_timing === 'collection' ? ' selected' : ''}>When the printed order is collected</option>
+          </select>
+        </label>
+        <label>Minimum order amount in rupees
+          <input name="minimumOrder" inputmode="decimal" placeholder="0 for no minimum"
+                 value="${escapeHtml(paiseToRupeesInput(shop.minimum_order_paise ?? 0))}" />
+        </label>
+        <p class="muted small">These rules are enforced by the database and shown to customers before submission.</p>
+        <button type="submit" data-label="Save cash rules">Save cash rules</button>
+        <p class="error" data-error role="alert"></p>
+      </form>
+    </section>`;
+  }
+
   function bindManager() {
     on('#details-form', 'submit', onSaveDetails);
     on('#features-form', 'submit', onSaveFeatures);
     on('#payment-qr-form', 'submit', onUploadPaymentQr);
+    on('#cash-policy-form', 'submit', onSaveCashPolicy);
     on('[data-action="remove-payment-qr"]', 'click', onRemovePaymentQr);
     on('#service-form', 'submit', onSaveService);
     on('[data-action="toggle-open"]', 'click', onToggleOpen);
@@ -524,7 +587,11 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   // Saves the shop's QR code as a PNG for printing. It is drawn in the browser
   // from the same address shown on the page.
   function downloadQr(slug) {
-    const { url } = customerAddress(slug);
+    const { url, problem } = customerAddress(slug);
+    if (problem) {
+      renderManager({ error: `${problem} QR generation is disabled until a verified HTTPS customer URL is configured.` });
+      return;
+    }
     qrCanvas(url, 12).toBlob((blob) => {
       if (!blob) {
         renderManager({ error: 'The QR code could not be saved. Try again.' });
@@ -556,6 +623,23 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       const updated = await ownerApi.updateShop(managed.shop.id, details);
       managed.shop = { ...managed.shop, ...updated };
       renderManager({ notice: 'Shop details saved.' });
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+    }
+  }
+
+  async function onSaveCashPolicy(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      const fields = validateCashPolicy({ timing: data.get('cashTiming'), minimumRupees: data.get('minimumOrder') });
+      const updated = await ownerApi.updateShop(managed.shop.id, fields);
+      managed.shop = { ...managed.shop, ...updated };
+      renderManager({ notice: 'Cash rules saved.' });
     } catch (err) {
       setError(form, messageFor(err));
       setBusy(form, false);
