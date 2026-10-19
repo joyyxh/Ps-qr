@@ -1,0 +1,73 @@
+name: Android APK
+
+# Builds the PrintNest debug APK in the cloud, so no Android tools are needed on
+# the developer's computer. Download the result from the run's "Artifacts" list.
+#
+# One-time setup in the GitHub repository:
+#   Settings > Secrets and variables > Actions > Variables > New repository variable
+#   Name:  PRINTNEST_PUBLIC_URL
+#   Value: the https address where the customer page is published, for example https://printnest.example/
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'web/**'
+      - '.github/workflows/android-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Capacitor
+        run: npm ci
+
+      - name: Copy the web app into the Android project source
+        env:
+          PRINTNEST_PUBLIC_URL: ${{ vars.PRINTNEST_PUBLIC_URL }}
+        run: |
+          test -n "$PRINTNEST_PUBLIC_URL" || {
+            echo 'PRINTNEST_PUBLIC_URL is required. Set it as a repository Actions variable to the deployed HTTPS web-app URL.' >&2
+            exit 1
+          }
+          npm run copy-web
+
+      - name: Create the Android project (first build only)
+        run: test -d android || npx cap add android
+
+      - name: Sync web files into the Android project
+        run: npx cap sync android
+
+      - name: Build the debug APK
+        working-directory: mobile/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: printnest-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,36 @@
+# Dependencies and generated output (rebuilt by the tools, never committed)
+node_modules/
+mobile/node_modules/
+mobile/www/
+mobile/android/
+mobile/ios/
+
+# Secrets: only the template is committed. Real values stay on your computer.
+.env
+.env.*
+!.env.example
+
+# Android signing keys and build output
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+*.apk
+*.aab
+
+# Logs, backups and editor/OS files
+*.log
+*.bak
+*.bak.*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python and Supabase local tooling
+__pycache__/
+*.pyc
+.venv/
+supabase/.temp/
+supabase/.branches/
