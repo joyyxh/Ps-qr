@@ -1,0 +1,482 @@
+import { createApi } from './api.js';
+import { createAuth } from './auth.js';
+import { createOwnerApi } from './owner-api.js';
+import { createOwnerPages } from './owner.js';
+import { browserSessionStorage, createSessionStore } from './session.js';
+import {
+  buildItem,
+  checkUploadFile,
+  colourAvailable,
+  escapeHtml,
+  fileAlreadyInOrder,
+  formatPaise,
+  publicAssetUrl,
+  shopOffersColour,
+  shopOffersDoubleSided,
+  statusLabel,
+  UPLOAD_ACCEPT,
+  unitLabel,
+} from './logic.js';
+
+const config = window.PRINTNEST_CONFIG;
+const app = document.getElementById('app');
+const DEFAULT_SHOP = 'demo-xerox';
+
+let api = null;
+let owner = null;
+let shop = null;
+let services = [];
+let catalog = []; // feature labels: { key, label, affects_orders }
+let cart = [];
+let pendingUpload = null; // the uploaded file for the item being built: { file_id, original_name, page_count }
+let uploadSeq = 0; // ignores a finished upload when the customer has picked another file since
+let quoteSeq = 0; // ignores out-of-order quote responses
+
+if (!config?.supabaseUrl || !config?.publishableKey) {
+  app.innerHTML = '<section class="card"><p class="error">Missing config.js settings.</p></section>';
+} else {
+  api = createApi(config);
+  const auth = createAuth({ config, store: createSessionStore(browserSessionStorage()) });
+  owner = createOwnerPages({ app, auth, ownerApi: createOwnerApi({ config, auth }), config });
+  // The Android app is for shop owners, so it opens the owner area first.
+  if (!window.location.hash && window.Capacitor?.isNativePlatform?.()) {
+    window.location.hash = '#/owner';
+  }
+  window.addEventListener('hashchange', route);
+  route();
+}
+
+// ---------- routing (hash based, so it works on any static host) ----------
+
+function route() {
+  const parts = window.location.hash.replace(/^#\/?/, '').split('/').map(safeDecode);
+  const [kind = '', value = ''] = parts;
+
+  if (kind === 's' && value) return renderShop(value);
+  if (kind === 'track') return renderTrack(value);
+  if (kind === 'owner') return owner.render(parts.slice(1));
+  return renderShop(DEFAULT_SHOP);
+}
+
+function safeDecode(text) {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return '';
+  }
+}
+
+function serviceById(id) {
+  return services.find((service) => service.id === id);
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text ?? '';
+}
+
+// ---------- shop page ----------
+
+async function renderShop(slug) {
+  app.innerHTML = '<p class="muted">Loading shop…</p>';
+  try {
+    shop = await api.getShop(slug);
+    if (!shop) {
+      app.innerHTML =
+        '<section class="card"><h1>Shop not found</h1>' +
+        '<p class="muted">Check the QR code or link and try again.</p></section>';
+      return;
+    }
+    // The feature list is extra information, so if it cannot load the page still works without it.
+    [services, catalog] = await Promise.all([api.getServices(shop.id), api.getFeatureCatalog().catch(() => [])]);
+  } catch (err) {
+    app.innerHTML = `<section class="card"><p class="error">Could not load this shop: ${escapeHtml(err.message)}</p></section>`;
+    return;
+  }
+
+  cart = [];
+  pendingUpload = null;
+  app.innerHTML = shopTemplate();
+  bindShop();
+  renderCart();
+  refreshQuote();
+}
+
+function shopTemplate() {
+  const details = [shop.address, shop.phone].filter(Boolean).map(escapeHtml).join(' · ');
+  const options = services
+    .map((service) => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)}</option>`)
+    .join('');
+
+  const status = shop.is_open
+    ? '<p class="badge ok">Open now</p>'
+    : '<p class="banner">This shop is closed right now. You can see prices, but orders cannot be placed.</p>';
+
+  const orderForm = services.length
+    ? `
+    <section class="card">
+      <h2>Add a print item</h2>
+      <form id="item-form" class="grid">
+        <label>Service
+          <select name="serviceId" id="service-select">${options}</select>
+        </label>
+        <p id="service-hint" class="hint muted"></p>
+        <label>File (PDF, JPEG or PNG, up to 10 MB)
+          <input name="file" id="file-input" type="file" accept="${UPLOAD_ACCEPT}" ${shop.is_open ? '' : 'disabled'} required />
+        </label>
+        <p id="upload-status" class="hint muted" role="status"></p>
+        <label>Copies
+          <input name="copies" type="number" min="1" max="100" value="1" inputmode="numeric" required />
+        </label>
+        <label class="check"><input name="colour" id="colour" type="checkbox"
+               ${shopOffersColour(shop) ? '' : 'disabled'} /> Colour${shopOffersColour(shop) ? '' : ' (not offered at this shop)'}</label>
+        <label class="check"><input name="duplex" id="duplex" type="checkbox"
+               ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /> Double-sided${shopOffersDoubleSided(shop) ? '' : ' (not offered at this shop)'}</label>
+        <button type="submit" id="add-item" disabled>Add to order</button>
+      </form>
+      <p class="muted small">Your file is stored privately and only this shop can open it. Automatic deletion is not switched on yet.</p>
+      <p id="item-error" class="error" role="alert"></p>
+    </section>
+
+    <section class="card">
+      <h2>Your order</h2>
+      <ul id="cart" class="cart"></ul>
+      <div id="quote" class="quote"></div>
+      <label>Note for the shop (optional)
+        <textarea id="note" rows="2" maxlength="300"></textarea>
+      </label>
+      <button id="place" type="button" disabled>Place order</button>
+      <p class="muted small">${
+        shop.payment_qr_path
+          ? 'Pay after your order is approved, at the counter or with the payment QR code above. PrintNest does not take any payment.'
+          : 'Pay at the shop counter after your order is approved. No payment is taken online.'
+      }</p>
+      <p id="order-error" class="error" role="alert"></p>
+    </section>`
+    : '<section class="card"><p class="muted">This shop has not published any services yet.</p></section>';
+
+  return `
+    <section class="card">
+      <h1>${escapeHtml(shop.name)}</h1>
+      ${details ? `<p class="muted">${details}</p>` : ''}
+      ${status}
+      ${offeredFeaturesHtml()}
+    </section>
+    ${paymentQrCard()}
+    ${orderForm}`;
+}
+
+// The features this shop has switched on, for example "Colour printing, Stapling".
+function offeredFeaturesHtml() {
+  const labels = catalog
+    .filter((feature) => shop.features?.[feature.key] === true)
+    .map((feature) => escapeHtml(feature.label));
+  return labels.length ? `<p class="small"><strong>Also offered here:</strong> ${labels.join(', ')}</p>` : '';
+}
+
+// The shop's own payment QR code, when the owner has uploaded one.
+function paymentQrCard() {
+  if (!shop.payment_qr_path) return '';
+  return `
+    <section class="card">
+      <h2>Pay with this QR code</h2>
+      <p class="muted small">Pay the shop directly with this code, for example in your UPI app.
+         PrintNest does not take the payment.</p>
+      <img class="payment-qr-preview" alt="Payment QR code for ${escapeHtml(shop.name)}"
+           src="${escapeHtml(publicAssetUrl(config.supabaseUrl, shop.payment_qr_path))}" />
+    </section>`;
+}
+
+// A colour-only service cannot be printed while the shop has colour printing switched off.
+function serviceBlocked(service) {
+  return Boolean(service) && service.bw_price_paise === null && !shopOffersColour(shop);
+}
+
+// The Add button is on only when a file is ready, the shop is open and the service can be ordered.
+function refreshAddButton() {
+  const addBtn = document.getElementById('add-item');
+  if (!addBtn) return;
+  const service = serviceById(document.getElementById('service-select').value);
+  addBtn.disabled = !(pendingUpload && shop.is_open) || serviceBlocked(service);
+}
+
+function bindShop() {
+  const select = document.getElementById('service-select');
+  if (!select) return;
+
+  select.addEventListener('change', updateServiceHint);
+  updateServiceHint();
+
+  document.getElementById('item-form').addEventListener('submit', onAddItem);
+  document.getElementById('file-input').addEventListener('change', onFileChosen);
+  document.getElementById('cart').addEventListener('click', onCartClick);
+  document.getElementById('place').addEventListener('click', onPlaceOrder);
+}
+
+function updateServiceHint() {
+  const service = serviceById(document.getElementById('service-select').value);
+  const colourBox = document.getElementById('colour');
+  if (!service) return;
+
+  const hasBw = service.bw_price_paise !== null;
+  const hasColour = colourAvailable(service);
+  const parts = [];
+  if (hasBw) parts.push(`B&W ${formatPaise(service.bw_price_paise)} ${unitLabel(service.pricing_unit)}`);
+  if (hasColour) parts.push(`Colour ${formatPaise(service.colour_price_paise)} ${unitLabel(service.pricing_unit)}`);
+  if (serviceBlocked(service)) parts.push('colour printing is not offered at this shop, so this service cannot be ordered');
+  setText('service-hint', parts.join(' · '));
+
+  // Colour is only a choice when the service offers both modes and the shop offers colour.
+  // A colour-only service is always colour; a B&W-only service never is.
+  colourBox.disabled = !(hasBw && hasColour) || !shopOffersColour(shop);
+  if (!hasBw) colourBox.checked = true;
+  if (!hasColour || !shopOffersColour(shop)) colourBox.checked = false;
+  refreshAddButton();
+}
+
+// Uploads as soon as a file is chosen. The server counts the pages, so the
+// customer never types them. The Add button stays off until the upload is done.
+async function onFileChosen(event) {
+  const input = event.currentTarget;
+  const addBtn = document.getElementById('add-item');
+  const file = input.files && input.files[0];
+  const seq = ++uploadSeq;
+
+  pendingUpload = null;
+  setText('item-error', '');
+  setText('upload-status', '');
+  addBtn.disabled = true;
+  if (!file) return;
+
+  const problem = checkUploadFile(file);
+  if (problem) {
+    input.value = '';
+    setText('item-error', problem);
+    return;
+  }
+
+  setText('upload-status', 'Uploading and checking the file…');
+  try {
+    const upload = await api.uploadFile(shop.slug, file);
+    if (seq !== uploadSeq) return; // the customer picked another file meanwhile
+    pendingUpload = upload;
+    setText('upload-status', `${upload.original_name} · ${plural(upload.page_count, 'page')} · ready to add`);
+    refreshAddButton();
+  } catch (err) {
+    if (seq !== uploadSeq) return;
+    input.value = '';
+    setText('upload-status', '');
+    setText('item-error', err.message);
+  }
+}
+
+function onAddItem(event) {
+  event.preventDefault();
+  setText('item-error', '');
+
+  const form = event.currentTarget;
+  const data = new FormData(form);
+  const service = serviceById(data.get('serviceId'));
+  const colourOnly = service && service.bw_price_paise === null;
+
+  if (!pendingUpload) {
+    setText('item-error', 'Upload a file first.');
+    return;
+  }
+  if (fileAlreadyInOrder(cart, pendingUpload.file_id)) {
+    setText('item-error', 'This file is already in your order. Upload it again to order it twice.');
+    return;
+  }
+
+  if (serviceBlocked(service)) {
+    setText('item-error', 'Colour printing is switched off at this shop, so this service cannot be ordered.');
+    return;
+  }
+
+  try {
+    cart.push(
+      buildItem({
+        serviceId: data.get('serviceId'),
+        file: pendingUpload,
+        copies: data.get('copies'),
+        colour: colourOnly ? true : data.get('colour') === 'on',
+        duplex: data.get('duplex') === 'on',
+      })
+    );
+  } catch (err) {
+    setText('item-error', err.message);
+    return;
+  }
+
+  pendingUpload = null;
+  form.reset();
+  document.getElementById('add-item').disabled = true;
+  setText('upload-status', '');
+  updateServiceHint();
+  renderCart();
+  refreshQuote();
+}
+
+function renderCart() {
+  const list = document.getElementById('cart');
+  if (!list) return;
+
+  if (!cart.length) {
+    list.innerHTML = '<li class="muted">No items yet.</li>';
+    return;
+  }
+
+  list.innerHTML = cart
+    .map((item, index) => {
+      const service = serviceById(item.service_id);
+      const modes = [item.colour ? 'Colour' : 'B&W', item.duplex ? 'double-sided' : 'single-sided'];
+      return `
+        <li>
+          <span>${escapeHtml(service ? service.name : 'Service')} · ${escapeHtml(item.file_name)}
+            (${plural(item.page_count, 'page')}) × ${plural(item.copies, 'copy')} · ${modes.join(', ')}</span>
+          <button type="button" class="link" data-remove="${index}">Remove</button>
+        </li>`;
+    })
+    .join('');
+}
+
+function onCartClick(event) {
+  const button = event.target.closest('button[data-remove]');
+  if (!button) return;
+  cart.splice(Number(button.dataset.remove), 1);
+  renderCart();
+  refreshQuote();
+}
+
+// The server prices the cart. The browser only displays the answer.
+async function refreshQuote() {
+  const quoteEl = document.getElementById('quote');
+  const placeBtn = document.getElementById('place');
+  if (!quoteEl || !placeBtn) return;
+
+  const seq = ++quoteSeq;
+  placeBtn.disabled = true;
+
+  if (!cart.length) {
+    quoteEl.innerHTML = '<p class="muted">Add an item to see the price.</p>';
+    return;
+  }
+
+  quoteEl.innerHTML = '<p class="muted">Calculating…</p>';
+  try {
+    const quote = await api.quote(shop.slug, cart);
+    if (seq !== quoteSeq) return; // a newer request is already in flight
+    quoteEl.innerHTML = quoteTemplate(quote);
+    placeBtn.disabled = !shop.is_open;
+  } catch (err) {
+    if (seq !== quoteSeq) return;
+    quoteEl.innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function quoteTemplate(quote) {
+  const rows = quote.items
+    .map(
+      (line) => `
+      <tr>
+        <td>${escapeHtml(line.service_name)} · ${escapeHtml(line.file_name ?? '')}${line.duplex ? ' (double-sided)' : ''}</td>
+        <td class="num">${line.billable_units} ${escapeHtml(unitLabel(line.pricing_unit))}
+          × ${formatPaise(line.unit_price_paise)}</td>
+        <td class="num">${formatPaise(line.amount_paise)}</td>
+      </tr>`
+    )
+    .join('');
+
+  return `
+    <table class="breakdown">
+      <thead><tr><th>Item</th><th class="num">Billed</th><th class="num">Amount</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr><th colspan="2">Total, pay at counter</th><th class="num">${formatPaise(quote.total_paise)}</th></tr>
+      </tfoot>
+    </table>
+    <p class="muted small">The shop's system recalculates this when you place the order.</p>`;
+}
+
+async function onPlaceOrder() {
+  const placeBtn = document.getElementById('place');
+  const note = document.getElementById('note').value.trim();
+  setText('order-error', '');
+  placeBtn.disabled = true;
+  placeBtn.textContent = 'Placing order…';
+
+  try {
+    const result = await api.placeOrder(shop.slug, cart, note);
+    renderConfirmation(result);
+  } catch (err) {
+    setText('order-error', err.message);
+    placeBtn.disabled = false;
+    placeBtn.textContent = 'Place order';
+  }
+}
+
+function renderConfirmation(result) {
+  cart = [];
+  const slug = encodeURIComponent(shop.slug);
+  const code = encodeURIComponent(result.tracking_code);
+  app.innerHTML = `
+    <section class="card confirm">
+      <h1>Order received</h1>
+      <p>Your tracking code</p>
+      <p class="code">${escapeHtml(result.tracking_code)}</p>
+      <p>Total <strong>${formatPaise(result.total_paise)}</strong>, pay at ${escapeHtml(result.shop_name)} after approval.</p>
+      <p class="muted">Status: ${escapeHtml(statusLabel(result.status))}</p>
+      <p><a href="#/track/${code}">Track this order</a> · <a href="#/s/${slug}">Start another order</a></p>
+    </section>
+    ${paymentQrCard()}`;
+}
+
+// ---------- order tracking ----------
+
+function renderTrack(code) {
+  app.innerHTML = `
+    <section class="card">
+      <h1>Track your order</h1>
+      <form id="track-form" class="grid">
+        <label>Tracking code
+          <input id="track-code" value="${escapeHtml(code)}" autocomplete="off"
+                 autocapitalize="characters" maxlength="12" required />
+        </label>
+        <button type="submit">Check status</button>
+      </form>
+      <div id="track-result"></div>
+    </section>`;
+
+  document.getElementById('track-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const value = document.getElementById('track-code').value.trim();
+    if (value) lookupOrder(value);
+  });
+
+  if (code) lookupOrder(code);
+}
+
+async function lookupOrder(code) {
+  const out = document.getElementById('track-result');
+  out.innerHTML = '<p class="muted">Checking…</p>';
+  try {
+    const order = await api.track(code);
+    if (!order) {
+      out.innerHTML = '<p class="error">No order found with that code.</p>';
+      return;
+    }
+    out.innerHTML = `
+      <div class="status">
+        <p class="muted">${escapeHtml(order.shop_name)} · ${escapeHtml(new Date(order.created_at).toLocaleString('en-IN'))}</p>
+        <p class="code">${escapeHtml(order.tracking_code)}</p>
+        <p><strong>${escapeHtml(statusLabel(order.status))}</strong></p>
+        <p>Total ${formatPaise(order.total_paise)}</p>
+      </div>`;
+  } catch (err) {
+    out.innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+  }
+}
