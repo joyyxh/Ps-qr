@@ -1,14 +1,14 @@
 {
-  "name": "PrintNest",
-  "short_name": "PrintNest",
+  "name": "QRquick",
+  "short_name": "QRquick",
   "description": "Order prints from your local print shop by scanning its QR code.",
   "id": "./",
-  "start_url": "./#/owner",
+  "start_url": "./#/home",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#f4f6fa",
-  "theme_color": "#1f6feb",
+  "orientation": "any",
+  "background_color": "#f6f7fb",
+  "theme_color": "#315be8",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }

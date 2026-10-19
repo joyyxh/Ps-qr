@@ -199,7 +199,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       `<section class="card">
         <h1>Check your email</h1>
         <p>We sent a confirmation link to <strong>${escapeHtml(email)}</strong>.
-           Open it on this device. PrintNest will establish your owner session;
+           Open it on this device. QRquick will establish your owner session;
            if the link opens in another browser, return here and sign in.</p>
         <p><button type="button" class="link" data-switch="signin">Go to sign in</button></p>
       </section>`
@@ -533,7 +533,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `printnest-${slug}-qr.png`;
+      link.download = `qrquick-${slug}-qr.png`;
       document.body.append(link);
       link.click();
       link.remove();

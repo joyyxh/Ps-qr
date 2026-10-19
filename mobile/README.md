@@ -1,6 +1,6 @@
-# PrintNest Android app
+# QRquick Android app
 
-The shop-owner app for Android. It is the PrintNest web app in an Android
+The shop-owner app for Android. It is the QRquick web app in an Android
 wrapper (Capacitor), so the same screens, database and rules are used. A
 shopkeeper signs in, sees their shop, shows the shop's QR code, uploads the
 payment QR, sets the yes/no features and manages orders.
@@ -14,7 +14,7 @@ payment QR, sets the yes/no features and manages orders.
    Without it, the app still builds, but the QR codes it makes point at the
    app, and the owner sees a warning until the address is set.
 3. Run the **Android APK** workflow (Actions tab, or push a change to `web/` or `mobile/`).
-4. Open the finished run and download **printnest-debug-apk** (`app-debug.apk`).
+4. Open the finished run and download **qrquick-debug-apk** (`app-debug.apk`).
 
 ## Install on a phone
 

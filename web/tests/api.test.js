@@ -66,6 +66,7 @@ test('placeOrder strips price and total fields before sending', async () => {
   const body = JSON.parse(calls[0].init.body);
   assert.equal(calls[0].url.endsWith('/rpc/place_order'), true);
   assert.equal(body.p_customer_note, null, 'blank notes are sent as null');
+  assert.equal(body.p_payment_method, 'cash');
   assert.deepEqual(Object.keys(body.p_items[0]).sort(), [
     'colour',
     'copies',
@@ -76,6 +77,13 @@ test('placeOrder strips price and total fields before sending', async () => {
   assert.equal('unit_price_paise' in body.p_items[0], false);
   assert.equal('amount_paise' in body.p_items[0], false);
   assert.equal('total_paise' in body.p_items[0], false);
+});
+
+test('placeOrder sends UPI only when explicitly selected', async () => {
+  const { calls, fetchImpl } = fakeFetch({ tracking_code: 'ABCD2345', payment_method: 'upi' });
+  const api = createApi(config, fetchImpl);
+  await api.placeOrder('demo-xerox', [], 'note', 'upi');
+  assert.equal(JSON.parse(calls[0].init.body).p_payment_method, 'upi');
 });
 
 test('track sends the tracking code to the track_order RPC', async () => {

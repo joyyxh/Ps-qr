@@ -3,7 +3,8 @@
 // the owner out. Every read and write is wrapped, because storage can be
 // blocked or throw in some privacy modes.
 
-export const SESSION_KEY = 'printnest.owner.session';
+export const SESSION_KEY = 'qrquick.owner.session';
+const LEGACY_SESSION_KEY = 'printnest.owner.session';
 const REFRESH_MARGIN_SECONDS = 60;
 
 export function browserSessionStorage() {
@@ -18,7 +19,7 @@ export function createSessionStore(storage) {
   return {
     load() {
       try {
-        const raw = storage?.getItem(SESSION_KEY);
+        const raw = storage?.getItem(SESSION_KEY) ?? storage?.getItem(LEGACY_SESSION_KEY);
         return raw ? JSON.parse(raw) : null;
       } catch {
         return null;
@@ -28,6 +29,7 @@ export function createSessionStore(storage) {
     save(session) {
       try {
         storage?.setItem(SESSION_KEY, JSON.stringify(session));
+        storage?.removeItem(LEGACY_SESSION_KEY);
       } catch {
         // Storage is unavailable, so the owner will need to sign in again later.
       }
@@ -36,6 +38,7 @@ export function createSessionStore(storage) {
     clear() {
       try {
         storage?.removeItem(SESSION_KEY);
+        storage?.removeItem(LEGACY_SESSION_KEY);
       } catch {
         // Nothing to clear.
       }

@@ -1,4 +1,4 @@
-// PrintNest service worker. It lets Android Chrome install the app to the home
+// QRquick service worker. It lets Android Chrome install the app to the home
 // screen and keeps the last copy of the page shell for when the network drops.
 //
 // Only same-origin GET requests are handled. Requests to Supabase (other origins)

@@ -20,7 +20,7 @@ import {
 
 const config = window.PRINTNEST_CONFIG;
 const app = document.getElementById('app');
-const DEFAULT_SHOP = 'demo-xerox';
+const THEME_KEY = 'qrquick.theme';
 
 let api = null;
 let owner = null;
@@ -42,6 +42,8 @@ if (!config?.supabaseUrl || !config?.publishableKey) {
 }
 
 async function startApp(auth) {
+  applyTheme(loadTheme());
+  bindThemePicker();
   const callback = await auth.consumeCallback(window.location.hash);
   if (callback.handled) {
     // Access and refresh tokens arrive in the fragment. Remove them before
@@ -55,9 +57,6 @@ async function startApp(auth) {
       return;
     }
     window.location.hash = '#/owner';
-  } else if (!window.location.hash && window.Capacitor?.isNativePlatform?.()) {
-    // The Android app is for shop owners, so it opens the owner area first.
-    window.location.hash = '#/owner';
   }
   window.addEventListener('hashchange', route);
   route();
@@ -69,10 +68,12 @@ function route() {
   const parts = window.location.hash.replace(/^#\/?/, '').split('/').map(safeDecode);
   const [kind = '', value = ''] = parts;
 
+  if (!kind || kind === 'home') return renderHome();
+  if (kind === 'scan') return renderScan();
   if (kind === 's' && value) return renderShop(value);
   if (kind === 'track') return renderTrack(value);
   if (kind === 'owner') return owner.render(parts.slice(1));
-  return renderShop(DEFAULT_SHOP);
+  return renderNotFound();
 }
 
 function safeDecode(text) {
@@ -80,6 +81,113 @@ function safeDecode(text) {
     return decodeURIComponent(text);
   } catch {
     return '';
+  }
+}
+
+function loadTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    return ['system', 'light', 'dark'].includes(saved) ? saved : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const select = document.getElementById('theme-select');
+  if (select) select.value = theme;
+}
+
+function bindThemePicker() {
+  document.getElementById('theme-select')?.addEventListener('change', (event) => {
+    const theme = ['system', 'light', 'dark'].includes(event.target.value) ? event.target.value : 'system';
+    try { localStorage.setItem(THEME_KEY, theme); } catch { /* preferences are optional */ }
+    applyTheme(theme);
+  });
+}
+
+function renderHome() {
+  app.innerHTML = `
+    <section class="hero card">
+      <p class="eyebrow">PRINT. PICK UP. DONE.</p>
+      <h1>Local printing, without the queue.</h1>
+      <p class="lead">Scan your shop’s QR code, choose your options, and send the job ahead. No customer account needed.</p>
+      <div class="actions hero-actions">
+        <a class="button" href="#/scan">▦ Scan a shop QR</a>
+        <a class="button secondary" href="#/owner">Add your shop</a>
+      </div>
+    </section>
+    <section class="home-grid" aria-label="QRquick customer actions">
+      <article class="card home-card"><span class="step">01</span><h2>Scan and connect</h2><p class="muted">Use a shop QR code or enter its link. You’ll land on the right counter, not a generic marketplace.</p><a href="#/scan">Open shop scanner →</a></article>
+      <article class="card home-card"><span class="step">02</span><h2>Send your files</h2><p class="muted">Upload a PDF, JPG, or PNG, set copies and print mode, then review the server-calculated price.</p><a href="#/track">Track an existing order →</a></article>
+      <article class="card home-card"><span class="step">03</span><h2>Collect with confidence</h2><p class="muted">Follow the status with your private tracking code. Customers never need an account.</p><a href="#/owner">For shop owners →</a></article>
+    </section>`;
+}
+
+function renderNotFound() {
+  app.innerHTML = '<section class="card"><p class="eyebrow">NOT FOUND</p><h1>That QRquick link is not valid.</h1><p class="muted">Use a participating shop’s QR code or return to the QRquick home screen.</p><p><a class="button" href="#/home">Back to QRquick</a></p></section>';
+}
+
+function renderScan() {
+  app.innerHTML = `
+    <section class="card scan-card">
+      <p class="eyebrow">SHOP CONNECT</p><h1>Scan a shop QR</h1>
+      <p class="muted">Choose a QR image from your phone, or paste the shop link/code below. QRquick only opens its own shop routes.</p>
+      <label>Shop link or slug<input id="shop-link" inputmode="url" placeholder="https://…/#/s/your-shop or your-shop" /></label>
+      <div class="actions"><button id="open-shop" type="button">Open shop</button><a class="button secondary" href="#/home">Cancel</a></div>
+      <p id="scan-error" class="error" role="alert"></p>
+      <label class="scan-upload">Scan an image<input id="qr-image" type="file" accept="image/*" capture="environment" /></label>
+      <p id="scan-status" class="hint muted" role="status"></p>
+    </section>`;
+  document.getElementById('open-shop').addEventListener('click', () => openShopInput(document.getElementById('shop-link').value));
+  document.getElementById('shop-link').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') openShopInput(event.target.value);
+  });
+  document.getElementById('qr-image').addEventListener('change', onQrImage);
+}
+
+function shopSlugFromInput(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  let candidate = raw;
+  try {
+    const url = new URL(raw, window.location.href);
+    if (url.origin !== window.location.origin && raw.includes('://')) return '';
+    const hash = url.hash.match(/^#\/?s\/([^/?#]+)/);
+    candidate = hash ? hash[1] : (url.pathname.match(/\/s\/([^/]+)/)?.[1] ?? raw);
+  } catch { /* treat it as a slug below */ }
+  candidate = safeDecode(candidate).toLowerCase();
+  return /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/.test(candidate) ? candidate : '';
+}
+
+function openShopInput(value) {
+  const slug = shopSlugFromInput(value);
+  const error = document.getElementById('scan-error');
+  if (!slug) {
+    if (error) error.textContent = 'Enter a valid QRquick shop link or slug.';
+    return;
+  }
+  window.location.hash = `#/s/${encodeURIComponent(slug)}`;
+}
+
+async function onQrImage(event) {
+  const status = document.getElementById('scan-status');
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!('BarcodeDetector' in window)) {
+    status.textContent = 'This browser cannot scan images directly. Paste the shop link or slug instead.';
+    return;
+  }
+  try {
+    status.textContent = 'Reading QR code…';
+    const bitmap = await createImageBitmap(file);
+    const results = await new window.BarcodeDetector({ formats: ['qr_code'] }).detect(bitmap);
+    bitmap.close?.();
+    if (!results[0]?.rawValue) throw new Error('No QR code found in that image.');
+    openShopInput(results[0].rawValue);
+  } catch (error) {
+    status.textContent = error.message || 'Could not read that QR image.';
   }
 }
 
@@ -166,11 +274,17 @@ function shopTemplate() {
       <label>Note for the shop (optional)
         <textarea id="note" rows="2" maxlength="300"></textarea>
       </label>
+      <label>Payment method
+        <select id="payment-method">
+          <option value="cash">Cash at the counter</option>
+          <option value="upi" ${shop.payment_qr_path ? '' : 'disabled'}>UPI via the shop QR${shop.payment_qr_path ? '' : ' (shop has not added a QR yet)'}</option>
+        </select>
+      </label>
       <button id="place" type="button" disabled>Place order</button>
       <p class="muted small">${
         shop.payment_qr_path
-          ? 'Pay after your order is approved, at the counter or with the payment QR code above. PrintNest does not take any payment.'
-          : 'Pay at the shop counter after your order is approved. No payment is taken online.'
+          ? 'Cash is verified by the shop. UPI remains pending until the shop verifies the receipt. QRquick does not take any payment.'
+          : 'Pay at the shop counter after your order is approved. The shop must verify cash before printing.'
       }</p>
       <p id="order-error" class="error" role="alert"></p>
     </section>`
@@ -202,7 +316,7 @@ function paymentQrCard() {
     <section class="card">
       <h2>Pay with this QR code</h2>
       <p class="muted small">Pay the shop directly with this code, for example in your UPI app.
-         PrintNest does not take the payment.</p>
+         QRquick does not take the payment.</p>
       <img class="payment-qr-preview" alt="Payment QR code for ${escapeHtml(shop.name)}"
            src="${escapeHtml(publicAssetUrl(config.supabaseUrl, shop.payment_qr_path))}" />
     </section>`;
@@ -422,12 +536,13 @@ function quoteTemplate(quote) {
 async function onPlaceOrder() {
   const placeBtn = document.getElementById('place');
   const note = document.getElementById('note').value.trim();
+  const paymentMethod = document.getElementById('payment-method')?.value === 'upi' ? 'upi' : 'cash';
   setText('order-error', '');
   placeBtn.disabled = true;
   placeBtn.textContent = 'Placing order…';
 
   try {
-    const result = await api.placeOrder(shop.slug, cart, note);
+    const result = await api.placeOrder(shop.slug, cart, note, paymentMethod);
     renderConfirmation(result);
   } catch (err) {
     setText('order-error', err.message);
@@ -445,7 +560,7 @@ function renderConfirmation(result) {
       <h1>Order received</h1>
       <p>Your tracking code</p>
       <p class="code">${escapeHtml(result.tracking_code)}</p>
-      <p>Total <strong>${formatPaise(result.total_paise)}</strong>, pay at ${escapeHtml(result.shop_name)} after approval.</p>
+      <p>Total <strong>${formatPaise(result.total_paise)}</strong>. ${result.payment_method === 'upi' ? 'UPI payment is pending shop verification.' : 'Pay cash at the counter; the shop verifies it before printing.'}</p>
       <p class="muted">Status: ${escapeHtml(statusLabel(result.status))}</p>
       <p><a href="#/track/${code}">Track this order</a> · <a href="#/s/${slug}">Start another order</a></p>
     </section>
@@ -492,6 +607,8 @@ async function lookupOrder(code) {
         <p class="code">${escapeHtml(order.tracking_code)}</p>
         <p><strong>${escapeHtml(statusLabel(order.status))}</strong></p>
         <p>Total ${formatPaise(order.total_paise)}</p>
+        <p>Payment: <strong>${escapeHtml(order.payment_status === 'paid' ? 'Verified' : order.payment_status === 'pending' ? 'Pending shop verification' : 'Cash due at counter')}</strong></p>
+        ${order.payment_rejection_reason ? `<p class="note">${escapeHtml(order.payment_rejection_reason)}</p>` : ''}
       </div>`;
   } catch (err) {
     out.innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;

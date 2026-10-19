@@ -99,12 +99,13 @@ export function createApi(config, fetchImpl = globalThis.fetch) {
       return rpc('quote_order', { p_shop_slug: shopSlug, p_items: toServerItems(items) });
     },
 
-    placeOrder(shopSlug, items, note) {
+    placeOrder(shopSlug, items, note, paymentMethod = 'cash') {
       const trimmed = typeof note === 'string' ? note.trim() : '';
       return rpc('place_order', {
         p_shop_slug: shopSlug,
         p_items: toServerItems(items),
         p_customer_note: trimmed || null,
+        p_payment_method: paymentMethod === 'upi' ? 'upi' : 'cash',
       });
     },
 
