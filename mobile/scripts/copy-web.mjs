@@ -25,11 +25,12 @@ if (publicUrl && !PUBLIC_URL_PATTERN.test(publicUrl)) {
 let config = await readFile(path.join(source, 'config.js'), 'utf8');
 if (publicUrl) {
   const replaced = config.replace(/publicBaseUrl:\s*'[^']*'/, `publicBaseUrl: '${publicUrl}'`);
-  if (replaced === config) {
-    console.error('config.js has no publicBaseUrl line to set. Check web/config.js.');
+  const withAuth = replaced.replace(/authRedirectUrl:\s*'[^']*'/, `authRedirectUrl: '${publicUrl}'`);
+  if (withAuth === config) {
+    console.error('config.js has no publicBaseUrl/authRedirectUrl lines to set. Check web/config.js.');
     process.exit(1);
   }
-  config = replaced;
+  config = withAuth;
 } else {
   console.warn(
     'PRINTNEST_PUBLIC_URL is not set. QR codes made in the app would point at the app itself, ' +

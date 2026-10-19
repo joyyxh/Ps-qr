@@ -47,7 +47,7 @@ printnest/
 ├── .env.example                        template for local settings (no real values)
 ├── mobile/                              Android app (Capacitor 8)
 │   ├── package.json, capacitor.config.json, README.md
-│   └── scripts/copy-web.mjs             copies web/ into www/ and sets the QR address
+│   └── scripts/copy-web.mjs             copies web/ into www/ and sets QR/auth URLs
 ├── supabase/
 │   ├── migrations/0001_stage1_foundation.sql   schema, RLS, pricing, RPCs
 │   ├── migrations/0002_services_public_policy_fix.sql   anon can read active services
@@ -72,7 +72,7 @@ printnest/
 ├── tools/vendor_qr.mjs                         turns the QR encoder into an ES module for the browser
 ├── qr/demo-xerox/                              generated QR files for the demo shop
 └── web/                                        customer and owner pages (no build step)
-    ├── index.html, styles.css, config.js       config.js holds publicBaseUrl (QR address)
+    ├── index.html, styles.css, config.js       config.js holds QR/auth redirect URLs
     ├── manifest.webmanifest, sw.js, icons/     installable web app (Android Chrome)
     ├── src/logic.js     pure helpers (formatting, validation, upload, statistics, CSV, QR address)
     ├── src/http.js      shared fetch error handling
@@ -85,7 +85,7 @@ printnest/
     ├── src/owner-stats.js  owner statistics page (earnings, orders, payments, services, activity, CSV)
     ├── src/qr.js        QR code as SVG (on the page) or canvas (PNG download)
     ├── src/vendor/qrcode/  QR encoder (MIT, Kazuhiko Arase; see LICENSE.txt)
-    └── tests/           node:test unit tests (106); browser/ holds the Playwright browser checks (see its README)
+    └── tests/           node:test unit tests (109); browser/ holds the Playwright browser checks (see its README)
 ```
 
 ## How the money, files and tenancy rules work
@@ -137,6 +137,44 @@ printnest/
 - **Customers never query the orders table.** They use `place_order` to create an
   order and `track_order` to read status with their code. Shop staff read orders
   only for shops they belong to.
+
+## Authentication and customer access
+
+Customers do not create accounts. A shop QR code opens `/s/<shop-slug>`; the
+customer can read the shop's public services, upload a PDF/JPEG/PNG anonymously,
+place an order through the `place_order` RPC, and check status with the returned
+tracking code through `track_order`. The database grants anonymous access only to
+the public reads and these narrowly scoped RPCs. Anonymous users cannot select
+orders, order items, customer files, memberships, or private storage objects.
+
+Only shop owners use `#/owner`. The owner pages require a Supabase session, and
+all shop/order/file operations are checked again by RLS and owner-only edge
+functions. No service-role key is shipped to the browser or APK.
+
+### Supabase email confirmation setup
+
+The source does not invent a production domain. Set the real deployed HTTPS site
+URL in the Supabase Dashboard for project `printnest` (`qvnwqrevgyootaaunrto`):
+
+1. **Authentication → URL Configuration → Site URL:**
+   `https://YOUR-REAL-DEPLOYED-DOMAIN/`
+2. **Authentication → URL Configuration → Redirect URLs:** add the same exact
+   URL, including the trailing slash. Add a separate local development URL only
+   if needed; do not use it for a release APK.
+3. **Authentication → Providers → Email:** keep email provider enabled and
+   enable **Confirm email** for owner registration.
+
+The web app sends `redirect_to` only when it has a safe HTTPS URL. On a deployed
+HTTPS page it uses that page as the fallback. The Android packaging script copies
+`PRINTNEST_PUBLIC_URL` into both `publicBaseUrl` and `authRedirectUrl`; therefore
+the release workflow must receive the real deployed URL, not localhost.
+
+Supabase confirmation links return tokens in the URL fragment. `web/src/app.js`
+now consumes that fragment, calls `/auth/v1/user` with the access token, persists
+the session, removes the tokens from browser history, and opens the owner area.
+No Android deep-link configuration is required when confirmation opens the real
+HTTPS website. A native deep link is an optional future enhancement, not a
+requirement for this flow.
 
 ## What is verified
 

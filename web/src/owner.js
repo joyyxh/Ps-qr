@@ -199,7 +199,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       `<section class="card">
         <h1>Check your email</h1>
         <p>We sent a confirmation link to <strong>${escapeHtml(email)}</strong>.
-           Open it, then come back here and sign in.</p>
+           Open it on this device. PrintNest will establish your owner session;
+           if the link opens in another browser, return here and sign in.</p>
         <p><button type="button" class="link" data-switch="signin">Go to sign in</button></p>
       </section>`
     );

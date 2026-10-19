@@ -38,8 +38,25 @@ if (!config?.supabaseUrl || !config?.publishableKey) {
   api = createApi(config);
   const auth = createAuth({ config, store: createSessionStore(browserSessionStorage()) });
   owner = createOwnerPages({ app, auth, ownerApi: createOwnerApi({ config, auth }), config });
-  // The Android app is for shop owners, so it opens the owner area first.
-  if (!window.location.hash && window.Capacitor?.isNativePlatform?.()) {
+  startApp(auth);
+}
+
+async function startApp(auth) {
+  const callback = await auth.consumeCallback(window.location.hash);
+  if (callback.handled) {
+    // Access and refresh tokens arrive in the fragment. Remove them before
+    // rendering anything so they are not retained in browser history.
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    if (callback.error) {
+      app.innerHTML = `<section class="card"><h1>Email confirmation failed</h1>
+        <p class="error">${escapeHtml(callback.error.message)}</p>
+        <p><a class="button" href="#/owner">Return to owner sign in</a></p></section>`;
+      window.addEventListener('hashchange', route);
+      return;
+    }
+    window.location.hash = '#/owner';
+  } else if (!window.location.hash && window.Capacitor?.isNativePlatform?.()) {
+    // The Android app is for shop owners, so it opens the owner area first.
     window.location.hash = '#/owner';
   }
   window.addEventListener('hashchange', route);

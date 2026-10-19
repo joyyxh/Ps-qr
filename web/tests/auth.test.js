@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAuth } from '../src/auth.js';
+import { createAuth, parseAuthCallbackHash } from '../src/auth.js';
 import { createSessionStore, isFresh, SESSION_KEY, toSession } from '../src/session.js';
 
 const config = {
@@ -111,6 +111,46 @@ test('signUp keeps the session when the project signs the owner in straight away
   assert.equal(result.confirmationNeeded, false);
   assert.equal(result.session.user.id, 'owner-3');
   assert.equal(storage._data.has(SESSION_KEY), true);
+});
+
+test('signUp sends the configured HTTPS callback and never localhost', async () => {
+  const { calls, fetchImpl } = scriptedFetch([{ body: { id: 'owner-4', email: 'x@example.com' } }]);
+  const auth = createAuth({
+    config: { ...config, authRedirectUrl: 'https://printnest.example/' },
+    store: createSessionStore(memoryStorage()),
+    fetchImpl,
+  });
+
+  await auth.signUp('x@example.com', 'long-password');
+
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    email: 'x@example.com',
+    password: 'long-password',
+    redirect_to: 'https://printnest.example/',
+  });
+  assert.equal(JSON.stringify(calls[0].init.body).includes('localhost'), false);
+});
+
+test('confirmation callback fetches the user and persists a usable owner session', async () => {
+  const storage = memoryStorage();
+  const { calls, fetchImpl } = scriptedFetch([
+    { body: { id: 'owner-5', email: 'confirmed@example.com' } },
+  ]);
+  const auth = createAuth({ config, store: createSessionStore(storage), fetchImpl, nowMs: () => 1_000_000 });
+  const callback = await auth.consumeCallback(
+    '#access_token=access-callback&refresh_token=refresh-callback&expires_in=3600&type=signup'
+  );
+
+  assert.equal(callback.session.user.id, 'owner-5');
+  assert.equal(calls[0].url, 'https://example-project.supabase.co/auth/v1/user');
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer access-callback');
+  assert.equal(JSON.parse(storage._data.get(SESSION_KEY)).refresh_token, 'refresh-callback');
+});
+
+test('customer and route hashes are not mistaken for auth callbacks', () => {
+  assert.deepEqual(parseAuthCallbackHash('#/s/demo-xerox'), { handled: false });
+  assert.deepEqual(parseAuthCallbackHash('#/track/ABC123'), { handled: false });
+  assert.equal(parseAuthCallbackHash('#error=access_denied&error_description=expired').handled, true);
 });
 
 test('a fresh session is reused without any network call', async () => {

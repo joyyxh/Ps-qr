@@ -9,6 +9,53 @@ import { isFresh, toSession } from './session.js';
 // Any other failure (for example no network) keeps the session for a retry.
 const REJECTED_REFRESH_STATUSES = [400, 401, 403];
 
+// Supabase's email-confirmation link returns the access and refresh tokens in
+// the URL fragment. Keep this parser separate from the hash router: a token
+// fragment starts with `#access_token=`, while application routes start with
+// `#/owner` or `#/s/...`.
+export function parseAuthCallbackHash(hash) {
+  const raw = String(hash ?? '');
+  if (!raw.startsWith('#') || raw.startsWith('#/')) return { handled: false };
+  const params = new URLSearchParams(raw.slice(1));
+  if (!params.has('access_token') && !params.has('error')) return { handled: false };
+
+  const error = params.get('error_description') || params.get('error');
+  if (error) return { handled: true, error: new Error(error) };
+
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+  if (!accessToken || !refreshToken) {
+    return { handled: true, error: new Error('The confirmation link is incomplete or has expired.') };
+  }
+  return {
+    handled: true,
+    tokenResponse: {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_in: Number(params.get('expires_in') || 3600),
+    },
+  };
+}
+
+function authRedirectUrl(config, location = globalThis.location) {
+  const configured = String(config?.authRedirectUrl ?? '').trim() || String(config?.publicBaseUrl ?? '').trim();
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (url.protocol === 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
+        url.hash = '';
+        return url.toString().replace(/\/$/, '') + '/';
+      }
+    } catch {
+      // Fall through to the current-page HTTPS check.
+    }
+  }
+  if (location?.protocol === 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) {
+    return `${location.origin}${location.pathname}`.replace(/#.*$/, '');
+  }
+  return '';
+}
+
 export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs = () => Date.now() }) {
   const base = config.supabaseUrl.replace(/\/$/, '');
   let session = store.load();
@@ -24,6 +71,15 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
     });
     const data = await readJson(response);
     if (!response.ok) throw apiError(response, data, 'Sign in failed');
+    return data;
+  }
+
+  async function currentUser(accessToken) {
+    const response = await fetchImpl(`${base}/auth/v1/user`, {
+      headers: { apikey: config.publishableKey, Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await readJson(response);
+    if (!response.ok) throw apiError(response, data, 'The confirmation link is no longer valid');
     return data;
   }
 
@@ -59,7 +115,13 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
     // Returns { confirmationNeeded: true } when the project requires the owner
     // to click a link in their email before the first sign-in.
     async signUp(email, password) {
-      const data = await call('signup', { email, password });
+      const redirect = authRedirectUrl(config);
+      const body = { email, password };
+      // Do not send localhost or a Capacitor origin to Supabase. When this is
+      // a deployed HTTPS page, the current page is a safe fallback; the APK
+      // receives the deployed URL through PRINTNEST_PUBLIC_URL.
+      if (redirect) body.redirect_to = redirect;
+      const data = await call('signup', body);
       if (data.access_token) {
         return { confirmationNeeded: false, session: remember(toSession(data, nowMs())) };
       }
@@ -69,6 +131,20 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
     async signIn(email, password) {
       const data = await call('token?grant_type=password', { email, password });
       return remember(toSession(data, nowMs()));
+    },
+
+    async consumeCallback(hash) {
+      const parsed = parseAuthCallbackHash(hash);
+      if (!parsed.handled || parsed.error) return parsed;
+      try {
+        const user = await currentUser(parsed.tokenResponse.access_token);
+        return {
+          handled: true,
+          session: remember(toSession({ ...parsed.tokenResponse, user }, nowMs())),
+        };
+      } catch (error) {
+        return { handled: true, error };
+      }
     },
 
     async signOut() {

@@ -7,4 +7,8 @@ window.PRINTNEST_CONFIG = {
   // 'https://printnest.example/'. Set this before printing QR codes. Leave it empty
   // to use the address of the page itself.
   publicBaseUrl: '',
+  // HTTPS page that receives Supabase email-confirmation links. The mobile
+  // build sets this from PRINTNEST_PUBLIC_URL; leave empty in source until the
+  // real deployed site URL is known.
+  authRedirectUrl: '',
 };
