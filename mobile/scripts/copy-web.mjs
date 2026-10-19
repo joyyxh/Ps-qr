@@ -14,7 +14,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const source = path.resolve(here, '../../web');
 const target = path.resolve(here, '../www');
 const APP_FILES = ['index.html', 'styles.css', 'config.js', 'manifest.webmanifest', 'icons', 'src'];
-const PUBLIC_URL_PATTERN = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?(\/[A-Za-z0-9._~\/-]*)?$/i;
+const PUBLIC_URL_PATTERN = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?(\/[A-Za-z0-9._~\/@-]*)?$/i;
 
 const publicUrl = (process.env.PRINTNEST_PUBLIC_URL ?? '').trim();
 if (publicUrl && !PUBLIC_URL_PATTERN.test(publicUrl)) {
