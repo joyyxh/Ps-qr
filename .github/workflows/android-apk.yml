@@ -49,7 +49,7 @@ jobs:
 
       - name: Copy the web app into the Android project source
         env:
-          PRINTNEST_PUBLIC_URL: ${{ inputs.public_url || vars.PRINTNEST_PUBLIC_URL }}
+          PRINTNEST_PUBLIC_URL: ${{ inputs.public_url || vars.PRINTNEST_PUBLIC_URL || 'https://joyyxh.github.io/Ps-qr/' }}
         run: |
           test -n "$PRINTNEST_PUBLIC_URL" || {
             echo 'PRINTNEST_PUBLIC_URL is required. Set it as a repository Actions variable to the deployed HTTPS web-app URL.' >&2
