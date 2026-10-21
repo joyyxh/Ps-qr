@@ -113,20 +113,34 @@ function bindThemePicker() {
 
 function renderHome() {
   app.innerHTML = `
-    <section class="hero card">
-      <p class="eyebrow">PRINT. PICK UP. DONE.</p>
-      <h1>Local printing, without the queue.</h1>
-      <p class="lead">Scan your shop’s QR code, choose your options, and send the job ahead. No customer account needed.</p>
-      <div class="actions hero-actions">
-        <a class="button" href="#/scan">▦ Scan a shop QR</a>
-        <a class="button secondary" href="#/owner">Add your shop</a>
+    <section class="qr-home-hero">
+      <div class="qr-home-copy">
+        <p class="eyebrow">PRINTING, MADE QUICK</p>
+        <h1>Print from your phone.<br /><span>Pick it up when it’s ready.</span></h1>
+        <p class="lead">Skip the queue. Scan your local shop’s QR code, upload your files, choose how you want them printed, and collect when you get the ready notification.</p>
+        <div class="actions hero-actions">
+          <a class="button button-large" href="#/scan">Scan shop QR <span aria-hidden="true">↗</span></a>
+          <a class="button secondary button-large" href="#/owner">Add your shop</a>
+        </div>
       </div>
+      <div class="qr-home-art" aria-hidden="true"><span class="qr-art-square">▦</span><span class="qr-art-paper">▤</span></div>
     </section>
-    <section class="home-grid" aria-label="QRquick customer actions">
-      <article class="card home-card"><span class="step">01</span><h2>Scan and connect</h2><p class="muted">Use a shop QR code or enter its link. You’ll land on the right counter, not a generic marketplace.</p><a href="#/scan">Open shop scanner →</a></article>
-      <article class="card home-card"><span class="step">02</span><h2>Send your files</h2><p class="muted">Upload a PDF, JPG, or PNG, set copies and print mode, then review the server-calculated price.</p><a href="#/track">Track an existing order →</a></article>
-      <article class="card home-card"><span class="step">03</span><h2>Collect with confidence</h2><p class="muted">Follow the status with your private tracking code. Customers never need an account.</p><a href="#/owner">For shop owners →</a></article>
+    <section class="track-entry card">
+      <div><p class="eyebrow">ALREADY ORDERED?</p><h2>Track your print order</h2><p class="muted">Enter the code you received after placing your order.</p></div>
+      <form id="home-track-form" class="track-inline"><input name="code" placeholder="e.g. QR7K-92MD" autocomplete="off" maxlength="12" aria-label="Tracking code" required /><button type="submit">Track order</button></form>
+    </section>
+    <section class="how-section"><div class="section-heading"><p class="eyebrow">HOW IT WORKS</p><h2>From QR code to pickup in three simple steps.</h2></div>
+      <div class="home-grid how-grid" aria-label="QRquick ordering steps">
+        <article class="card home-card"><span class="step-icon">01</span><h3>Scan the shop QR</h3><p class="muted">Every participating print shop has its own QRquick code.</p></article>
+        <article class="card home-card"><span class="step-icon">02</span><h3>Upload and configure</h3><p class="muted">Choose your files, colour, paper, sides, pages and copies.</p></article>
+        <article class="card home-card"><span class="step-icon">03</span><h3>Pay and collect</h3><p class="muted">Pay by UPI or cash, then follow your private tracking code.</p></article>
+      </div>
     </section>`;
+  document.getElementById('home-track-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const code = String(new FormData(event.currentTarget).get('code') || '').trim();
+    if (code) window.location.hash = `#/track/${encodeURIComponent(code)}`;
+  });
 }
 
 function renderNotFound() {
@@ -251,32 +265,32 @@ function shopTemplate() {
 
   const orderForm = services.length
     ? `
-    <section class="card">
-      <h2>Add a print item</h2>
+    <section class="order-shell">
+      <div class="order-stepper" aria-label="Order steps"><span class="active"><b>1</b> Upload</span><i></i><span><b>2</b> Customize</span><i></i><span><b>3</b> Confirm</span></div>
+      <div class="card order-card">
+      <div class="section-heading"><p class="eyebrow">STEP 1 OF 3</p><h2>What would you like to print?</h2><p class="muted">Upload your file and choose a print service. You can add more files before checking out.</p></div>
       <form id="item-form" class="grid">
-        <label>Service
+        <label class="field-label">Service
           <select name="serviceId" id="service-select">${options}</select>
         </label>
         <p id="service-hint" class="hint muted"></p>
-        <label>File (PDF, JPEG or PNG, up to 10 MB)
+        <label class="upload-dropzone"><span class="upload-icon">↑</span><strong>Upload your file</strong><span class="muted small">PDF, JPG or PNG · up to 10 MB</span>
           <input name="file" id="file-input" type="file" accept="${UPLOAD_ACCEPT}" ${shop.is_open ? '' : 'disabled'} required />
         </label>
         <p id="upload-status" class="hint muted" role="status"></p>
-        <label>Copies
+        <label class="field-label">Copies
           <input name="copies" type="number" min="1" max="100" value="1" inputmode="numeric" required />
         </label>
-        <label class="check"><input name="colour" id="colour" type="checkbox"
-               ${shopOffersColour(shop) ? '' : 'disabled'} /> Colour${shopOffersColour(shop) ? '' : ' (not offered at this shop)'}</label>
-        <label class="check"><input name="duplex" id="duplex" type="checkbox"
-               ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /> Double-sided${shopOffersDoubleSided(shop) ? '' : ' (not offered at this shop)'}</label>
-        <button type="submit" id="add-item" disabled>Add to order</button>
+        <div class="choice-grid"><label class="choice-card"><input name="colour" id="colour" type="checkbox" ${shopOffersColour(shop) ? '' : 'disabled'} /><span><strong>Colour</strong><small>Vibrant colour printing</small></span></label><label class="choice-card"><input name="duplex" id="duplex" type="checkbox" ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /><span><strong>Double-sided</strong><small>Save paper on every sheet</small></span></label></div>
+        <button type="submit" id="add-item" disabled>Add file to order <span aria-hidden="true">→</span></button>
       </form>
       <p class="muted small">Your file is stored privately and only this shop can open it. Automatic deletion is not switched on yet.</p>
       <p id="item-error" class="error" role="alert"></p>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>Your order</h2>
+    <section class="card order-card cart-card">
+      <div class="between"><div><p class="eyebrow">STEP 2 OF 3</p><h2>Your order</h2></div><span class="cart-count" id="cart-count">0 files</span></div>
       <ul id="cart" class="cart"></ul>
       <div id="quote" class="quote"></div>
       <label>Note for the shop (optional)
@@ -289,7 +303,7 @@ function shopTemplate() {
           <option value="upi" ${shop.payment_qr_path ? '' : 'disabled'}>UPI via the shop QR${shop.payment_qr_path ? '' : ' (shop has not added a QR yet)'}</option>
         </select>
       </label>
-      <button id="place" type="button" disabled>Place order</button>
+      <button id="place" type="button" class="button-large" disabled>Review and place order <span aria-hidden="true">→</span></button>
       <p class="muted small">${
         shop.payment_qr_path
           ? 'Cash is verified by the shop. UPI remains pending until the shop verifies the receipt. QRquick does not take any payment.'
@@ -465,6 +479,8 @@ function onAddItem(event) {
 function renderCart() {
   const list = document.getElementById('cart');
   if (!list) return;
+  const count = document.getElementById('cart-count');
+  if (count) count.textContent = `${cart.length} ${cart.length === 1 ? 'file' : 'files'}`;
 
   if (!cart.length) {
     list.innerHTML = '<li class="muted">No items yet.</li>';

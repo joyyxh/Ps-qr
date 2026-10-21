@@ -267,25 +267,26 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   async function renderShopList(user) {
     const shops = await ownerApi.listMyShops(user.id);
+    const openCount = shops.filter((shop) => shop.is_open).length;
     const items = shops
       .map(
         (shop) => `
-        <li>
-          <a href="#/owner/shop/${encodeURIComponent(shop.slug)}"><strong>${escapeHtml(shop.name)}</strong></a>
-          <span class="muted small">${shop.is_open ? 'Open' : 'Closed'} · /s/${escapeHtml(shop.slug)}</span>
+        <li class="owner-shop-card">
+          <div class="between"><a href="#/owner/shop/${encodeURIComponent(shop.slug)}"><strong>${escapeHtml(shop.name)}</strong></a><span class="shop-status ${shop.is_open ? 'is-open' : ''}">${shop.is_open ? 'Open' : 'Closed'}</span></div>
+          <span class="muted small">/${escapeHtml(shop.slug)}</span>
+          <div class="owner-shop-actions"><a class="button secondary" href="#/owner/shop/${encodeURIComponent(shop.slug)}">Manage shop</a><a href="#/owner/shop/${encodeURIComponent(shop.slug)}/orders">View orders →</a></div>
         </li>`
       )
       .join('');
 
     show(
-      `<section class="card">
-        <div class="between">
-          <h1>Your shops</h1>
-          <button type="button" class="link" data-action="signout">Sign out</button>
-        </div>
-        <p class="muted small">Signed in as ${escapeHtml(user.email)}</p>
-        ${shops.length ? `<ul class="list">${items}</ul>` : '<p class="muted">You do not have a shop yet.</p>'}
-        <p><a class="button" href="#/owner/new">Create a shop</a></p>
+      `<section class="owner-dashboard-head">
+        <div><p class="eyebrow">OWNER DASHBOARD</p><h1>Good to see you.</h1><p class="muted">Here’s what’s happening with your print shops today.</p></div>
+        <button type="button" class="button secondary" data-action="signout">Sign out</button>
+      </section>
+      <section class="owner-summary-grid"><article class="card"><span class="muted small">Your shops</span><strong>${shops.length}</strong><span class="muted small">${openCount} currently open</span></article><article class="card"><span class="muted small">Needs you now</span><strong>—</strong><span class="muted small">Orders appear here</span></article><article class="card"><span class="muted small">Account</span><strong class="summary-email">${escapeHtml(user.email)}</strong><span class="muted small">Owner access</span></article></section>
+      <section class="card owner-shops-section"><div class="between"><div><p class="eyebrow">YOUR SHOPS</p><h2>Manage your print counters</h2></div><a class="button" href="#/owner/new">+ Create a shop</a></div>
+        ${shops.length ? `<ul class="list owner-shop-list">${items}</ul>` : '<div class="empty-state"><p class="muted">You do not have a shop yet.</p><a class="button" href="#/owner/new">Create your first shop</a></div>'}
       </section>`
     );
     on('[data-action="signout"]', 'click', signOut);
