@@ -6,10 +6,10 @@ window.PRINTNEST_CONFIG = {
   // The public address of the customer page, used inside shop QR codes, for example
   // 'https://printnest.example/'. Set this before printing QR codes. Leave it empty
   // to use the address of the page itself.
-  publicBaseUrl: 'https://cdn.jsdelivr.net/gh/joyyxh/Ps-qr@gh-pages/index.html',
+  publicBaseUrl: 'https://joyyxh.github.io/Ps-qr/',
   // HTTPS page that receives Supabase email-confirmation links. The mobile
   // build sets this from PRINTNEST_PUBLIC_URL; leave empty in source until the
   // real deployed site URL is known.
-  authRedirectUrl: 'https://cdn.jsdelivr.net/gh/joyyxh/Ps-qr@gh-pages/index.html',
+  authRedirectUrl: 'https://joyyxh.github.io/Ps-qr/',
   ownerApp: false,
 };
