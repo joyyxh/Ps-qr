@@ -68,9 +68,9 @@ create or replace function pg_temp.fixture_file(p_shop_slug text, p_pages intege
 language plpgsql as $$
 declare v_id uuid;
 begin
-  insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
-  select s.id, 'fixture/' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
-  from public.shops s
+  insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+  select x.u, s.id, s.id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
+  from public.shops s, (select gen_random_uuid() as u) x
   where s.slug = p_shop_slug
   returning id into v_id;
   return v_id;
@@ -133,6 +133,10 @@ begin
 
   perform pg_temp.expect_rows('S02 owner A approves a pending order', 1,
     'update public.orders set status = ''approved'' where id = ' || q1);
+
+  -- Migration 0008: an order cannot start printing until the payment is verified.
+  -- The owner records the cash payment first, as the owner screen does.
+  perform public.set_order_payment(order_1, 'set_paid', 'cash');
 
   perform pg_temp.expect_rows('S03 owner A starts printing', 1,
     'update public.orders set status = ''printing'' where id = ' || q1);

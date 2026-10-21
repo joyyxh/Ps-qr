@@ -37,6 +37,11 @@ if (publicUrl) {
       'and the app shows a warning until the address is set.'
   );
 }
+config = config.replace(/ownerApp:\s*(true|false)/, 'ownerApp: true');
+if (!/ownerApp:\s*true/.test(config)) {
+  console.error('config.js has no ownerApp flag to configure the Android owner-only bundle.');
+  process.exit(1);
+}
 
 await rm(target, { recursive: true, force: true });
 await mkdir(target, { recursive: true });

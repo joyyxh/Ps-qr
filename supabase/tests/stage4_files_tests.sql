@@ -72,10 +72,10 @@ create or replace function pg_temp.fixture_file(
 ) returns uuid language plpgsql as $$
 declare v_id uuid;
 begin
-  insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name, expires_at)
-  select s.id, 'fixture/' || gen_random_uuid()::text || '.pdf', 'application/pdf', 2048, p_pages, p_name,
+  insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name, expires_at)
+  select x.u, s.id, s.id::text || '/' || x.u::text || '.pdf', 'application/pdf', 2048, p_pages, p_name,
          coalesce(p_expires, now() + interval '1 day')
-  from public.shops s
+  from public.shops s, (select gen_random_uuid() as u) x
   where s.slug = p_shop_slug
   returning id into v_id;
   return v_id;
@@ -243,9 +243,9 @@ begin
 
   -- F18 the table refuses a file name over 120 characters
   begin
-    insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
-    select id, 'fixture/long-' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, 1, repeat('a', 121)
-    from public.shops where slug = 'demo-xerox';
+    insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+    select x.u, id, id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, 1, repeat('a', 121)
+    from public.shops, (select gen_random_uuid() as u) x where slug = 'demo-xerox';
     insert into stage4_results values ('F18 a file name over 120 characters is refused', false, 'no error raised');
   exception when others then
     insert into stage4_results values ('F18 a file name over 120 characters is refused', sqlstate = '23514', sqlstate || ': ' || sqlerrm);

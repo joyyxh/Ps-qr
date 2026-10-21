@@ -1,0 +1,32 @@
+name: Clean up expired customer files
+
+# Runs the cleanup-files edge function once a day (02:00 India time).
+# Needs two repository secrets:
+#   QRQUICK_CLEANUP_URL  the function URL, https://<project>.supabase.co/functions/v1/cleanup-files
+#   CLEANUP_SECRET       the same value as the function's CLEANUP_SECRET
+on:
+  schedule:
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the cleanup function
+        env:
+          CLEANUP_URL: ${{ secrets.QRQUICK_CLEANUP_URL }}
+          CLEANUP_SECRET: ${{ secrets.CLEANUP_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CLEANUP_URL" ] || [ -z "$CLEANUP_SECRET" ]; then
+            echo "Set QRQUICK_CLEANUP_URL and CLEANUP_SECRET in the repository secrets."
+            exit 1
+          fi
+          curl -sS --fail-with-body -X POST "$CLEANUP_URL" \
+            -H "x-cleanup-secret: $CLEANUP_SECRET" \
+            -H "content-type: application/json" \
+            -d '{}'

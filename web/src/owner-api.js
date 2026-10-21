@@ -12,7 +12,7 @@ const SERVICE_FIELDS = ['name', 'pricing_unit', 'bw_price_paise', 'colour_price_
 const ORDER_SELECT =
   'id,tracking_code,status,total_paise,customer_note,created_at,' +
   'payment_status,payment_channel,paid_at,refunded_at,refund_paise,cancel_reason,' +
-  'order_items(service_name,pricing_unit,page_count,copies,colour,duplex,billable_units,amount_paise,file_id,file_name)';
+  'order_items(id,service_name,pricing_unit,page_count,copies,colour,duplex,billable_units,amount_paise,file_id,file_name)';
 // Fields for the CSV export. File names are left out: the export does not need them.
 const EXPORT_SELECT =
   'tracking_code,status,total_paise,created_at,payment_status,payment_channel,paid_at,refunded_at,refund_paise,cancel_reason,' +
@@ -249,6 +249,41 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
       });
       if (!rows.length) throw withStatus('You do not have permission to change this order.', 403);
       return rows[0];
+    },
+
+    // ----- automatic printing -----
+
+    // The printing computers of this shop and its recent print jobs.
+    printStatus(shopId) {
+      return request('POST', 'rpc/owner_print_status', { body: { p_shop_id: shopId } });
+    },
+
+    // A one-time code, valid for ten minutes, that pairs a shop computer with this shop.
+    createPrintPairing(shopId) {
+      return request('POST', 'rpc/create_print_agent_pairing', { body: { p_shop_id: shopId } });
+    },
+
+    revokePrintAgent(agentId) {
+      return request('POST', 'rpc/revoke_print_agent', { body: { p_agent_id: agentId } });
+    },
+
+    // printer: the printer name the computer reports, or null to use the computer's default.
+    setAgentPrinter(agentId, printer) {
+      return request('POST', 'rpc/set_print_agent_printer', {
+        body: { p_agent_id: agentId, p_printer: printer },
+      });
+    },
+
+    // Queues the files of a paid order and moves the order to printing. Safe to repeat.
+    approveForPrint(orderId) {
+      return request('POST', 'rpc/approve_order_for_print', { body: { p_order_id: orderId } });
+    },
+
+    // Only a failed job, or a job that may have printed (confirmMayHavePrinted true), can be retried.
+    retryPrintJob(jobId, confirmMayHavePrinted = false) {
+      return request('POST', 'rpc/retry_print_job', {
+        body: { p_job_id: jobId, p_confirm_may_have_printed: confirmMayHavePrinted === true },
+      });
     },
 
     // ----- shop features and payment QR -----

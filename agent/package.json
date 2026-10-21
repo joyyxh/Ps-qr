@@ -1,0 +1,17 @@
+{
+  "name": "qrquick-print-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QRquick print agent. Runs on a shop computer and prints approved, paid orders.",
+  "bin": {
+    "qrquick-print-agent": "bin/qrquick-print-agent.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node bin/qrquick-print-agent.mjs run"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}

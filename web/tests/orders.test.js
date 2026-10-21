@@ -128,7 +128,7 @@ test('listOrders reads the shop orders with their items, newest first', async ()
   assert.equal(calls[0].init.method, 'GET');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer owner-token');
   assert.match(calls[0].url, /\/rest\/v1\/orders\?shop_id=eq\.shop-1&select=/);
-  assert.match(calls[0].url, /order_items\(service_name,/);
+  assert.match(calls[0].url, /order_items\(id,service_name,/);
   assert.match(calls[0].url, /order=created_at\.desc&limit=100$/);
 });
 

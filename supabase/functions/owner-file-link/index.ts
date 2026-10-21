@@ -77,7 +77,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // 2. Storage path from the server-only table, then a short-lived signed URL.
     const fileRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/customer_files?select=storage_path&id=eq.${fileId}`,
+      `${SUPABASE_URL}/rest/v1/customer_files?select=storage_path&id=eq.${fileId}&storage_deleted_at=is.null`,
       { headers: serviceHeaders() },
     );
     if (!fileRes.ok) throw new Error(`file lookup failed: ${fileRes.status}`);

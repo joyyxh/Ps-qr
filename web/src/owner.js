@@ -31,6 +31,15 @@ import {
   validateCashPolicy,
   validateShopDetails,
   validateSlug,
+  agentStatusLabel,
+  canSendToPrint,
+  latestJobsByItem,
+  printAgentFunctionUrl,
+  printerOptionLabel,
+  printFailureText,
+  printingNotice,
+  printJobLabel,
+  retryOptions,
 } from './logic.js';
 import { createStatsPages } from './owner-stats.js';
 import { qrCanvas, qrSvg } from './qr.js';
@@ -46,7 +55,7 @@ const CONNECTION_MESSAGE = 'Could not reach the server. Check your internet conn
 export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNEST_CONFIG ?? {} }) {
   let current = []; // the owner route being shown, used by "Try again"
   let managed = null; // { shop, services } for the shop page on screen
-  let orderView = null; // { shop, orders, showAll } for the orders page on screen
+  let orderView = null; // { shop, orders, showAll, printing, jobsByItem, pairing } for the orders page on screen
   const statsPages = createStatsPages({ app, ownerApi, messageFor });
 
   // ---------- navigation and shared helpers ----------
@@ -740,14 +749,31 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   // ---------- orders ----------
 
+  async function loadOrderView(shopId) {
+    const [orders, printing] = await Promise.all([
+      ownerApi.listOrders(shopId),
+      // If the printer status cannot load, the orders still show; printing is marked unavailable.
+      ownerApi.printStatus(shopId).catch(() => null),
+    ]);
+    return { orders, printing };
+  }
+
   async function renderOrdersFor(shop) {
-    const orders = await ownerApi.listOrders(shop.id);
-    orderView = { shop, orders, showAll: false };
+    const { orders, printing } = await loadOrderView(shop.id);
+    orderView = { shop, orders, printing, showAll: false, jobsByItem: new Map(), pairing: null };
     renderOrders();
+  }
+
+  // Reloads the orders and the printer status together, so the job lines stay current.
+  async function reloadOrders() {
+    const { orders, printing } = await loadOrderView(orderView.shop.id);
+    orderView.orders = orders;
+    orderView.printing = printing;
   }
 
   function renderOrders({ notice = '', error = '' } = {}) {
     const { shop, orders, showAll } = orderView;
+    orderView.jobsByItem = latestJobsByItem(orderView.printing?.jobs ?? []);
     const visible = showAll ? orders : orders.filter((order) => isOpenOrder(order.status));
     show(ordersHtml(shop, visible, orders.length, showAll, notice, error));
     bindOrders();
@@ -769,6 +795,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         </div>
         <p class="muted small">Page counts are what customers typed. Files are not uploaded yet, so check the
            count at the counter.</p>
+        ${printPanelHtml()}
         <div class="segmented">
           <button type="button" class="${showAll ? '' : 'on'}" data-action="filter" data-all="false">Open orders</button>
           <button type="button" class="${showAll ? 'on' : ''}" data-action="filter" data-all="true">All orders</button>
@@ -789,10 +816,15 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
             `data-file-order="${escapeHtml(order.id)}">Download file</button></span>`
           : '';
         return `<li><span>${escapeHtml(describeOrderItem(item))}</span>` +
-          `<span class="num">${formatPaise(item.amount_paise)}</span>${file}</li>`;
+          `<span class="num">${formatPaise(item.amount_paise)}</span>${file}${jobLineHtml(order, item)}</li>`;
       })
       .join('');
+    const sendButton = canSendToPrint(order, orderView.jobsByItem)
+      ? `<button type="button" data-send-order="${escapeHtml(order.id)}" data-code="${escapeHtml(order.tracking_code)}">Send to printer</button>`
+      : '';
+    // "Start printing" is not offered here: Send to printer queues the files and starts printing.
     const buttons = nextOrderStatuses(order.status)
+      .filter((status) => status !== 'printing')
       .map(
         (status) => `
         <button type="button" class="${isIrreversibleMove(status) ? 'danger' : ''}"
@@ -811,7 +843,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         <ul class="plain">${items}</ul>
         ${order.customer_note ? `<p class="note"><strong>Customer note:</strong> ${escapeHtml(order.customer_note)}</p>` : ''}
         ${paymentSection(order)}
-        ${buttons ? `<div class="actions">${buttons}</div>` : ''}
+        ${sendButton || buttons ? `<div class="actions">${sendButton}${buttons}</div>` : ''}
       </li>`;
   }
 
@@ -856,17 +888,22 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     onAll('[data-file-id]', 'click', onFileLink);
     onAll('[data-pay-order]', 'click', onPaymentAction);
     onAll('[data-reason-order]', 'change', onReasonChange);
+    on('[data-print-action="pair"]', 'click', onPairPrinter);
+    onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
+    onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
+    onAll('[data-send-order]', 'click', onSendToPrint);
+    onAll('[data-retry-job]', 'click', onRetryJob);
   }
 
   // Records a payment step, then reloads the orders so the page shows what the database holds.
   async function runOrderChange(change, notice) {
     try {
       await change();
-      orderView.orders = await ownerApi.listOrders(orderView.shop.id);
+      await reloadOrders();
       renderOrders({ notice });
     } catch (err) {
       try {
-        orderView.orders = await ownerApi.listOrders(orderView.shop.id);
+        await reloadOrders();
       } catch {
         // Keep the list on screen. The error below explains what failed.
       }
@@ -903,7 +940,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   async function refreshOrders(notice = '') {
     try {
-      orderView.orders = await ownerApi.listOrders(orderView.shop.id);
+      await reloadOrders();
       renderOrders({ notice });
     } catch (err) {
       renderOrders({ error: messageFor(err) });
@@ -919,16 +956,137 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     button.disabled = true;
     try {
       await ownerApi.updateOrderStatus(orderView.shop.id, orderId, status);
-      orderView.orders = await ownerApi.listOrders(orderView.shop.id);
+      await reloadOrders();
       renderOrders({ notice: `Order ${code} is now ${ownerStatusLabel(status).toLowerCase()}.` });
     } catch (err) {
       try {
-        orderView.orders = await ownerApi.listOrders(orderView.shop.id);
+        await reloadOrders();
       } catch {
         // Keep the list on screen. The error below explains what failed.
       }
       renderOrders({ error: messageFor(err) });
     }
+  }
+
+  // ----- automatic printing -----
+
+  // Sends a paid order's files to the printing computers. The notice says "sent", not
+  // "printed": a page only prints when a computer picks the job up.
+  async function onSendToPrint(event) {
+    const button = event.currentTarget;
+    const { sendOrder, code } = button.dataset;
+    button.disabled = true;
+    await runOrderChange(
+      () => ownerApi.approveForPrint(sendOrder),
+      `Order ${code} was sent to the printing computer. It prints when the computer picks it up.`
+    );
+  }
+
+  // Printing again asks for a second confirmation when the page may already have come out.
+  async function onRetryJob(event) {
+    const button = event.currentTarget;
+    const { retryJob, retryConfirm, retryWarning, code } = button.dataset;
+    const mayHavePrinted = retryConfirm === 'true';
+    if (mayHavePrinted && !window.confirm(`${retryWarning}\n\nPrint order ${code} again?`)) return;
+    button.disabled = true;
+    await runOrderChange(
+      () => ownerApi.retryPrintJob(retryJob, mayHavePrinted),
+      `Order ${code} was queued to print again.`
+    );
+  }
+
+  async function onPairPrinter(event) {
+    event.currentTarget.disabled = true;
+    try {
+      orderView.pairing = await ownerApi.createPrintPairing(orderView.shop.id);
+      renderOrders();
+    } catch (err) {
+      renderOrders({ error: messageFor(err) });
+    }
+  }
+
+  async function onRevokePrinter(event) {
+    const { agentId, agentName } = event.currentTarget.dataset;
+    if (!window.confirm(`Remove "${agentName}"? It stops printing until it is paired again.`)) return;
+    await runOrderChange(() => ownerApi.revokePrintAgent(agentId), `"${agentName}" was removed.`);
+  }
+
+  async function onAgentPrinterChange(event) {
+    const select = event.currentTarget;
+    select.disabled = true;
+    await runOrderChange(
+      () => ownerApi.setAgentPrinter(select.dataset.agentPrinter, select.value || null),
+      'The printer for that computer was saved.'
+    );
+  }
+
+  // The printing computers and the pairing box. Only the shop owner can pair, rename or remove them.
+  function printPanelHtml() {
+    const printing = orderView.printing;
+    if (!printing) {
+      return '<p class="muted small">Automatic printing status is not available right now.</p>';
+    }
+    const agents = printing.agents ?? [];
+    const notice = printingNotice({ agents, jobs: printing.jobs ?? [] });
+    const rows = agents.map((agent) => agentRowHtml(agent, printing.is_owner)).join('');
+    const pairing = orderView.pairing;
+    const pairingBox = pairing
+      ? `<div class="notice" data-pairing>
+           <p><strong>Pairing code: <span class="mono">${escapeHtml(pairing.code)}</span></strong>
+              Valid until ${escapeHtml(new Date(pairing.expires_at).toLocaleTimeString('en-IN', { timeStyle: 'short' }))}. Use it once.</p>
+           <p class="small">On the shop computer, open a terminal in the agent folder and run:</p>
+           <p class="mono small">qrquick-print-agent pair ${escapeHtml(printAgentFunctionUrl(config.supabaseUrl))} ${escapeHtml(pairing.code)}</p>
+         </div>`
+      : '';
+    return `
+      <section class="print-panel">
+        <strong>Printing computers</strong>
+        ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
+        ${rows || '<p class="muted small">No computer is connected for printing yet.</p>'}
+        ${printing.is_owner
+          ? '<div class="actions"><button type="button" data-print-action="pair">Connect a printing computer</button></div>'
+          : ''}
+        ${pairingBox}
+      </section>`;
+  }
+
+  function agentRowHtml(agent, isOwner) {
+    const options = (agent.printers ?? [])
+      .map(
+        (printer) =>
+          `<option value="${escapeHtml(printer.name)}"${printer.name === agent.chosen_printer ? ' selected' : ''}>` +
+          `${escapeHtml(printerOptionLabel(printer))}</option>`
+      )
+      .join('');
+    const controls = isOwner
+      ? `<label class="small">Printer
+           <select data-agent-printer="${escapeHtml(agent.id)}">
+             <option value="">Use this computer's default</option>
+             ${options}
+           </select>
+         </label>
+         <button type="button" class="link danger" data-print-action="revoke"
+                 data-agent-id="${escapeHtml(agent.id)}" data-agent-name="${escapeHtml(agent.name)}">Remove</button>`
+      : '';
+    return `<div class="agent-row">
+        <span><strong>${escapeHtml(agent.name)}</strong> · ${escapeHtml(agentStatusLabel(agent))}</span>
+        ${controls}
+      </div>`;
+  }
+
+  // The job status under one order item, with "Print again" when a retry is allowed.
+  function jobLineHtml(order, item) {
+    const job = orderView.jobsByItem.get(item.id);
+    if (!job) return '';
+    const failure = printFailureText(job);
+    const retry = retryOptions(job);
+    const again = retry
+      ? `<button type="button" class="link" data-retry-job="${escapeHtml(job.id)}"
+                 data-retry-confirm="${retry.confirmMayHavePrinted}" data-retry-warning="${escapeHtml(retry.warning)}"
+                 data-code="${escapeHtml(order.tracking_code)}">Print again</button>`
+      : '';
+    return `<span class="job-line small">${escapeHtml(printJobLabel(job.status))}` +
+      `${failure ? `: ${escapeHtml(failure)}` : ''} ${again}</span>`;
   }
 
   // Asks for a five-minute link to the file and opens it in a new tab.

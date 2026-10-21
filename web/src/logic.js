@@ -278,6 +278,112 @@ export function describeOrderItem(item) {
   return `${item.service_name} · ${pages} × ${copies} · ${mode}, ${sides}`;
 }
 
+// ---------- owner: automatic printing ----------
+// The owner app shows what the printing computers report. The database decides every
+// change (migration 0010). These helpers only choose the words and the buttons.
+
+const JOB_STATUS_LABELS = {
+  queued: 'Waiting for a printing computer',
+  claimed: 'Being sent to the printer',
+  printing: 'Printing',
+  sent: 'Sent to the printer',
+  failed: 'Not printed',
+  needs_check: 'Check the printer',
+};
+
+export function printJobLabel(status) {
+  return JOB_STATUS_LABELS[status] ?? status;
+}
+
+// Plain words for the reasons a job did not print. A message from the agent is more
+// specific, so it is shown first when there is one.
+const FAILURE_TEXT = {
+  printer_offline: 'The printer is turned off or offline. Turn it on, then print again.',
+  printer_not_found: 'That printer is not connected to the printing computer.',
+  printer_unknown: 'The printer options could not be read on the printing computer.',
+  unsupported_setting: 'This printer cannot print what the order asks for.',
+  print_engine_missing: 'The printing software is not set up on the printing computer.',
+  spooler_error: 'The printing computer could not send the job to the printer.',
+  download_failed: 'The file could not be downloaded to the printing computer.',
+  file_changed: 'The file does not match the upload. Ask the customer to upload it again.',
+  file_type_unknown: 'The file is not a PDF, JPEG or PNG.',
+  image_unsupported: 'This picture format cannot be printed here. Ask for a JPG or PDF.',
+  too_many_claims: 'The printing computer could not finish this job after several tries.',
+  bad_settings: 'The order settings could not be read.',
+};
+
+export function printFailureText(job) {
+  if (!job) return '';
+  if (job.status === 'needs_check') {
+    return 'The printer may already have printed this. Check it before printing again.';
+  }
+  if (job.status !== 'failed') return '';
+  return job.error_message || FAILURE_TEXT[job.error_code] || 'The order did not print.';
+}
+
+// The newest job for each order item. A retry creates a new attempt number.
+export function latestJobsByItem(jobs) {
+  const latest = new Map();
+  for (const job of jobs ?? []) {
+    const current = latest.get(job.order_item_id);
+    if (!current || job.attempt > current.attempt) latest.set(job.order_item_id, job);
+  }
+  return latest;
+}
+
+// The file items of an order that have no print job yet.
+export function itemsToSend(order, jobsByItem) {
+  return (order.order_items ?? []).filter((item) => item.file_id && item.id && !jobsByItem.has(item.id));
+}
+
+// "Send to printer" shows for a paid order that is approved or already printing, when a
+// file item has no job yet. Once every file is queued the button goes away.
+export function canSendToPrint(order, jobsByItem) {
+  if (!['approved', 'printing'].includes(order.status)) return false;
+  if (order.payment_status !== 'paid') return false;
+  return itemsToSend(order, jobsByItem).length > 0;
+}
+
+// Print again. A failed job is safe to retry. A job that may already have printed needs
+// the owner to confirm first.
+export function retryOptions(job) {
+  if (!job) return null;
+  if (job.status === 'failed') return { confirmMayHavePrinted: false, warning: '' };
+  if (job.status === 'needs_check') {
+    return {
+      confirmMayHavePrinted: true,
+      warning: 'The printer may already have printed this page. Only print it again if you checked the printer and nothing came out.',
+    };
+  }
+  return null;
+}
+
+export function printAgentFunctionUrl(supabaseUrl) {
+  return `${String(supabaseUrl ?? '').replace(/\/$/, '')}/functions/v1/print-agent`;
+}
+
+export function agentStatusLabel(agent) {
+  return agent.online ? 'Connected' : 'Not connected right now';
+}
+
+export function printerOptionLabel(printer) {
+  const notes = [];
+  if (printer.isDefault) notes.push('system default');
+  if (!printer.enabled) notes.push('offline');
+  if (printer.capabilitiesKnown) notes.push(printer.colour ? 'colour' : 'black and white');
+  if (printer.duplex) notes.push('double-sided');
+  return notes.length ? `${printer.name} (${notes.join(', ')})` : printer.name;
+}
+
+// A line for the top of the orders page about the printing computers. '' when all is well.
+export function printingNotice({ agents = [], jobs = [] }) {
+  if (!agents.length) return 'No printing computer is set up yet, so orders will not print automatically.';
+  if (agents.some((agent) => agent.online)) return '';
+  const waiting = jobs.filter((job) => job.status === 'queued').length;
+  if (!waiting) return 'No printing computer is connected right now.';
+  return `No printing computer is connected. ${waiting} job${waiting === 1 ? ' is' : 's are'} waiting.`;
+}
+
 // ---------- owner: statistics, payments and CSV ----------
 // Calendar days are "YYYY-MM-DD" strings in India time (IST). The arithmetic
 // below runs on those strings in UTC, so the result does not depend on the

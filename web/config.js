@@ -11,4 +11,5 @@ window.PRINTNEST_CONFIG = {
   // build sets this from PRINTNEST_PUBLIC_URL; leave empty in source until the
   // real deployed site URL is known.
   authRedirectUrl: 'https://cdn.jsdelivr.net/gh/joyyxh/Ps-qr@gh-pages/index.html',
+  ownerApp: false,
 };

@@ -42,6 +42,9 @@
 }
 
 * { box-sizing: border-box; }
+.owner-app nav a[href="#/home"],
+.owner-app nav a[href="#/scan"],
+.owner-app nav a[href="#/track"] { display: none; }
 body { margin: 0; min-height: 100vh; background: var(--bg); }
 
 .topbar {
@@ -199,6 +202,10 @@ h3 { font-size: 1rem; margin: 18px 0 10px; }
 .order-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .order { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 6px; }
 .order p { margin: 0; }
+.job-line { display: block; color: var(--muted, #555); }
+.print-panel { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
+.agent-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.agent-row label { display: inline-flex; gap: 6px; align-items: center; }
 .plain { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; font-size: 0.95rem; }
 .plain li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
 .file-line { flex-basis: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; overflow-wrap: anywhere; }

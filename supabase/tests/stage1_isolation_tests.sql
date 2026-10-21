@@ -21,9 +21,9 @@ create or replace function pg_temp.fixture_file(p_shop_slug text, p_pages intege
 language plpgsql as $$
 declare v_id uuid;
 begin
-  insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
-  select s.id, 'fixture/' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
-  from public.shops s
+  insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+  select x.u, s.id, s.id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
+  from public.shops s, (select gen_random_uuid() as u) x
   where s.slug = p_shop_slug
   returning id into v_id;
   return v_id;
@@ -162,9 +162,9 @@ begin
 
   -- T08 a file with 0 pages cannot be stored (the server measures pages; the table enforces 1-500)
   begin
-    insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
-    select id, 'fixture/zero-' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, 0, 'zero.pdf'
-    from public.shops where slug = 'demo-xerox';
+    insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+    select x.u, id, id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, 0, 'zero.pdf'
+    from public.shops, (select gen_random_uuid() as u) x where slug = 'demo-xerox';
     insert into stage1_results values ('T08 a file with 0 pages cannot be stored', false, 'no error raised');
   exception when others then
     insert into stage1_results values ('T08 a file with 0 pages cannot be stored', sqlstate = '23514', sqlstate || ': ' || sqlerrm);

@@ -22,6 +22,8 @@ const config = window.PRINTNEST_CONFIG;
 const app = document.getElementById('app');
 const THEME_KEY = 'qrquick.theme';
 
+if (config?.ownerApp) document.body.classList.add('owner-app');
+
 let api = null;
 let owner = null;
 let shop = null;
@@ -67,6 +69,8 @@ async function startApp(auth) {
 function route() {
   const parts = window.location.hash.replace(/^#\/?/, '').split('/').map(safeDecode);
   const [kind = '', value = ''] = parts;
+
+  if (config?.ownerApp && kind !== 'owner') return owner.render([]);
 
   if (!kind || kind === 'home') return renderHome();
   if (kind === 'scan') return renderScan();

@@ -99,6 +99,21 @@ async function removeObject(path: string): Promise<void> {
   });
 }
 
+// Anonymous uploads: at most 30 files per connection in 10 minutes. Fails closed.
+async function uploadAllowed(req: Request): Promise<boolean> {
+  const forwarded = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+  const ip = forwarded || req.headers.get("cf-connecting-ip") || "unknown";
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
+  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/consume_rate_limit`, {
+    method: "POST",
+    headers: serviceHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ p_key: `upload:${hex}`, p_limit: 30, p_window_seconds: 600 }),
+  });
+  if (!res.ok) throw new Error(`rate limit check failed: ${res.status}`);
+  return (await res.json()) === true;
+}
+
 async function insertFileRow(row: Record<string, unknown>): Promise<Record<string, unknown>> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/customer_files`, {
     method: "POST",
@@ -117,6 +132,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try {
     const slug = parseShopSlug(new URL(req.url).searchParams.get("shop"));
     const shop = await findOpenShop(slug);
+
+    if (!(await uploadAllowed(req))) {
+      throw new UploadError(429, "rate_limited", "Too many uploads from this connection. Wait a few minutes and try again.");
+    }
 
     const declared = Number(req.headers.get("content-length") ?? "0");
     if (declared > MAX_UPLOAD_BYTES) {
