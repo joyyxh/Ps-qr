@@ -814,3 +814,67 @@ export function publicAssetUrl(supabaseUrl, path) {
   const encoded = String(path).split('/').map(encodeURIComponent).join('/');
   return `${String(supabaseUrl).replace(/\/$/, '')}/storage/v1/object/public/shop-assets/${encoded}`;
 }
+
+// ---------- owner accounts: registration, verification and sign-in (owner.js, auth.js) ----------
+// The server decides how long a code lasts and how often codes can be sent. These
+// helpers only shape what the owner sees. Supabase codes are 6 digits by default, and
+// the project can change that, so the page accepts 6 to 10.
+export const OTP_RESEND_SECONDS = 60;
+export const PASSWORD_MIN_LENGTH = 8;
+const CONNECTION_TEXT = 'Could not reach the server. Check your internet connection and try again.';
+
+// Seconds left before a new code may be requested. 0 means the owner may resend now.
+export function resendWaitSeconds(sentAtMs, nowMs, cooldownSeconds = OTP_RESEND_SECONDS) {
+  if (!sentAtMs) return 0;
+  return Math.max(0, Math.ceil((sentAtMs + cooldownSeconds * 1000 - nowMs) / 1000));
+}
+
+export function isOtpCode(value) {
+  return /^\d{6,10}$/.test(String(value ?? '').trim());
+}
+
+export function isEmailAddress(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? '').trim());
+}
+
+export function isNewPassword(value) {
+  return String(value ?? '').length >= PASSWORD_MIN_LENGTH;
+}
+
+// Turns a failed verify or resend into a sentence for the owner. Supabase reports an
+// expired code and a wrong code with the same message, so both get the same advice.
+export function otpErrorMessage(err, stage = 'verify') {
+  if (err instanceof TypeError) return CONNECTION_TEXT;
+  const text = String(err?.message ?? '');
+  const status = err?.status;
+  if (status === 429) {
+    return stage === 'resend'
+      ? 'Too many codes have been requested. Wait a minute, then try again.'
+      : 'Too many attempts. Wait a few minutes, then request a new code.';
+  }
+  if (stage === 'resend') return text || 'The code could not be sent. Try again.';
+  if ([400, 401, 403, 422].includes(status)) {
+    return 'That code is not right or has expired. Check the newest email, or request a new code.';
+  }
+  return text || 'The code could not be checked. Try again.';
+}
+
+// Turns a failed password sign-in, registration or reset request into a sentence.
+// The unverified-owner case (code email_not_confirmed) is handled by the screen itself.
+export function accountErrorMessage(err) {
+  if (err instanceof TypeError) return CONNECTION_TEXT;
+  const code = err?.code;
+  const text = String(err?.message ?? '');
+  if (err?.status === 429) return 'Too many attempts. Wait a few minutes, then try again.';
+  if (code === 'invalid_credentials' || /invalid login/i.test(text)) {
+    return 'That email and password do not match an account.';
+  }
+  if (code === 'user_already_exists' || /already (registered|exists)/i.test(text)) {
+    return 'An account with this email already exists. Sign in with your password instead.';
+  }
+  if (code === 'signup_disabled' || /signups? not allowed/i.test(text)) {
+    return 'New owner accounts cannot be created right now. Ask QRquick for help.';
+  }
+  if (code === 'weak_password') return 'Choose a password that is harder to guess, with at least 8 characters.';
+  return text || 'Something went wrong. Try again.';
+}
