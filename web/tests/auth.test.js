@@ -101,16 +101,16 @@ test('signUp reports when the owner must confirm their email first', async () =>
   assert.equal(storage._data.has(SESSION_KEY), false, 'no session without confirmation');
 });
 
-test('signUp keeps the session when the project signs the owner in straight away', async () => {
+test('signUp refuses a session reply and keeps nothing, so an owner cannot skip email verification', async () => {
   const storage = memoryStorage();
   const { fetchImpl } = scriptedFetch([{ body: tokenBody({ user: { id: 'owner-3', email: 'x@example.com' } }) }]);
   const auth = createAuth({ config, store: createSessionStore(storage), fetchImpl, nowMs: () => 0 });
 
-  const result = await auth.signUp('x@example.com', 'long-password');
-
-  assert.equal(result.confirmationNeeded, false);
-  assert.equal(result.session.user.id, 'owner-3');
-  assert.equal(storage._data.has(SESSION_KEY), true);
+  await assert.rejects(auth.signUp('x@example.com', 'long-password'), (err) => {
+    assert.equal(err.code, 'confirmation_disabled');
+    return true;
+  });
+  assert.equal(storage._data.has(SESSION_KEY), false);
 });
 
 test('signUp sends the configured HTTPS callback and never localhost', async () => {
@@ -131,7 +131,7 @@ test('signUp sends the configured HTTPS callback and never localhost', async () 
   assert.equal(JSON.stringify(calls[0].init.body).includes('localhost'), false);
 });
 
-test('confirmation callback fetches the user and persists a usable owner session', async () => {
+test('confirmation callback holds the session in memory until the owner chooses a password', async () => {
   const storage = memoryStorage();
   const { calls, fetchImpl } = scriptedFetch([
     { body: { id: 'owner-5', email: 'confirmed@example.com' } },
@@ -141,10 +141,12 @@ test('confirmation callback fetches the user and persists a usable owner session
     '#access_token=access-callback&refresh_token=refresh-callback&expires_in=3600&type=signup'
   );
 
-  assert.equal(callback.session.user.id, 'owner-5');
+  assert.equal(callback.type, 'signup');
+  assert.equal(callback.pending, true);
   assert.equal(calls[0].url, 'https://example-project.supabase.co/auth/v1/user');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer access-callback');
-  assert.equal(JSON.parse(storage._data.get(SESSION_KEY)).refresh_token, 'refresh-callback');
+  assert.equal(storage._data.has(SESSION_KEY), false, 'nothing is stored before a password is saved');
+  assert.equal(auth.hasPendingSignup(), true);
 });
 
 test('customer and route hashes are not mistaken for auth callbacks', () => {

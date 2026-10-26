@@ -9,6 +9,12 @@
 //   The database stores and enforces them.
 
 import {
+  accountErrorMessage,
+  isEmailAddress,
+  isNewPassword,
+  isOtpCode,
+  otpErrorMessage,
+  resendWaitSeconds,
   CANCEL_REASONS,
   cancelReasonLabel,
   checkPaymentQrFile,
@@ -126,6 +132,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     show('<p class="muted">Loading…</p>');
     const [page = '', value = '', section = ''] = parts;
     try {
+      // A verified owner who has not chosen a password yet goes no further (see completeSignup).
+      if (auth.hasPendingSignup()) return renderSetPassword();
       const session = await auth.getSession();
       if (!session) return renderSignIn('signin');
       if (page === 'reset') return renderResetPassword();
@@ -152,41 +160,55 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('[data-action="retry"]', 'click', () => render(current));
   }
 
-  // ---------- sign in and sign up ----------
+  // ---------- sign in, registration and verification ----------
+  // An owner signs in with email and password. A new owner registers with email and
+  // password, then enters the one-time code emailed to them before the account opens.
+  // An owner whose email is still unverified is sent a new code when they sign in.
+  // Customers never reach these screens.
 
-  function renderSignIn(mode, notice = '') {
-    const isSignUp = mode === 'signup';
-    const isForgot = mode === 'forgot';
-    const heading = isSignUp ? 'Create a shop owner account' : isForgot ? 'Reset your password' : 'Shop owner sign in';
-    const action = isSignUp ? 'Create account' : isForgot ? 'Send reset link' : 'Sign in';
-    const password = isForgot ? '' : `<label>Password${isSignUp ? ' (at least 8 characters)' : ''}
-            <input name="password" type="password" required
-                   autocomplete="${isSignUp ? 'new-password' : 'current-password'}"
-                   ${isSignUp ? 'minlength="8"' : ''} />
-          </label>`;
+  let pendingEmail = ''; // the address waiting for a verification code
+  let pendingSentAt = 0; // when the last verification code was sent, in milliseconds
+  let pendingPassword = ''; // the password typed at registration, kept in memory until the code is accepted
+  let resendTimer = null;
+
+  function clearResendTimer() {
+    if (resendTimer) clearInterval(resendTimer);
+    resendTimer = null;
+  }
+
+  function renderSignIn(mode = 'signin', notice = '') {
+    clearResendTimer();
+    pendingPassword = '';
+    if (mode === 'register') return renderRegister(notice);
+    if (mode === 'verify' && pendingEmail) return renderVerify(notice);
+    if (mode === 'forgot') return renderForgotPassword(notice);
+    return renderSignInForm(notice);
+  }
+
+  function renderSignInForm(notice = '') {
     show(
       `<section class="card">
-        <h1>${heading}</h1>
+        <h1>Shop owner sign in</h1>
         <p class="muted small">Only shop owners sign in here. Customers do not need an account.</p>
         <form id="auth-form" class="grid">
           <label>Email
             <input name="email" type="email" autocomplete="email" required />
           </label>
-          ${password}
-          <button type="submit" data-label="${action}">${action}</button>
+          <label>Password
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" data-label="Sign in">Sign in</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
         </form>
-        <p><button type="button" class="link" data-switch="${isForgot ? 'signin' : isSignUp ? 'signin' : 'signup'}">
-          ${isForgot ? 'Back to sign in' : isSignUp ? 'Already have an account? Sign in' : 'New here? Create an owner account'}
-        </button></p>
-        ${!isSignUp && !isForgot ? '<p><button type="button" class="link" data-switch="forgot">Forgot password?</button></p>' : ''}
+        <p><button type="button" class="link" data-switch="forgot">Forgot password?</button></p>
+        <p><button type="button" class="link" data-switch="register">New owner? Create an account</button></p>
       </section>`
     );
-    on('#auth-form', 'submit', (event) => onAuthSubmit(event, mode));
-    on('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    on('#auth-form', 'submit', onSignInSubmit);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
   }
 
-  async function onAuthSubmit(event, mode) {
+  async function onSignInSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
@@ -195,34 +217,253 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     setError(form, '');
     setBusy(form, true);
     try {
-      if (mode === 'forgot') {
-        await auth.recoverPassword(email);
-        return showConfirmationNeeded(email, 'If the account exists, check your email');
-      }
-      if (mode === 'signup') {
-        const result = await auth.signUp(email, password);
-        if (result.confirmationNeeded) return showConfirmationNeeded(email);
-      } else {
-        await auth.signIn(email, password);
-      }
+      await auth.signIn(email, password);
       go([]);
     } catch (err) {
-      setError(form, friendlyAuthError(err));
+      if (err.code === 'email_not_confirmed') {
+        return startVerification(email, 'Your email is not verified yet. We have sent you a new code.');
+      }
+      setError(form, accountErrorMessage(err));
       setBusy(form, false);
     }
   }
 
-  function showConfirmationNeeded(email, heading = 'Check your email') {
+  // An owner who has not verified yet gets a new code, then the code screen.
+  async function startVerification(email, notice) {
+    pendingEmail = email;
+    pendingPassword = ''; // this owner did not register here, so there is no password to save
+    try {
+      await auth.resendSignupCode(email);
+      pendingSentAt = Date.now();
+      renderVerify(notice);
+    } catch (err) {
+      if (err.status === 429) pendingSentAt = Date.now(); // a code went out a moment ago
+      renderVerify(err.status === 429 ? 'A code was sent a moment ago. Enter it, or wait a minute to resend.' : otpErrorMessage(err, 'resend'));
+    }
+  }
+
+  function renderRegister(notice = '') {
     show(
       `<section class="card">
-        <h1>${escapeHtml(heading)}</h1>
-        <p>We sent a confirmation link to <strong>${escapeHtml(email)}</strong>.
-           Open it on this device. QRquick will establish your owner session;
-           if the link opens in another browser, return here and sign in.</p>
+        <h1>Create an owner account</h1>
+        <p class="muted small">Only shop owners register here. Customers do not need an account.
+           We will email a one-time code to confirm your address.</p>
+        <form id="auth-form" class="grid">
+          <label>Email
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>Password (at least 8 characters)
+            <input name="password" type="password" minlength="8" autocomplete="new-password" required />
+          </label>
+          <button type="submit" data-label="Create account">Create account</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-switch="signin">Already have an account? Sign in</button></p>
+      </section>`
+    );
+    on('#auth-form', 'submit', onRegisterSubmit);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+  }
+
+  async function onRegisterSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const email = String(data.get('email') ?? '').trim();
+    const password = String(data.get('password') ?? '');
+    if (!isEmailAddress(email)) return setError(form, 'Enter a valid email address.');
+    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await auth.signUp(email, password);
+      pendingEmail = email;
+      pendingSentAt = Date.now(); // signing up has just emailed the first code
+      pendingPassword = password;
+      renderVerify('');
+    } catch (err) {
+      setError(form, accountErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
+
+  function renderVerify(notice = '') {
+    show(
+      `<section class="card">
+        <h1>Check your email</h1>
+        <p>Enter the one-time code we emailed to <strong>${escapeHtml(pendingEmail)}</strong>.
+           It can take a minute to arrive, and it may be in your spam folder. Next you will
+           choose the password you use to sign in.</p>
+        <form id="auth-form" class="grid">
+          <label>Verification code
+            <input name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required />
+          </label>
+          <button type="submit" data-label="Verify email">Verify email</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-action="resend">Resend code</button></p>
+        <p class="muted small">Already verified? <button type="button" class="link" data-switch="signin">Sign in with your password</button></p>
+      </section>`
+    );
+    on('#auth-form', 'submit', onVerifySubmit);
+    on('[data-action="resend"]', 'click', onResendCode);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    startResendCountdown();
+  }
+
+  // The resend button stays disabled, with a countdown, until the cooldown ends.
+  function startResendCountdown() {
+    const button = app.querySelector('[data-action="resend"]');
+    if (!button) return;
+    const update = () => {
+      if (!button.isConnected) return clearResendTimer();
+      const wait = resendWaitSeconds(pendingSentAt, Date.now());
+      button.disabled = wait > 0;
+      button.textContent = wait > 0 ? `Resend code in ${wait} s` : 'Resend code';
+      if (wait <= 0) clearResendTimer();
+    };
+    clearResendTimer();
+    update();
+    if (button.disabled) resendTimer = setInterval(update, 1000);
+  }
+
+  async function onResendCode(event) {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    try {
+      await auth.resendSignupCode(pendingEmail);
+      pendingSentAt = Date.now();
+      renderVerify('A new code is on its way.');
+    } catch (err) {
+      if (err.status === 429) pendingSentAt = Date.now();
+      renderVerify(otpErrorMessage(err, 'resend'));
+    }
+  }
+
+  async function onVerifySubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const token = String(new FormData(form).get('token') ?? '').replace(/\s+/g, '');
+    if (!isOtpCode(token)) return setError(form, 'Enter the code from the email. It has 6 to 10 digits.');
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await auth.verifySignupCode(pendingEmail, token);
+    } catch (err) {
+      setError(form, otpErrorMessage(err, 'verify'));
+      setBusy(form, false);
+      return;
+    }
+    clearResendTimer();
+    pendingEmail = '';
+    // The password typed at registration is saved now, so the owner's own password is the
+    // one that works. An owner who came here from sign-in chooses one on the next screen.
+    const password = pendingPassword;
+    pendingPassword = '';
+    if (!password) return renderSetPassword();
+    return finishSignup(password);
+  }
+
+  // Saves the password and opens the account. A failure is shown on the password screen.
+  async function finishSignup(password) {
+    try {
+      await auth.completeSignup(password);
+    } catch (err) {
+      return signupFailed(err);
+    }
+    return go([]);
+  }
+
+  // A confirmation that has ended sends the owner to Forgot password. Any other failure
+  // keeps the owner on the password screen to try again.
+  function signupFailed(err) {
+    if (err.code === 'signup_expired') return renderSignIn('forgot', err.message);
+    return renderSetPassword(accountErrorMessage(err));
+  }
+
+  // The password step: after the code or the confirmation link, before the account opens.
+  // Nothing stays signed in until a password is saved.
+  function renderSetPassword(notice = '') {
+    clearResendTimer();
+    show(`<section class="card">
+      <h1>Choose your password</h1>
+      <p class="muted small">Your email is confirmed. Choose the password you will use to sign in from now on.
+         It replaces any password set before the confirmation. Use at least 8 characters.</p>
+      <form id="set-password-form" class="grid">
+        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <button type="submit" data-label="Save password">Save password</button>
+        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+      </form>
+      <p class="muted small">Cannot save a password? <button type="button" class="link" data-switch="forgot">Use Forgot password</button></p>
+    </section>`);
+    on('#set-password-form', 'submit', onSetPasswordSubmit);
+    onAll('[data-switch]', 'click', (event) => {
+      auth.abandonSignup();
+      renderSignIn(event.currentTarget.dataset.switch);
+    });
+  }
+
+  async function onSetPasswordSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const password = String(data.get('password') ?? '');
+    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
+    if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
+    setError(form, '');
+    setBusy(form, true);
+    return finishSignup(password);
+  }
+
+  // ---------- password reset (a separate flow, unchanged) ----------
+
+  function renderForgotPassword(notice = '') {
+    show(
+      `<section class="card">
+        <h1>Reset your password</h1>
+        <p class="muted small">We email a reset link to owners who have a password.</p>
+        <form id="auth-form" class="grid">
+          <label>Email
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <button type="submit" data-label="Send reset link">Send reset link</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+      </section>`
+    );
+    on('#auth-form', 'submit', onForgotSubmit);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+  }
+
+  async function onForgotSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const email = String(new FormData(form).get('email') ?? '').trim();
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await auth.recoverPassword(email);
+      showResetSent(email);
+    } catch (err) {
+      setError(form, accountErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
+
+  // The same message whether or not the address has an account, so the form cannot be
+  // used to find which emails are registered.
+  function showResetSent(email) {
+    show(
+      `<section class="card">
+        <h1>Check your email</h1>
+        <p>If <strong>${escapeHtml(email)}</strong> has an owner account with a password, we have emailed a reset link. Open it on this device to choose a new password.</p>
         <p><button type="button" class="link" data-switch="signin">Go to sign in</button></p>
       </section>`
     );
-    on('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
   }
 
   function renderResetPassword(notice = '') {
