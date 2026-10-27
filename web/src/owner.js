@@ -48,6 +48,7 @@ import {
   retryOptions,
 } from './logic.js';
 import { createStatsPages } from './owner-stats.js';
+import { PRINTER_RETRY_MS, browserVisibility, createOrderRefresher, printerRetryDue } from './order-refresh.js';
 import { qrCanvas, qrSvg } from './qr.js';
 
 const UNIT_OPTIONS = [
@@ -63,6 +64,26 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   let managed = null; // { shop, services } for the shop page on screen
   let orderView = null; // { shop, orders, showAll, printing, jobsByItem, pairing } for the orders page on screen
   const statsPages = createStatsPages({ app, ownerApi, messageFor });
+
+  // Automatic refresh of the orders page (order-refresh.js). The page is only redrawn when the data changed.
+  let navigation = 0; // counts page changes, so a slow load cannot draw over a page the owner has left
+  let loadSeq = 0; // only the newest orders reply is kept
+  let liveState = 'live'; // what the orders page says about automatic updates: 'live', 'offline' or 'expired'
+  const liveMessages = {
+    live: 'Updates automatically while this page is open.',
+    offline: 'Automatic updates are paused because the connection failed. The list shows the last update. Use Refresh to try again.',
+    expired: 'Your session has ended. Sign in again to continue.',
+  };
+  let printerRetryAt = 0; // 0 when the last printer-status read worked; otherwise when an automatic refresh may ask again
+  let feedback = null; // { notice, error, at }: the last action message. Automatic redraws keep it for a minute.
+  const FEEDBACK_KEEP_MS = 60000;
+  const liveOrders = createOrderRefresher({
+    fetchData: refreshOrderData,
+    apply: () => renderOrders({ keep: true }),
+    canApply: () => !isFocusedListControl(),
+    onStatus: onLiveStatus,
+    visibility: browserVisibility(),
+  });
 
   // ---------- navigation and shared helpers ----------
 
@@ -128,6 +149,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   // ---------- entry point, called by app.js for every #/owner route ----------
 
   async function render(parts = []) {
+    navigation += 1;
+    liveOrders.stop(); // leaving a page ends its automatic refresh
     current = parts;
     show('<p class="muted">Loading…</p>');
     const [page = '', value = '', section = ''] = parts;
@@ -991,34 +1014,79 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   // ---------- orders ----------
 
-  async function loadOrderView(shopId) {
+  // Reads the orders and the printer status. An automatic refresh skips the printer read while a
+  // failed read is waiting to be retried (PRINTER_RETRY_MS), so a broken read is not repeated every
+  // few seconds. Opening the page, an action and the Refresh button always ask. A skipped read
+  // returns printing as undefined, and the last printer status stays on screen.
+  async function loadOrderView(shopId, { manual = true } = {}) {
+    const askPrinter = manual || printerRetryDue(printerRetryAt, Date.now());
     const [orders, printing] = await Promise.all([
       ownerApi.listOrders(shopId),
-      // If the printer status cannot load, the orders still show; printing is marked unavailable.
-      ownerApi.printStatus(shopId).catch(() => null),
+      askPrinter ? readPrinterStatus(shopId) : undefined,
     ]);
     return { orders, printing };
   }
 
+  // If the printer status cannot load, the orders still show; printing is marked unavailable.
+  function readPrinterStatus(shopId) {
+    return ownerApi.printStatus(shopId).then(
+      (status) => {
+        printerRetryAt = 0;
+        return status;
+      },
+      () => {
+        printerRetryAt = Date.now() + PRINTER_RETRY_MS;
+        return null;
+      }
+    );
+  }
+
   async function renderOrdersFor(shop) {
+    const nav = navigation;
     const { orders, printing } = await loadOrderView(shop.id);
+    if (nav !== navigation) return; // the owner has left this page while it loaded
     orderView = { shop, orders, printing, showAll: false, jobsByItem: new Map(), pairing: null };
+    liveState = 'live'; // a message from an earlier visit must not show on a fresh page
     renderOrders();
+    liveOrders.start();
   }
 
   // Reloads the orders and the printer status together, so the job lines stay current.
-  async function reloadOrders() {
-    const { orders, printing } = await loadOrderView(orderView.shop.id);
-    orderView.orders = orders;
-    orderView.printing = printing;
+  // Only the newest reply is kept, so a slow earlier reply cannot overwrite a newer one.
+  async function reloadOrders(options) {
+    const shopId = orderView.shop.id;
+    const seq = ++loadSeq;
+    const { orders, printing } = await loadOrderView(shopId, options);
+    if (seq === loadSeq && orderView?.shop.id === shopId) {
+      orderView.orders = orders;
+      if (printing !== undefined) orderView.printing = printing; // undefined: the printer read was skipped
+    }
   }
 
-  function renderOrders({ notice = '', error = '' } = {}) {
+  // The data the automatic refresh and the Refresh button load. The same shop-scoped reads as before.
+  async function refreshOrderData({ manual = true } = {}) {
+    await reloadOrders({ manual });
+    return { orders: orderView?.orders ?? [], printing: orderView?.printing ?? null };
+  }
+
+  // Automatic redraws pass keep: true. They show the last action message for up to a minute, so a poll
+  // that brings new orders does not wipe out "Payment updated…". Any other redraw replaces it.
+  function renderOrders({ notice = '', error = '', keep = false } = {}) {
+    if (keep) {
+      const kept = feedback && Date.now() - feedback.at < FEEDBACK_KEEP_MS ? feedback : null;
+      feedback = kept;
+      notice = kept?.notice ?? '';
+      error = kept?.error ?? '';
+    } else {
+      feedback = notice || error ? { notice, error, at: Date.now() } : null;
+    }
     const { shop, orders, showAll } = orderView;
     orderView.jobsByItem = latestJobsByItem(orderView.printing?.jobs ?? []);
     const visible = showAll ? orders : orders.filter((order) => isOpenOrder(order.status));
     show(ordersHtml(shop, visible, orders.length, showAll, notice, error));
     bindOrders();
+    // The automatic refresh compares against what is on screen, so it does not redraw the same data.
+    liveOrders.remember({ orders, printing: orderView.printing });
   }
 
   function ordersHtml(shop, visible, total, showAll, notice, error) {
@@ -1035,6 +1103,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
           <h1>Orders</h1>
           <button type="button" class="link" data-action="refresh-orders">Refresh</button>
         </div>
+        <p class="${liveState === 'live' ? 'muted' : 'error'} small" data-live-status>${escapeHtml(liveMessages[liveState])}</p>
         <p class="muted small">Page counts are what customers typed. Files are not uploaded yet, so check the
            count at the counter.</p>
         ${printPanelHtml()}
@@ -1180,13 +1249,34 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     );
   }
 
+  // The Refresh button. It shares the automatic refresh's request, so the two never overlap.
   async function refreshOrders(notice = '') {
     try {
-      await reloadOrders();
+      await liveOrders.refresh({ manual: true });
       renderOrders({ notice });
     } catch (err) {
       renderOrders({ error: messageFor(err) });
     }
+  }
+
+  // Called after every automatic attempt. An expired session stops the refresh and asks the owner to sign in.
+  function onLiveStatus(state, error) {
+    if (state === 'live') liveState = 'live';
+    else if (error?.status === 401) liveState = 'expired';
+    else liveState = 'offline';
+    if (liveState === 'expired') liveOrders.stop();
+    const el = app.querySelector('[data-live-status]');
+    if (el) {
+      el.textContent = liveMessages[liveState];
+      el.className = `${liveState === 'live' ? 'muted' : 'error'} small`;
+    }
+  }
+
+  // Changes from the automatic refresh wait while the owner is using a menu in the list
+  // (a printer or reason menu), so the menu does not close under them.
+  function isFocusedListControl() {
+    const el = document.activeElement;
+    return Boolean(el && app.contains(el) && ['SELECT', 'INPUT', 'TEXTAREA'].includes(el.tagName));
   }
 
   async function onOrderAction(event) {
