@@ -5,7 +5,7 @@
   "type": "module",
   "description": "QRquick customer printing page (static, no build step)",
   "scripts": {
-    "test": "node --test tests/logic.test.js tests/api.test.js tests/owner-logic.test.js tests/auth.test.js tests/owner-registration.test.js tests/owner-api.test.js tests/orders.test.js tests/stats.test.js tests/qr-features.test.js tests/ui.test.js tests/print-logic.test.js",
+    "test": "node --test tests/logic.test.js tests/api.test.js tests/owner-logic.test.js tests/auth.test.js tests/owner-registration.test.js tests/order-refresh.test.js tests/owner-api.test.js tests/orders.test.js tests/stats.test.js tests/qr-features.test.js tests/ui.test.js tests/print-logic.test.js",
     "start": "python3 -m http.server 5173"
   }
 }
