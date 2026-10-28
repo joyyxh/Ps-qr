@@ -18,7 +18,7 @@ Android app. Each shop is isolated from every other shop.
 | 5b. Statistics and payment records | Earnings and revenue (day, week, month, year), order statistics, cancellations, payments (cash or online), popular services, recent activity, CSV export | Built. Migration `0006` is applied to the live project and its 54 database checks pass. The browser check with a mocked backend passes at phone width |
 | 5c. Shop features and payment QR | Yes/no features (colour printing, double-sided, and six more), payment QR upload, features and payment QR shown to customers | Built. Migrations `0004` and `0005` are in the repo. Browser check with a mocked backend passes. Not re-checked on the live project in this session |
 | 5d. Android app and installable web app | Capacitor app built in GitHub Actions, and an install-to-home-screen web app | Built, **not yet built or run**. See "What is not verified" |
-| 6. Local print agent | Simulated printer first, then Windows | Not started |
+| 6. Local print agent | Simulated printer first, then Windows | Offline simulation built and tested locally (`simulate` command: no network, no printer, 39 tests). Not run on a real printer, so not hardware-validated. Windows and CUPS adapters unchanged |
 | 7. Payments and licences | One-time licence checkout, Stripe | Not started (Stripe is installed but not connected) |
 | 8. Privacy and hardening | Automatic file deletion, rate limits, audit log | Not started. Until this stage, uploaded files are kept until someone removes them by hand |
 

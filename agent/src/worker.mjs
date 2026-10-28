@@ -257,8 +257,16 @@ export function createWorker({
       try {
         await api.markPrinting(jobRef);
       } catch (err) {
-        // Nothing has been sent to the printer. The server requeues the job when the lease ends,
-        // or it has already moved on. Do not report a failure: that would invite a reprint.
+        // The printer has not been given the file. Do not report a failure: if the server did record
+        // "printing", a failure report would invite a reprint. The agent cannot always tell which of
+        // these happened, so it leaves the job to the server:
+        //   - The "printing" request never reached the server, or the server refused it (for example
+        //     lease_lost) and recorded nothing. The job stays "claimed". Once the claim lease ends, the
+        //     server requeues it the next time any computer in this shop sends a heartbeat or asks for
+        //     work (or fails it after repeated claims).
+        //   - The server recorded "printing", but its reply was lost. If no "sent" or "failed" report
+        //     arrives before the printing lease ends, the server moves the job to "needs_check" for the
+        //     owner to decide. It is never requeued automatically.
         await journal.clearActive();
         log(`${label}: not printed. The server did not confirm the start (${err.code ?? 'error'}).`);
         return;
@@ -287,7 +295,11 @@ export function createWorker({
       await journal.setActive({ ...jobRef, state: 'submitted', at: now(), spoolerId: result?.spoolerId ?? null });
       await report(jobRef, 'sent');
       await journal.clearActive();
-      log(`${label}: sent to ${printer.name}.`);
+      log(
+        adapter.simulated
+          ? `${label}: SIMULATED on "${printer.name}". No printer was used and no paper came out.`
+          : `${label}: sent to ${printer.name}.`,
+      );
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

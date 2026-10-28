@@ -1,13 +1,14 @@
 // Command-line front end for the agent. Each command returns an exit code and never
 // prints the agent's token.
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createAgentApi } from './api.mjs';
 import { configPaths, defaultConfigDir, loadConfig, normaliseServerUrl, saveConfig } from './config.mjs';
 import { createJournal } from './journal.mjs';
 import { createPrinterAdapter } from './printers/index.mjs';
+import { builtInFixture, readFixtureJobs, runSimulation, SAMPLE_FILE_NAME, SIMULATION_BANNER } from './simulation.mjs';
 import { findSumatra } from './printers/windows.mjs';
 import { runCommand } from './runner.mjs';
 import { buildSamplePdf } from './sample-page.mjs';
@@ -24,9 +25,13 @@ Commands:
   doctor                                 Check the setup and the connection to QRquick
   test-print                             Print one test page on the chosen printer (uses paper)
   run                                    Start printing approved orders (keep this running)
+  simulate [fixture.json]                Testing only: run the print steps offline. Contacts no
+                                         server and uses no printer. Nothing is printed.
 
 Setup order: pair, printers, set-printer, doctor, test-print, run.
 `;
+
+const SIMULATED_FLAG = '--simulated-printer';
 
 function platformName(platform) {
   if (platform === 'win32') return 'windows';
@@ -184,7 +189,17 @@ async function testPrint(_args, deps, { dir, out, platform }) {
   return 0;
 }
 
-async function run(_args, deps, { dir, out, platform }) {
+async function run(args, deps, { dir, out, platform }) {
+  // Simulated printing is the offline "simulate" command. This refusal happens before any saved
+  // setting is read, so a simulated run can never reach a server.
+  if (args.includes(SIMULATED_FLAG)) {
+    throw new Error(
+      'Simulated printing is now the "simulate" command. It works offline and never contacts QRquick. Nothing was started.',
+    );
+  }
+  // Any other option is refused, so a typo can never start real printing by accident.
+  if (args.length > 0) throw new Error(`Unknown option "${args[0]}". Usage: qrquick-print-agent run`);
+
   const config = await requireConfig(dir);
   const api = createAgentApi({ serverUrl: config.serverUrl, token: config.token, fetchImpl: deps.fetchImpl });
   const worker = createWorker({
@@ -209,7 +224,52 @@ async function run(_args, deps, { dir, out, platform }) {
   return 0;
 }
 
-const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run };
+const MAX_FIXTURE_BYTES = 1024 * 1024;
+
+// Offline testing. It reads no saved server address or token and contacts no server. With no
+// file, it runs a built-in scenario that writes a sample PDF into a temporary folder.
+async function simulate(args, _deps, { out }) {
+  if (args.length > 1) throw new Error('Usage: qrquick-print-agent simulate [fixture.json]');
+  let fixtureDir;
+  let data;
+  let tempDir = null;
+  try {
+    if (args.length === 0) {
+      tempDir = await mkdtemp(path.join(os.tmpdir(), 'qrquick-simulate-'));
+      fixtureDir = tempDir;
+      await writeFile(path.join(fixtureDir, SAMPLE_FILE_NAME), buildSamplePdf(['QRquick simulation', 'Nothing is printed.']));
+      data = builtInFixture();
+    } else {
+      const file = path.resolve(args[0]);
+      const info = await stat(file).catch(() => null);
+      if (!info) throw new Error(`Could not open "${args[0]}".`);
+      if (info.size > MAX_FIXTURE_BYTES) throw new Error('The fixture file is larger than 1 MB. Nothing was simulated.');
+      try {
+        data = JSON.parse(await readFile(file, 'utf8'));
+      } catch {
+        throw new Error(`"${args[0]}" is not a valid JSON file. Nothing was simulated.`);
+      }
+      fixtureDir = path.dirname(file);
+    }
+
+    // Any problem in the file stops everything here, before the simulation starts.
+    const jobs = readFixtureJobs(data, fixtureDir);
+    out(SIMULATION_BANNER);
+    const { records } = await runSimulation({ jobs, fixtureDir, out, version: VERSION });
+    const simulated = records.filter((r) => r.state === 'sent').length;
+    const refused = records.filter((r) => r.state === 'failed').length;
+    const leftAlone = records.length - simulated - refused;
+    out(
+      `Simulation finished. Simulated: ${simulated}. Refused: ${refused}. ` +
+        `Left alone (already printing or needing a check): ${leftAlone}. Nothing was printed and nothing was sent to QRquick.`,
+    );
+    return 0;
+  } finally {
+    if (tempDir) await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run, simulate };
 
 // Entry point. deps are for tests: dir, platform, out, fail, fetchImpl, run, adapter, download, computerName.
 export async function main(argv, deps = {}) {

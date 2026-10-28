@@ -18,6 +18,7 @@ real printer, with the live Supabase project, or in the Android app.** Those ste
 | Windows agent | Written, **not run on Windows** | SumatraPDF plus PowerShell. Setting names are unverified on a real install. |
 | Linux agent (CUPS) | Written, **not run on CUPS** | Uses `lpstat`, `lpoptions`, `lp`. |
 | Sending jobs without duplicates | Built, tested locally | Claim lease, "printing" recorded before the printer gets the file, `needs_check` for uncertain jobs, no automatic reprint. |
+| Simulated printing (testing only) | Built, tested locally | `qrquick-print-agent simulate` runs the order steps offline, from a local file. It makes no network request, never calls CUPS, PowerShell, SumatraPDF or a printer, and never says paper came out. It does not test the live server or database, or real printers. |
 | Failure handling | Built, tested locally | Offline printer, unsupported option, spooler error, lost connection, revoked computer, repeated claims. |
 | Owner retry | Built, tested locally | Failed jobs can be printed again. Jobs that may have printed need confirmation. |
 | Print options | Partial | Copies, colour, double-sided and A4 are applied and refused when the printer cannot do them. Orientation, page range, fit-to-page, cropping and the customer's paper choice are **not** built. |
@@ -40,7 +41,13 @@ real printer, with the live Supabase project, or in the Android app.** Those ste
 - `supabase/tests/print_agent_api_checks.test.js`: 7 of 7 static checks on the print-agent function
   (code normalisation, hashing, token handling, no database text in responses, rate limits).
   These read the source; the function itself was **not executed**.
-- **Desktop agent (`agent/`)**: 61 of 61 unit tests, using fake printers and a fake server.
+- **Desktop agent (`agent/`)**: 102 of 102 unit tests, using fake printers and a fake server. That is
+  61 from before, plus 14 for the simulated printer, 25 for the offline simulation, and 2 for the
+  real `run` command (its wiring through a local stub that answers 401, and the early refusal of
+  `run --simulated-printer`).
+- **Simulation guard check**: five safety guards were each disabled on purpose, one at a time. Each
+  one made specific tests fail within seconds, and none hung. The file was restored and compared
+  byte for byte after each run.
 - **Web app (`web/`)**: `npm test`, 124 of 124 pass, including 10 new tests for the printing helpers
   and API calls.
 
@@ -78,6 +85,13 @@ browser, and the Android APK build (the build runs only in GitHub Actions).
 - A real paper-size check on Windows.
 - Repeat the review of the file-link and retention code with a timestamp simulation.
 - Browser test of the owner screens (the Playwright smoke suite needs its own install).
+- Simulation never contacts a server, so it cannot write to the database. A server-side simulated
+  flag was considered and not built. It would not stop a localhost server connected to production
+  from writing rows, so it does not address this risk. It would need a migration and an explicit
+  decision in any case.
+- The live server and database rules (migration 0010) have not been run here. The offline
+  simulation follows four of the same rules, and a test checks that the migration still states
+  those four. Lease expiry, revocation, job recovery and the deleted-file filter are not copied.
 
 ## Files added or changed in this round
 
@@ -94,3 +108,21 @@ browser, and the Android APK build (the build runs only in GitHub Actions).
 - `web/tests/print-logic.test.js` (new); `web/tests/orders.test.js` (select string updated);
   `web/package.json` (test list)
 - `docs/PRINTING_STATUS.md` (this file)
+
+## Stage 6 round: simulated printer (branch `stage6-simulated-printer`)
+
+- `agent/src/simulation.mjs` (new): the offline `simulate` steps, fixture checks and the in-memory
+  server that follows four of migration 0010's job rules
+- `agent/src/printers/simulated.mjs` (new): the simulated adapter (the localhost check was removed)
+- `agent/src/cli.mjs`: the `simulate` command; `run --simulated-printer` is now refused before any
+  setting is read; `makeAdapter` is back to its original form
+- `agent/src/worker.mjs`: one log line says SIMULATED when the adapter is simulated; a comment
+  explains a lost "printing" reply (comment only, no runtime change)
+- `agent/test/simulated.test.mjs` (new, 14 tests): the simulated printer and worker steps
+- `agent/test/simulation.test.mjs` (new, 25 tests): offline simulation, fixture checks, links inside
+  the fixture folder, safety limit, CLI
+- `agent/test/run-wiring.test.mjs` (new, 2 tests): the real `run` command against a local stub that
+  answers 401, with no printer and no QRquick, and the early refusal of `run --simulated-printer`
+  before the config is read
+- `agent/README.md`, `docs/PRINTING_STATUS.md`, `README.md`: simulation notes
+- No database migration, no Supabase change, no change to the live server, the APK or GitHub Pages

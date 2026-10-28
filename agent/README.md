@@ -55,7 +55,8 @@ node bin/qrquick-print-agent.mjs run
   computer; that choice wins.
 - `doctor` — checks the printing software, the printers and the connection to QRquick.
 - `test-print` — prints **one** test page on the chosen printer. This uses paper.
-- `run` — keeps printing approved orders. Leave it running. Ctrl+C stops it safely.
+- `run` — keeps printing approved orders. Leave it running. Ctrl+C stops it safely. It takes no
+  options: any option is refused, so nothing starts by mistake.
 
 The agent works on A4 paper only, because the order does not yet record a paper size.
 A printer with no A4 option will refuse every order, and the owner sees why.
@@ -92,6 +93,56 @@ the agent stops with a message to pair again.
 - `outbox.json` — the agent's own notes about the job it is printing, and results not yet sent.
   Do not delete it while the agent is running.
 
+## Simulated printing (testing only)
+
+`qrquick-print-agent simulate` runs the order-to-print steps with no server and no printer. It
+works fully offline:
+
+- It reads no saved server address or token, and it makes no network request. A test can block
+  the network and the command still works.
+- Jobs come from a local JSON file, or from a built-in scenario when no file is given. Files are
+  read only from the folder that holds the JSON file. A link inside that folder that points
+  outside it is refused before anything runs.
+- The steps are the agent's own: the lease, "printing" recorded before anything is sent, and the
+  duplicate-print safeguards. The in-memory server follows four of the QRquick database's job
+  rules (migration `0010`: claim, printing and finish). It does not model lease expiry, revocation
+  or recovery. A test checks that those four rules still appear in the migration.
+- Only approved and paid orders can be simulated, as on the real server. One unpaid or
+  unapproved job stops the whole file before anything runs.
+- Jobs already printing or needing a check are never claimed or printed again.
+- The printer is the simulated one. It never runs CUPS, PowerShell, SumatraPDF or any printer
+  command. Its messages say **SIMULATED** and "no paper came out".
+
+```
+qrquick-print-agent simulate
+qrquick-print-agent simulate my-test-jobs.json
+```
+
+A fixture file looks like this. `file` is a name inside the same folder:
+
+```json
+{
+  "jobs": [
+    {
+      "job_id": "sim-0001",
+      "attempt": 1,
+      "state": "queued",
+      "approved": true,
+      "paid": true,
+      "file": "menu.pdf",
+      "settings": { "copies": 1, "colour": false, "duplex": false, "paper": "A4" },
+      "printer": null
+    }
+  ]
+}
+```
+
+`state` can be `queued` (the job is printed), `printing` or `needs_check` (the job is left alone).
+
+`run --simulated-printer` is refused. It used to run against a server, and a server connected to
+the production database would have recorded simulated jobs as sent, or taken real orders. It
+now stops before reading any saved setting, so no simulated run can reach a server.
+
 ## Tests (for developers)
 
 ```
@@ -99,8 +150,13 @@ cd agent
 npm test
 ```
 
-61 unit tests cover: the duplicate-print rules, the printer option parsing for CUPS and
-PowerShell, the picture-to-PDF wrapper, the CLI and the API client. They do not print anything.
+102 unit tests cover: the duplicate-print rules, the printer option parsing for CUPS and
+PowerShell, the picture-to-PDF wrapper, the CLI, the API client, the simulated printer, the
+offline simulation, and the real `run` command (its wiring against a local stub that answers
+401, and the early refusal of `run --simulated-printer`). They do not print anything. The
+simulation tests block the network, check that the real printer adapter is never called, check
+that a run that never ends stops at its safety limit, and check that a link cannot lead out of the
+fixture folder.
 
 ## Hardware checklist (do this before going live)
 
@@ -132,3 +188,8 @@ Until items 3 to 5 pass, do not describe automatic printing as working.
 - Paper size is A4 only. Orientation, page ranges, fit-to-page and cropping are not implemented.
 - No printing confirmation: the agent knows the job was accepted by the printing system, not
   that paper came out.
+- Simulated printing (`simulate`) checks the agent's steps and four of the server's job rules
+  only. It says nothing about printer drivers, paper, colour, or double-sided output. It never
+  contacts QRquick, so it does not test the live server or database.
+- The automated tests never run a successful print through `run`. The `run` test covers only the
+  path where the server answers 401; the print path is covered by unit tests with a fake API.
