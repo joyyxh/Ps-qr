@@ -39,6 +39,19 @@ Counts after this record (items 1–35): 7 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 I
 
 Not approved by this record: the admin-side lock contract (R18: advisory lock, then shop meta row, then payment), `licence_lock_shop()`, any admin RPC, any printing change, any test, staging or local setup, any commit or push, and any applied migration. Each needs its own approval.
 
+## Part 1B. Recorded on 2026-11-01 (second record)
+
+These four owner decisions, dated 2026-11-01, are recorded in `STAGE7_DECISIONS.md` §13. They change statuses and wording only. They approve no gate, no migration change, no test, no SQL, no setup and no commit.
+
+| No. | Owner decision (2026-11-01) | Effect |
+|---|---|---|
+| 8 | ACTIVE `next_start`: shown only in SCHEDULED | Decided. In ACTIVE the next start is NULL, as migration 0011 already returns. The Dec 19 label questions stay open. |
+| 9 | C-9: the replacement wording in §12B.9 is adopted | C-9 DECIDED. The superseded passages are in §9 item 7 only. B stays conditional on C-1 and C-3. |
+| 10 | `service_role` stays revoked from the licence tables and helper functions (migration 0011) | Decided. This differs from 0010 by design. No service-key path reads licence data now; any future grant needs its own decision. |
+| 11 | `p_at`: owner-facing state reads use the current time only. Historical state queries are not supported | Decided. History comes from `licence_audit_log`. |
+
+Not decided by this record: R18 (lock order) stays NOT APPROVED. Its deadlock analysis is returned for approval, and no printing or admin change is authorised. 7B-2 and 7C do not start.
+
 ## Part 2. Decide now (owner answers, RECOMMENDED)
 
 These are defaults the owner can confirm or change. A confirmed answer records a decision and approves no gate.
@@ -50,7 +63,7 @@ These are defaults the owner can confirm or change. A confirmed answer records a
 | Dec 15 | Admin UI hosting (item 6) | RECOMMENDED | A separate private deployment, not linked from the shop app and not published with the public site | 7D needs this decision and the visibility check. |
 | Dec 16 | Backdating and lifetime rules (item 7, 7C validation) | RECOMMENDED. Maximum custom length DECIDED (none, 2026-11-01) | Backdating only with explicit confirmation. Lifetime owner-only | These are 7C inputs and do not change the 7B schema. Maximum custom length: none (owner decision 6). |
 | Dec 18 | Grace period (item 13) | RECOMMENDED | No grace period | Printing is blocked in every non-ACTIVE state (§12B.3, from B and C). Queued jobs are held and retries are blocked from the end date. Jobs already printing may finish. Any grace days would change this rule. The wording for the NONE state is also open. |
-| Dec 19 | Shop-facing view: labels (item 13) | RECOMMENDED | Keep the file's position: Active or Inactive only, with no admin-grant label | Approved (§12B.2 D): the owner-only fields are active or inactive, access end or no-expiry, and next start when relevant (in ACTIVE the next start is OPEN, register §12A.6). Still open: the label wording, whether an admin grant may show a label, and staff visibility. The Android view is DEFERRED (Part 9). |
+| Dec 19 | Shop-facing view: labels (item 13) | RECOMMENDED | Keep the file's position: Active or Inactive only, with no admin-grant label | Approved (§12B.2 D): the owner-only fields are active or inactive, access end or no-expiry, and next start when relevant (next start shown only in SCHEDULED, owner decision 8, 2026-11-01). Still open: the label wording, whether an admin grant may show a label, and staff visibility. The Android view is DEFERRED (Part 9). |
 | Dec 11 | Advisers (item 19) | RECOMMENDED | Engage an Indian CA and a lawyer before any paid collection | No engagement is evidenced. Their advice is needed for the blockers in Part 6. |
 | Dec 10 | Stage 6 merge order (item 20) | RECOMMENDED | No view given here | Decide whether `stage6-simulated-printer` (885d28b) is merged before Stage 7 is rebased. This affects rebase order only. Nothing is merged by this sheet. |
 | S-4 | Residual 180-second file-link window (item 35) | RECOMMENDED | Accept it, or reduce it before the 7F build | §15.3 requires S-4 accepted before 7F. |
@@ -183,6 +196,7 @@ These approvals have no open condition. Blocked, conditional and proposed items 
 - Approved for design only: §12B.2 E. Enabling stays blocked until item 11 is answered.
 - Licence unit: per shop (decision 1, owner decision 2026-10-31). Item 16: renewal DEFERRED (decision 2; owner decision 7, 2026-11-01). The unit is DECIDED.
 - 2026-11-01: Stage 7 baseline is origin/main (717717b lineage), numbering from 0011, and local-main 0011–0014 kept separate and unmerged. C-5 accepted. Item 8 accepted (C-8, fixes 5 and 9). Item 7 basis ranking confirmed (lifetime over admin). Dec 16 maximum custom length: none. Renewal deferred and not a 7B blocker.
+- 2026-11-01, second record: next start shown only in SCHEDULED (decision 8); C-9 replacement wording adopted (decision 9); `service_role` stays revoked in 0011 (decision 10); owner-facing state reads use the current time only (decision 11).
 - Not approved (2026-11-01): the admin-side lock contract (R18), `licence_lock_shop()`, admin RPCs, printing fixes 23 and 24, tests, staging, local setup, commits and pushes.
 
 Not listed here, and still open: §12B.2 B (conditional on C-1 and C-3; EXTERNAL BLOCKER), I (pricing, blocked), K (fix implementation, Part 7), L (local setup first), M1 (proposal), and M8 (policy, legal review needed).
