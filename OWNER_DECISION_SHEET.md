@@ -68,6 +68,30 @@ The owner accepted the final R18 lock-order contract as an approved **design** d
 | Two-session tests (11, in §13) | OUTSTANDING. Staging only, separate approval |
 | Migrations, SQL, printing code, tests, local setup, staging, commit, push, merge, deployment | NOT approved by this record |
 
+## Part 1D. Recorded on 2026-11-02: owner approval of Stage 7C recommendations (OWNER-APPROVED)
+
+Source: owner approval given in a ChatGPT conversation on 2026-11-02, in direct response to the Stage 7C recommendations: "Continue, i approve". Recorded here at the owner's instruction. Full wording and applied-to references are in `STAGE7_DECISIONS.md` §13.
+
+This part approves no implementation, SQL, staging, migration application, commit, push, merge or deployment. 7C stays NOT approved.
+
+| No. | Owner decision (2026-11-02, OWNER-APPROVED) | Conditions and OPEN items |
+|---|---|---|
+| 1 | AAL2: `aal2` is required for every platform-admin RPC. | OPEN: verified recovery procedure if the admin loses the TOTP factor; hosted and local verification of the `aal` claim (R16, S-3). Both remain prerequisites before 7C. |
+| 2 | Item 15: option (a), a provisional ceiling for staging only. | OPEN: the production ceiling value; the remaining C-12 and item 15 details. |
+| 3 | Migration placement P1: `licence_requests` and `licence_denials` go in the existing `0011_licence_foundation.sql`. | Subject to pre-staging review. Not applied. 0011 does not yet contain these tables. Adding them is a separate step, not approved here. |
+| 4 | Lifetime grants: admin-only. | Replaces the earlier "owner-only" recommendation. Under 0011 as written, any platform admin can grant lifetime, because no role column exists. |
+| 5 | Backdating: explicit confirmation required. | OPEN: the maximum backdating window. |
+| 6 | Extend: rejected while lifetime coverage is active. | Not addressed here: the extend start rule when no lifetime coverage is active. |
+| 7 | Denied requests: not written to the replay ledger. A later valid request may reuse the same request ID. | Denial rows are unchanged. |
+| 8 | Request ID scope: globally unique. | Replay matching rules are not restated here; they stay as in R5. |
+| 9 | Global enforcement audit (`enforcement_change`): deferred to 7F. | Out of 7C scope. No change to 0011 from this decision. |
+| 10 | Lock enforcement: no GUC marker. No lock-acquiring trigger, unless staging evidence shows a gap and a separate 7B-2 amendment is approved. | OPEN: that staging evidence and that amendment. |
+| 11 | Admin grant arithmetic: Asia/Kolkata calendar arithmetic. | OPEN: month-end clamping, and exact timestamp behaviour. |
+
+**Still OPEN after this record:** the maximum backdating window; the AAL2 recovery procedure and hosted and local claim verification; admin grant month-end arithmetic confirmation; C-12 and the remaining item 15 details; legal review of production retention and personal-data handling.
+
+**Not approved by this record:** 7C implementation; 7C staging; SQL execution; staging setup and tests; migration application; commit, push, merge and deployment. 7B-2 and R18 implementation keep their existing status. Item statuses and counts (§14.2) are unchanged.
+
 ## Part 2. Decide now (owner answers, RECOMMENDED)
 
 These are defaults the owner can confirm or change. A confirmed answer records a decision and approves no gate.
@@ -77,7 +101,7 @@ These are defaults the owner can confirm or change. A confirmed answer records a
 | Dec 2 | Term and renewal (item 16) | DEFERRED (owner decision 7, 2026-11-01) | Manual renewal each year, with no automatic renewal (not decided) | Renewal is deferred. It does not block 7B. It reopens with the paid path (M5). The 12-month term stays approved as policy (M4). |
 | Dec 13 | Admin accounts (item 5) | RECOMMENDED | One owner admin. An extra admin needs an owner-run SQL row | The admin Auth UUID is still needed (Part 4). |
 | Dec 15 | Admin UI hosting (item 6) | RECOMMENDED | A separate private deployment, not linked from the shop app and not published with the public site | 7D needs this decision and the visibility check. |
-| Dec 16 | Backdating and lifetime rules (item 7, 7C validation) | RECOMMENDED. Maximum custom length DECIDED (none, 2026-11-01) | Backdating only with explicit confirmation. Lifetime owner-only | These are 7C inputs and do not change the 7B schema. Maximum custom length: none (owner decision 6). |
+| Dec 16 | Backdating and lifetime rules (item 7, 7C validation) | RECOMMENDED. Maximum custom length DECIDED (none, 2026-11-01). 2026-11-02 (Part 1D): backdating needs explicit confirmation; lifetime admin-only; backdating window OPEN | Backdating only with explicit confirmation. Lifetime owner-only | These are 7C inputs and do not change the 7B schema. Maximum custom length: none (owner decision 6). |
 | Dec 18 | Grace period (item 13) | RECOMMENDED | No grace period | Printing is blocked in every non-ACTIVE state (§12B.3, from B and C). Queued jobs are held and retries are blocked from the end date. Jobs already printing may finish. Any grace days would change this rule. The wording for the NONE state is also open. |
 | Dec 19 | Shop-facing view: labels (item 13) | RECOMMENDED | Keep the file's position: Active or Inactive only, with no admin-grant label | Approved (§12B.2 D): the owner-only fields are active or inactive, access end or no-expiry, and next start when relevant (next start shown only in SCHEDULED, owner decision 8, 2026-11-01). Still open: the label wording, whether an admin grant may show a label, and staff visibility. The Android view is DEFERRED (Part 9). |
 | Dec 11 | Advisers (item 19) | RECOMMENDED | Engage an Indian CA and a lawyer before any paid collection | No engagement is evidenced. Their advice is needed for the blockers in Part 6. |
@@ -98,9 +122,9 @@ Not needed before the 7B design (§15.3): item 5 and Dec 13 to 15; C-6; C-1; C-3
 
 | ID | Decision | Needed before | Claude suggests | Consequence |
 |---|---|---|---|---|
-| Item 5, Dec 14 | Production-owner evidence: the admin Auth user UUID (never inferred) and the MFA status. Whether `aal2` is required for admin RPCs. Both are EXTERNAL BLOCKER | 7A, the bootstrap row, 7C, 7D | Require `aal2`. The production owner supplies the UUID | 7A cannot finish without them. The UUID is not put in the migration. |
+| Item 5, Dec 14 | Production-owner evidence: the admin Auth user UUID (never inferred) and the MFA status. Whether `aal2` is required for admin RPCs. Both are EXTERNAL BLOCKER | 7A, the bootstrap row, 7C, 7D | Require `aal2`. The production owner supplies the UUID | 7A cannot finish without them. The UUID is not put in the migration. 2026-11-02 (Part 1D): `aal2` requirement OWNER-APPROVED. Recovery procedure and hosted and local claim verification OPEN. |
 | Dec 16, maximum length (item 7) | Maximum custom grant length | 7C validation | DECIDED (owner, 2026-11-01): none. No maximum duration | Closed. The 7B schema has no duration cap. The 7C validation must not impose one. |
-| Item 15, C-12 | Global denial ceiling value. Accept count-only records above the cap of 20 per user per hour | 7C | Set the ceiling after staging measures row growth. No value is proposed here. **Circular:** §15.3 requires this ceiling accepted before 7C, but the measurement needs the 7C denial log on staging. Owner to choose: (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. Not decided. | Sets denial-log growth. Detail above the cap is lost, and the owner must accept that. |
+| Item 15, C-12 | Global denial ceiling value. Accept count-only records above the cap of 20 per user per hour | 7C | Set the ceiling after staging measures row growth. No value is proposed here. **Circular:** §15.3 requires this ceiling accepted before 7C, but the measurement needs the 7C denial log on staging. Owner to choose: (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. 2026-11-02 (Part 1D): option (a) chosen, a provisional ceiling for staging only. Production ceiling and remaining C-12 details OPEN. | Sets denial-log growth. Detail above the cap is lost, and the owner must accept that. |
 | Dec 7 | Deletion schedule: whether licence expiry should change file deletion timing. This is separate from the expiry behaviour already approved (A, B, C) | Enforcement activation, and any retention change | No view given here. The current schedule stays until decided | Open under item 1. The current purge schedule is unverified live (§5C). |
 | C-1 (item 1) | Lawyer's answer on the release rule for held files. Option (i): a new terminal order status, which changes the 0001 transitions and is out of scope so far. Option (ii): a licence-specific file-release rule | Before the owner's C-3 decision, and before M1 | Lawyer answers first. The owner chooses the option afterwards | Without an answer, held files of paid orders in `printing` are never purged (0010 lines 795–798). |
 | C-3 (item 1) | Held files: accept as an interim, or hold enforcement back | The 7F build (C-3 decided). Enabling depends on the choice | Decide after the C-1 answer | Accept as an interim: held files are kept indefinitely until M1 exists. Hold back: enabling waits for M1, for item 2 (reopened) and, where paid orders are affected, for item 10. The build needs C-3 decided, whichever choice is made. |

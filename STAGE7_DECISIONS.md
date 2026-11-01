@@ -826,6 +826,35 @@ The earlier chat plan is not reproduced in this file. The items below record its
 
 ## 13. Revision log
 
+### Owner decisions (2026-11-02): Stage 7C recommendations (OWNER-APPROVED)
+
+Source: owner approval given in a ChatGPT conversation on 2026-11-02, in direct response to the Stage 7C recommendations: "Continue, i approve". Recorded here at the owner's instruction.
+
+This record approves the decisions below, and nothing else. It does **not** approve 7C implementation, SQL execution, staging setup or tests, migration application, commit, push, merge or deployment. 7B-2 implementation, R18 implementation and the two-session tests keep their existing status. No earlier decision or date is changed.
+
+| # | Decision (OWNER-APPROVED, 2026-11-02) | Conditions and OPEN items | Applied to |
+|---|---|---|---|
+| 1 | AAL2: `aal2` is required for every platform-admin RPC. | OPEN: a verified recovery procedure if the admin loses the TOTP factor; hosted and local verification of the `aal` claim (R16, S-3). Both remain prerequisites before 7C. | Decision 14; item 5; §12A.4; §12A.11 |
+| 2 | Item 15: option (a), a provisional ceiling for staging only. | OPEN: the production ceiling value; the remaining C-12 and item 15 details. The §15.3 wording that separates staging from production is not yet amended. | Item 15; C-12; §15.3 |
+| 3 | Migration placement P1: `licence_requests` and `licence_denials` are included in `supabase/migrations/0011_licence_foundation.sql`. | Subject to pre-staging review. Not applied. 0011 does not yet contain these tables. Adding them is a separate step and is not approved by this record. | §12A.12 7B; §15.3 7B |
+| 4 | Lifetime grants: admin-only. | Replaces the earlier "owner-only" recommendation. Under 0011 as written, any platform admin can grant lifetime, because no role column exists. | Decision 16; item 7 |
+| 5 | Backdating: explicit confirmation required. | OPEN: the maximum backdating window. | Decision 16; item 7 |
+| 6 | Extend: rejected while lifetime coverage is active. | Not addressed by this record: the extend start rule when no lifetime coverage is active. | §12A.6; §12B.11 |
+| 7 | Denied requests: not written to the replay ledger. A later valid request may reuse the same request ID. | Denial rows (detail or count) are unchanged. | R5; M3; §12B.7 |
+| 8 | Request ID scope: globally unique. | Replay matching rules are not restated here; they stay as in R5. | R5; §12A.8 |
+| 9 | Global enforcement audit (`enforcement_change`): deferred to 7F. | Out of 7C scope. No change to 0011 from this decision. | §12A.9; §15.3 7F |
+| 10 | Lock enforcement: no GUC marker. No lock-acquiring trigger, unless staging evidence shows a gap and a separate 7B-2 amendment is approved. | OPEN: that staging evidence and that amendment. | R18; §13 third record |
+| 11 | Admin grant arithmetic: Asia/Kolkata calendar arithmetic. | OPEN: month-end clamping, and exact timestamp behaviour. | M4; fix 10; §12B.11 |
+
+**Still OPEN after this record (not decided):**
+- The maximum backdating window.
+- The AAL2 recovery procedure, and hosted and local verification of the `aal` claim.
+- Admin grant month-end arithmetic confirmation (clamping and exact timestamp behaviour).
+- C-12 and the remaining item 15 details, including the production ceiling value.
+- Legal review of production retention and personal-data handling (decision 20; M8; S-6; items 14 and 15).
+
+**Status after this record:** 7C implementation NOT approved. 7C staging NOT approved. 7B-2 implementation NOT approved (unchanged). R18 implementation NOT approved (unchanged). Two-session tests OUTSTANDING. Migration 0011 NOT applied, and this record does not edit it. Item statuses and counts in §14.2 are unchanged, because no item changed status.
+
 ### Owner decisions (2026-11-01): baseline, C-5, items 7 and 8, Dec 16, renewal
 
 Seven owner decisions recorded. They change statuses and scope. No code, test, SQL run, local setup, staging, commit, push, merge or applied migration is approved by this entry.
@@ -1172,7 +1201,7 @@ Count (2026-11-01): 7 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 6
 | 12 | Email-volume tier E (§5A; §10 item 11) | RECOMMENDED | B | The owner estimates emails per order from real data. Both the Free and Pro scenarios stay until then. | Projections only. Not Stage 7 code. |
 | 13 | Expiry, grace and the shop-facing view (decisions 7, 18, 19) | RECOMMENDED | A, D | Approved: printing-only enforcement, held queued jobs and no retries while inactive (A, B, C). The "no new customer orders" wording is superseded by A and B (C-9, DECIDED 2026-11-01, owner decision 9; see §12B.9). Approved (§12B.2 D): owner-only status with the fields listed there. Open: staff visibility (§12B.2 D); the owner confirms no grace period (decision 18); and the labels, Active or Inactive, with no admin-grant label (decision 19). The Android view is DEFERRED. Reopening trigger for it: a new owner decision to show the licence view in the Android app. The deletion-schedule question under decision 7 sits in item 1. | 7E wording. |
 | 14 | Manual payments, verification and audit (decision 20; §12A.7; §12B.8) | EXTERNAL BLOCKER | A, C, D | The payment-method list is recommended (UPI direct, bank transfer, cash, cheque, other), but it is DEFERRED with the paid path (M5). A CA advises on GST invoices for manual receipts. A lawyer advises on personal data in audit rows and their retention. | Paid path (M5); any audit-retention job (none approved). |
-| 15 | Denial and replay retention; denial growth (M3, M8; C-12; decision 20) | EXTERNAL BLOCKER | A, B, E | Approved: detailed denial records capped at 20 per user per hour, with count-only records above the cap (M3, design only). A lawyer reviews the retention periods (90 days for denial records; replay records kept until a safe mechanism exists; M8). Staging measures row growth. The owner accepts the global ceiling (no value is proposed here) and the count-only limitation (C-12). Circular: §15.3 requires the ceiling accepted before 7C, but the measurement needs 7C denial logging on staging. The owner chooses (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. Not decided. | 7C denial logging; retention in 7C. |
+| 15 | Denial and replay retention; denial growth (M3, M8; C-12; decision 20) | EXTERNAL BLOCKER | A, B, E | Approved: detailed denial records capped at 20 per user per hour, with count-only records above the cap (M3, design only). A lawyer reviews the retention periods (90 days for denial records; replay records kept until a safe mechanism exists; M8). Staging measures row growth. The owner accepts the global ceiling (no value is proposed here) and the count-only limitation (C-12). Circular: §15.3 requires the ceiling accepted before 7C, but the measurement needs 7C denial logging on staging. The owner chooses (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. Not decided. 2026-11-02 (§13): option (a) chosen, a provisional ceiling for staging only. The production ceiling value and the remaining C-12 and item 15 details remain OPEN. Status unchanged. | 7C denial logging; retention in 7C. |
 | 16 | Licence unit and term (decisions 1, 2; §9 items 1–2) | DEFERRED (renewal part; unit DECIDED) | A | Unit: DECIDED, per shop (decision 1, owner decision 2026-10-31; §13). Term: 12 months, approved as policy (M4). Renewal (decision 2): DEFERRED by owner decision 7 (2026-11-01). It does not block 7B. Its proposal is manual renewal with no automatic renewal. | Paid path (renewal rule). The unit no longer blocks 7B. |
 | 17 | Processor and gateway (decision 9; §3; §4) | DEFERRED | C, D | The gateway is deferred. §12A.1 records that the owner collects licence payments manually for now. Stripe is invite-only for new Indian businesses (§3, verified). Razorpay India signup is unverified. When the gateway is reopened, processor eligibility evidence and CA advice are needed first. If a named processor is chosen for pricing (item 4), its eligibility evidence and fee basis are needed before pricing; that does not reopen integration. | Gateway work (later stage; §12A.12); the fee basis for pricing if a named processor is chosen (item 4). Reopening trigger: a new owner decision to reopen decision 9. |
 | 18 | GST route, exemption, input credit, reverse charge, TDS and invoices (decision 4; §10 item 3) | EXTERNAL BLOCKER | C | The CA decides the registration route, the current status of Notification 10/2017-IT, input credit, reverse charge on foreign services, TDS and invoicing. | Pricing tax treatment (I); invoices; paid path. |
@@ -1274,9 +1303,9 @@ Apart from C-5, items 4 (pricing and channel), 10, 14, 17 and 18 are not prerequ
 | 11 | Advisers | RECOMMENDED | 19 | Owner engages. |
 | 12 | Premium features | DEFERRED | 21 | None built. Reopening trigger: a feature list and build plan (item 21). |
 | 13 | Admin accounts (one owner account) | RECOMMENDED | 5 | Owner confirms. The UUID is EXTERNAL (item 5). |
-| 14 | MFA (`aal2`) | EXTERNAL BLOCKER | 5 | The production owner records the MFA status. |
+| 14 | MFA (`aal2`) | EXTERNAL BLOCKER | 5 | OWNER-APPROVED 2026-11-02 (§13): `aal2` is required for every platform-admin RPC. OPEN: the verified recovery procedure, and hosted and local verification of the `aal` claim. The production owner records the MFA status. Status unchanged. |
 | 15 | Admin UI hosting | RECOMMENDED | 6 | Owner confirms a separate private deployment. |
-| 16 | Grant limits | RECOMMENDED | 7 | Backdating and lifetime owner-only are 7C validation and remain RECOMMENDED. Maximum custom length: none (owner decision 6, 2026-11-01). |
+| 16 | Grant limits | RECOMMENDED | 7 | Maximum custom length: none (owner decision 6, 2026-11-01). 2026-11-02 (§13): backdating requires explicit confirmation; lifetime grants are admin-only, replacing the earlier "owner-only" recommendation; the maximum backdating window is OPEN. Status unchanged. |
 | 17 | Standalone revocation of paid periods | DEFERRED | 8 | Deferred with the paid path (M5). Reversal (H) and refusal after the natural end (M2) are approved. Reopening trigger: the paid path is approved (M5). |
 | 18 | Expiry and grace (no grace) | RECOMMENDED | 13 | Owner confirms. Printing is blocked in every non-ACTIVE state. |
 | 19 | Shop-facing view | RECOMMENDED | 13 | The owner-only fields are approved (§12B.2 D). Open: the labels, including whether an admin grant may show a label; and staff visibility (§12B.3). The Android view is DEFERRED. Reopening trigger: a new owner decision to show the licence view in the Android app. |
