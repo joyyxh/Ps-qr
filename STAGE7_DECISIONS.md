@@ -564,7 +564,7 @@ SQL tests run only on a staging copy (CLAUDE.md). Minimum matrix:
 ### 12A.12 Implementation stages (proposed; none started or approved)
 
 - **7A. Owner inputs:** decisions 13–20; the Auth user UUID; MFA confirmation; admin UI hosting. No code.
-- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, and `shop_licence_meta`. Excludes `paid_verified`, `trial`, and `licence_payments` (M5; C-5, DECIDED 2026-11-01). **Split on 2026-11-01:** 7B-1 (file only, unapplied, `supabase/migrations/0011_licence_foundation.sql`) covers the tables, triggers, RLS deny-all, `is_platform_admin()` and `shop_licence_state()`. 7B-2 (`licence_lock_shop()` and `shop_licence_meta`) needs its own implementation approval, because it takes the shop lock. The R18 lock-order contract is design-approved (§13, third record). Its implementation is not approved. Built to the corrections in §12B.5 and the tests in §12B.11. SQL tests on staging only, after separate approvals for local setup and for migration creation.
+- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, and `shop_licence_meta`. Excludes `paid_verified`, `trial`, and `licence_payments` (M5; C-5, DECIDED 2026-11-01). **Split on 2026-11-01:** 7B-1 (file only, unapplied, `supabase/migrations/0011_licence_foundation.sql`) covers the tables, triggers, RLS deny-all, `is_platform_admin()` and `shop_licence_state()`. 7B-2 (`licence_lock_shop()` and `shop_licence_meta`) was approved for implementation on 2026-11-01, for that scope only, because it takes the shop lock. The R18 lock-order contract is design-approved (§13, third record). Its implementation is not approved. Built to the corrections in §12B.5 and the tests in §12B.11. SQL tests on staging only, after separate approvals for local setup and for migration creation.
 - **7C. Admin RPCs and the read RPC:** grant, extend, revoke (with the M2 rule), and replace; `shop_licence_status` (owner read RPC); denial logging (M3, M8). Manual payment record, verify, and reverse are deferred (M5). Matrix from §12A.11 and §12B.11 on staging.
 - **7D. Admin UI:** a separate private app with login, shop search, grant, extend, revoke, and replace forms with confirmation, and an audit view. Payment entry is deferred (M5). Browser smoke test on staging.
 - **7E. Shop read-only status:** owner web view with the minimal fields in decision D. Android is DEFERRED (item 13). No enforcement.
@@ -819,12 +819,22 @@ The earlier chat plan is not reproduced in this file. The items below record its
 1. Owner answers to C-1, C-3, C-4, C-6, and the pending items in §12B.3. C-5 and C-8 were answered on 2026-11-01. C-2 is deferred with item 2. C-10 is answered: trials are deferred, not removed (owner instruction 4, 2026-10-31).
 2. Separate approval for local setup (Option A). The setup steps are not reproduced in this file and must be written out and reviewed before that approval is requested.
 3. Separate approval to inspect the local Auth schema (L).
-4. Creating migration 0011 for 7B-1 was approved on 2026-11-01. It is file only and unapplied. 7B-2 needs its own implementation approval. The R18 lock-order contract is design-approved (§13, third record). Each staging run needs its own approval.
+4. Creating migration 0011 for 7B-1 was approved on 2026-11-01. It is file only and unapplied. 7B-2 implementation was approved on 2026-11-01 for its scope only (§13, status correction). The R18 lock-order contract is design-approved (§13, third record); its implementation is NOT approved. Each staging run needs its own approval.
 5. Diff review of the duplicate-print fix (K). Then a separate approval for targeted local tests. Staging tests and the implementation each need their own explicit approval.
 6. Separate approval for the refund and claim fix (M7), after diff review.
 7. Separate approval for each of 7C, 7D, 7E, and 7F. The M1 rule has its own review (§12B.6).
 
 ## 13. Revision log
+
+### Status correction (2026-11-02): 7B-2 implementation
+
+*Corrected 2026-11-02.* Earlier wording in this file and in `OWNER_DECISION_SHEET.md` described 7B-2 as NOT approved or waiting for approval. That wording was stale. The accurate status is:
+
+- **7B-2 implementation was approved on 2026-11-01**, under the owner's instruction of that date to implement only Stage 7B-2 under the approved R18 design. Scope: `shop_licence_meta`, its guard (`shop_licence_meta_guard`), and `licence_lock_shop()`. Nothing else is covered.
+- The draft is in `supabase/migrations/0011_licence_foundation.sql`, untracked on `stage7-payments`. It is not applied, not tested and not committed.
+- **Not approved:** staging verification of 7B-2, SQL execution, database access, staging setup and runs, and migration application. Each needs its own approval.
+- **R18 implementation: NOT APPROVED.** The R18 lock-order design is approved (third record, 2026-11-01). That approval does not cover R18 implementation or the two-session tests.
+- The O1–O13 proposals in the 2026-11-02 section below remain **PROPOSED — OWNER APPROVAL REQUIRED**. The 2026-11-02 migration-placement approval (decision 3) is unchanged.
 
 ### Owner decisions (2026-11-02): Stage 7C recommendations (OWNER-APPROVED)
 
@@ -853,7 +863,29 @@ This record approves the decisions below, and nothing else. It does **not** appr
 - C-12 and the remaining item 15 details, including the production ceiling value.
 - Legal review of production retention and personal-data handling (decision 20; M8; S-6; items 14 and 15).
 
-**Status after this record:** 7C implementation NOT approved. 7C staging NOT approved. 7B-2 implementation NOT approved (unchanged). R18 implementation NOT approved (unchanged). Two-session tests OUTSTANDING. Migration 0011 NOT applied, and this record does not edit it. Item statuses and counts in §14.2 are unchanged, because no item changed status.
+**Status after this record:** 7C implementation NOT approved. 7C staging NOT approved. *Corrected 2026-11-02:* 7B-2 implementation APPROVED on 2026-11-01 for its scope only (§13, status correction). R18 implementation NOT APPROVED (unchanged). Two-session tests OUTSTANDING. Migration 0011 NOT applied, and this record does not edit it. Item statuses and counts in §14.2 are unchanged, because no item changed status.
+
+### Proposed decisions (2026-11-02): awaiting owner approval
+
+**PROPOSED — OWNER APPROVAL REQUIRED.** The 13 items below are proposals. None is an approved decision. Each needs its own explicit owner approval. They change no status, gate, count or migration. They approve no 7C implementation, SQL, database access, staging setup or runs, tests, migration application, commit, push, merge or deployment. The approved 2026-11-02 record above is unchanged, including decision 3 (migration placement).
+
+| # | Proposal | Status | Relation to approved decisions and open points |
+|---|---|---|---|
+| O1 | Use a separate `licence_denial_windows` table for licence denial counters. | PROPOSED — OWNER APPROVAL REQUIRED | Would replace the `consume_rate_limit` counter design in §12B.7. Its placement is not decided here (see O2). |
+| O2 | Keep the 2026-11-02 placement: `licence_requests` and `licence_denials` stay in `0011_licence_foundation.sql` and are not moved to a new migration. The `licence_denial_windows` table needs separate placement approval. | PROPOSED — OWNER APPROVAL REQUIRED | Restates approved decision 3. Adds no table to 0011. |
+| O3 | Extend starts at `greatest(v_now, latest non-revoked coverage end)`. | PROPOSED — OWNER APPROVAL REQUIRED | Fills the open start-rule point in decision 6. §12A.6 is not edited here; it would need a matching edit if approved. |
+| O4 | Reject overlapping grants and duplicate non-revoked lifetime grants. | PROPOSED — OWNER APPROVAL REQUIRED | The decision docs have no current rule for either case. The exact overlap test is not written here. |
+| O5 | Accept PostgreSQL month-end clamping for admin grant arithmetic. | PROPOSED — OWNER APPROVAL REQUIRED | Partly fills decision 11. The exact timestamp behaviour stays OPEN. |
+| O6 | Defer admin disable from 7C. | PROPOSED — OWNER APPROVAL REQUIRED | §12A.8 still describes a disable RPC and is not edited here. If approved, that text moves out of 7C scope. |
+| O7 | Break-glass writes require a documented lock-first procedure: `licence_lock_shop()` is called before any write. | PROPOSED — OWNER APPROVAL REQUIRED | The procedure is not written here. Decision 10 (no GUC marker, no lock-acquiring trigger) is unchanged. |
+| O8 | Staging backdating window: 31 days, staging only. | PROPOSED — OWNER APPROVAL REQUIRED | The production window stays OPEN (decision 5). |
+| O9 | Staging denial ceiling: count and alert, with no automatic refusal. | PROPOSED — OWNER APPROVAL REQUIRED | The numeric ceiling stays undecided. Item 15 stays on option (a) (decision 2). |
+| O10 | Accept the C-12 limitations for synthetic staging only. The limitations: above 20 detailed denial rows per user per hour, only counts are kept; calls rejected by the permission check before the function runs (for example anon, which has no EXECUTE on admin RPCs) are not counted. | PROPOSED — OWNER APPROVAL REQUIRED | Not accepted for production. The production C-12 position stays OPEN. |
+| O11 | Verify the AAL2 requirement and the recovery procedure using hosted staging. | PROPOSED — OWNER APPROVAL REQUIRED | Local verification of the `aal` claim is not covered and stays OPEN (decision 1). |
+| O12 | Use a hosted staging project for SQL and staging tests (recommended). | PROPOSED — OWNER APPROVAL REQUIRED | No project, credentials or setup are approved. |
+| O13 | Approve the proposed staging test scope, including the R18 two-session tests (item 33). | PROPOSED — OWNER APPROVAL REQUIRED | Subject to separate setup approval and separate execution approval. Two-session tests stay OUTSTANDING. |
+
+**Status after these proposals:** unchanged from "Status after this record" above.
 
 ### Owner decisions (2026-11-01): baseline, C-5, items 7 and 8, Dec 16, renewal
 
@@ -908,7 +940,7 @@ Rules:
 
 | Function (0010 unless stated) | Requirement | Gate |
 |---|---|---|
-| `licence_lock_shop()` and `shop_licence_meta` (new, 7B-2) | Rules 2 to 4: insert-if-missing and lock. No advisory lock | Separate implementation approval (7B-2) |
+| `licence_lock_shop()` and `shop_licence_meta` (new, 7B-2) | Rules 2 to 4: insert-if-missing and lock. No advisory lock | Approved for implementation 2026-11-01 (7B-2 scope only). Staging and application need separate approval |
 | Admin licence RPCs (new, 7C) | Rules 1 to 3 | 7C approval; item 15 ceiling; staging test first |
 | `agent_claim_next_job` (630–685) | Rule 4 before line 643; rule 10 for the recovery call at line 644 | 7F approval; rule 10 under printing approval |
 | `agent_mark_printing` (688–709) | Rule 4 before line 699 | 7F approval |
@@ -934,7 +966,7 @@ Rules:
 
 **Remaining blockers.** None is cleared by this record.
 
-- Implementation approval for `licence_lock_shop()` and `shop_licence_meta` (7B-2), and for each row of the function table.
+- 7B-2 (`licence_lock_shop()` and `shop_licence_meta`): implementation approved on 2026-11-01 for that scope only. Each other row of the function table still needs its own implementation approval.
 - Item 23 (M7 diff review) before the retry change. Item 24 after item 23 and the R-a, R-b or R-c choice.
 - Printing approval for rule 10, with the M7 review.
 - Rule 8 decision: whether approve checks licence (7F).
@@ -1219,7 +1251,7 @@ Count (2026-11-01): 7 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 6
 | 30 | Customer-document sensitivity and retention (§4; README passport-photo layout) | EXTERNAL BLOCKER | C | A lawyer classifies sensitivity and DPDP applicability (§4). Engineering reviews storage and link handling, including the 180-second window (S-4). | Retention rules (item 1); privacy text (item 29). |
 | 31 | Live Auth settings and Supabase configuration (§4; README next steps item 6; `supabase/config.toml`) | EXTERNAL BLOCKER | B, E | The production owner records, read-only, the live leaked-password protection, Site URL, SMTP and MFA settings. Versioning the configuration (`supabase/config.toml`, created by `supabase init`) is DEFERRED until local setup is approved. | MFA decision (item 5). Configuration versioning waits for local setup. |
 | 32 | Rollback and enforcement kill switch (§12A.10; §12B) | IMPLEMENTATION GATE | B, E | No design exists. Engineering designs it, and the owner approves before 7F. Without it, 7F has no designed off switch. 0011 has no production rollback plan. | 7F approval. |
-| 33 | Lock-order contract (R18; §12B.5) | IMPLEMENTATION GATE | B, E | The per-RPC lock map of the existing code is in §12B.5. The lock-order contract (meta → order → agent → jobs) is design-APPROVED (2026-11-01, §13 third record) and not built. It is NOT approved for implementation (owner, 2026-11-01). Two-session tests on staging need separate approval. It blocks `licence_lock_shop()` and `shop_licence_meta` (gate 7B-2) until a separate implementation approval. | 7B-2, 7C and 7F. |
+| 33 | Lock-order contract (R18; §12B.5) | IMPLEMENTATION GATE | B, E | The per-RPC lock map of the existing code is in §12B.5. The lock-order contract (meta → order → agent → jobs) is design-APPROVED (2026-11-01, §13 third record) and not built. It is NOT approved for implementation (owner, 2026-11-01). Two-session tests on staging need separate approval. The 7B-2 helper and meta row (`licence_lock_shop()`, `shop_licence_meta`) are approved for implementation (2026-11-01, scope only). That approval does not approve the R18 implementation above or these tests. | 7B-2, 7C and 7F. |
 | 34 | Test data and demo seed on live (README lines 397 and 463; `supabase/seed/demo_seed.sql`) | EXTERNAL BLOCKER | B, D | The production owner confirms whether `demo_seed.sql` ever ran on live. Deleting the test rows listed in the README is destructive and needs explicit owner go-ahead. That deletion is DEFERRED. Reopening trigger: the owner's explicit go-ahead. | Shop count N (item 11). |
 | 35 | Other numbered items: R1 to R19, S-1 to S-8, M1 to M8 (§12B) | EXTERNAL BLOCKER | D, E | Each ID has its own status in §14.4 to §14.7. The item takes the status of its first outside step: a lawyer reviews the M8 and S-6 retention periods (item 15). | As listed per ID. |
 
@@ -1360,7 +1392,7 @@ Item 4's owner parts (collection channel, price and minimum) follow the CA's tax
 | Gate | Scope | Prerequisites | Approval needed | Tests (§12A.11, §12B.11) | Rollback |
 |---|---|---|---|---|---|
 | 7A Owner inputs | Decisions 13 to 16 and 18 to 19; owner confirmations for items 6, 7, 8, 13, 16; the production-owner UUID and MFA answers (item 5) | Owner's written answers; production-owner checks | The owner's written answers | None. No code | None needed |
-| 7B Schema, migration 0011 (staging only) | 7B-1 (file only, unapplied): licence tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`. 7B-2 (not approved; needs its own implementation approval; R18 contract design-approved 2026-11-01): `licence_lock_shop()`, `shop_licence_meta`. Paid tables excluded (C-5, decided 2026-11-01) | Gate 1 or staging setup, with 0010 applied to the staging copy under its own approval; the owner inputs listed below the gate table (C-5, item 8, and the basis ranking in item 7, all decided 2026-11-01; the licence unit in item 16 was decided 2026-10-31). For tests only: the R15 fixture approach (decision L) and the R17 default-privilege check. Item 26's live list is needed before any production migration, not for staging | File creation for 7B-1 approved 2026-11-01. Separate approval for 7B-2, for each staging run, and for any application | State, trigger, privilege and regression tests | Drop the 0011 objects on staging. No production rollback plan exists (item 32) |
+| 7B Schema, migration 0011 (staging only) | 7B-1 (file only, unapplied): licence tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`. 7B-2 (approved for implementation 2026-11-01, scope only; R18 contract design-approved 2026-11-01; R18 implementation NOT approved): `licence_lock_shop()`, `shop_licence_meta`, and the guard. Paid tables excluded (C-5, decided 2026-11-01) | Gate 1 or staging setup, with 0010 applied to the staging copy under its own approval; the owner inputs listed below the gate table (C-5, item 8, and the basis ranking in item 7, all decided 2026-11-01; the licence unit in item 16 was decided 2026-10-31). For tests only: the R15 fixture approach (decision L) and the R17 default-privilege check. Item 26's live list is needed before any production migration, not for staging | File creation for 7B-1 approved 2026-11-01. Separate approval for each staging run and for any application. 7B-2 implementation approved 2026-11-01 (scope only) | State, trigger, privilege and regression tests | Drop the 0011 objects on staging. No production rollback plan exists (item 32) |
 | 7C Admin RPCs and owner read RPC | Grant, extend, revoke (M2), replace; denial logging (M3); idempotency (R5); owner read (decision D) | 7B on staging; the lock map confirmed by a two-session test (item 33); the global denial ceiling accepted (item 15; circular with its measurement, see §14.2 item 15); the count-only limitation accepted (C-12); item 5; the decision 16 validation inputs (duration, backdating, lifetime owner-only, and maximum custom length, decided as none by owner decision 6) | Separate approval | Admin, privilege, concurrency and denial-cap tests | Revoke `EXECUTE` on the admin RPCs (needs a migration). This rollback changes no coverage row (§15.5) |
 | 7D Admin UI, separate private deployment | Login, shop search, grant, extend, revoke, replace with confirmation, audit view; MFA enrolment if decision 14 requires it | 7C on staging; the hosting decision (item 6); the visibility check (item 6); item 5 | Separate approval | Browser smoke test on staging; static scan that no service key is in the bundle | Take the deployment down. No database change, and no coverage row changes (§15.5) |
 | 7E Owner read-only status, web | Fields as in decision D; labels (item 13); display rule (item 8) | 7C; the label decision (item 13); the display rule (item 8) | Separate approval | Owner status returns only the D fields whatever the enforcement state; staff denied (§12B.2 D) | Remove the owner status UI. Revoke `EXECUTE` on `shop_licence_status` only if the read RPC must be withdrawn (needs a migration). The rollback changes no coverage row and grants or revokes no licence (§15.5) |
@@ -1419,7 +1451,7 @@ Answers are as of 2026-10-31. "NO" means the question is not yet satisfied.
 | 3 | Is every open ID given one status? | YES | Items 1 to 35, groups A to E, decisions A to L and 1 to 20, M1 to M8, C-1 to C-15, S-1 to S-8 and R1 to R19 are each in §14. |
 | 4 | Are external blockers identified with their outside party? | YES | The 17 EXTERNAL BLOCKER items in §14.2 name the party. The answers are not in the repository. |
 | 5 | Are factual claims supported by repository evidence? | PARTLY | Repository facts are re-checked with line numbers (§2, §4, §5C, §12A.2, §12B.4 to §12B.9). Live state, README statements and external sources are labelled and not verified. |
-| 6 | Is the implementation scope frozen? | NO | The 7B-1 inputs (C-5, item 8, item 7 basis ranking) were decided on 2026-11-01. 7B-2 waits on its own implementation approval (R18 contract design-approved 2026-11-01). Staging waits on a copy with 0010 applied and its own approval. The licence unit (item 16) is decided. Item 26 is needed only before a production migration. 7F build waits on 7C and 7E, on item 1 (requires C-1 answered and C-3 decided; neither is decided), and on items 25, 32, 33 and S-4. Before enabling only: item 11, and M1 and item 2 if C-3 holds enforcement back. |
+| 6 | Is the implementation scope frozen? | NO | The 7B-1 inputs (C-5, item 8, item 7 basis ranking) were decided on 2026-11-01. 7B-2 implementation was approved on 2026-11-01 for its scope only (R18 contract design-approved 2026-11-01; R18 implementation NOT approved). Staging waits on a copy with 0010 applied and its own approval. The licence unit (item 16) is decided. Item 26 is needed only before a production migration. 7F build waits on 7C and 7E, on item 1 (requires C-1 answered and C-3 decided; neither is decided), and on items 25, 32, 33 and S-4. Before enabling only: item 11, and M1 and item 2 if C-3 holds enforcement back. |
 | 7 | Are setup, staging, production and deployment permissions still separate? | YES | §15.2, §15.3 and §15.5. No approval exists for any of them. The main checkout and `stash@{0}` are untouched. |
 | 8 | Are the Stage 7 closure criteria met? | NO | See §16.1. |
 

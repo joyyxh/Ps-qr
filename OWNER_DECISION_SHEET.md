@@ -50,7 +50,7 @@ These four owner decisions, dated 2026-11-01, are recorded in `STAGE7_DECISIONS.
 | 10 | `service_role` stays revoked from the licence tables and helper functions (migration 0011) | Decided. This differs from 0010 by design. No service-key path reads licence data now; any future grant needs its own decision. |
 | 11 | `p_at`: owner-facing state reads use the current time only. Historical state queries are not supported | Decided. History comes from `licence_audit_log`. |
 
-Not decided by this record: R18 (lock order). Status after the third record on the same date (Part 1C): R18 design is APPROVED; implementation is NOT APPROVED. The deadlock analysis was returned for approval, and no printing or admin change is authorised. 7B-2 and 7C do not start.
+Not decided by this record: R18 (lock order). Status after the third record on the same date (Part 1C): R18 design is APPROVED; implementation is NOT APPROVED. The deadlock analysis was returned for approval, and no printing or admin change is authorised. *Corrected 2026-11-02:* 7B-2 implementation was approved on 2026-11-01 for its scope only (Part 1F). 7C does not start.
 
 ## Part 1C. Recorded on 2026-11-01 (third record): R18 lock-order contract, design only
 
@@ -61,7 +61,7 @@ The owner accepted the final R18 lock-order contract as an approved **design** d
 | R18 lock order: shop meta row → order → agent → jobs (ascending id) | Design APPROVED. Not built, not tested |
 | Rate-limit calls before the meta lock; no coverage row without a locked meta row | Part of the approved design |
 | Advisory lock from the earlier R18 design | Removed from the design |
-| `licence_lock_shop()` and `shop_licence_meta` (7B-2) | NOT approved for implementation. Separate approval |
+| `licence_lock_shop()` and `shop_licence_meta` (7B-2) | *Corrected 2026-11-02:* approved for implementation on 2026-11-01, scope only (Part 1F). As first recorded: NOT approved for implementation |
 | Admin RPCs (7C) | NOT approved. Separate approval |
 | Retry (item 23), refund R-a (item 24), recovery `SKIP LOCKED` | NOT approved. Each keeps its own gate (Part 8) |
 | 7F build and enabling | NOT approved. Gates unchanged |
@@ -90,7 +90,39 @@ This part approves no implementation, SQL, staging, migration application, commi
 
 **Still OPEN after this record:** the maximum backdating window; the AAL2 recovery procedure and hosted and local claim verification; admin grant month-end arithmetic confirmation; C-12 and the remaining item 15 details; legal review of production retention and personal-data handling.
 
-**Not approved by this record:** 7C implementation; 7C staging; SQL execution; staging setup and tests; migration application; commit, push, merge and deployment. 7B-2 and R18 implementation keep their existing status. Item statuses and counts (§14.2) are unchanged.
+**Not approved by this record:** 7C implementation; 7C staging; SQL execution; staging setup and tests; migration application; commit, push, merge and deployment. 7B-2 implementation keeps its 2026-11-01 approval (scope only, Part 1F). R18 implementation keeps its NOT APPROVED status. Item statuses and counts (§14.2) are unchanged.
+
+## Part 1E. Proposed on 2026-11-02, awaiting owner approval
+
+**PROPOSED — OWNER APPROVAL REQUIRED.** These 13 items mirror the proposed section in `STAGE7_DECISIONS.md` §13. None is approved. Each needs its own explicit owner approval. They change no status, count or gate, and approve nothing: no 7C implementation, SQL, database access, staging setup or runs, tests, migration application, commit, push, merge or deployment. The approved 2026-11-02 decisions in Part 1D are unchanged.
+
+| No. | Proposal | Status |
+|---|---|---|
+| O1 | Use a separate `licence_denial_windows` table for licence denial counters, replacing the `consume_rate_limit` design. Its placement is separate (O2). | PROPOSED — OWNER APPROVAL REQUIRED |
+| O2 | Keep the 2026-11-02 placement: `licence_requests` and `licence_denials` stay in `0011_licence_foundation.sql`, not a new migration. The `licence_denial_windows` placement needs separate approval. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O3 | Extend starts at `greatest(v_now, latest non-revoked coverage end)`. Fills the start-rule point in Part 1D item 6. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O4 | Reject overlapping grants and duplicate non-revoked lifetime grants. No current rule exists. The exact overlap test is not written here. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O5 | Accept PostgreSQL month-end clamping. The exact timestamp behaviour stays OPEN. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O6 | Defer admin disable from 7C. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O7 | Break-glass writes require a documented lock-first procedure (`licence_lock_shop()` before any write). The procedure is not written here. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O8 | Staging backdating window: 31 days, staging only. The production window stays OPEN. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O9 | Staging denial ceiling: count and alert, with no automatic refusal. The numeric ceiling stays undecided. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O10 | Accept C-12 limitations for synthetic staging only: above 20 detailed denial rows per user per hour only counts are kept, and calls rejected by the permission check are not counted. Not accepted for production. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O11 | Verify the AAL2 requirement and recovery procedure using hosted staging. Local verification of the `aal` claim stays OPEN. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O12 | Use a hosted staging project for SQL and staging tests (recommended). No setup is approved. | PROPOSED — OWNER APPROVAL REQUIRED |
+| O13 | Approve the proposed staging test scope, including the R18 two-session tests, subject to separate setup and execution approval. | PROPOSED — OWNER APPROVAL REQUIRED |
+
+## Part 1F. Status correction (2026-11-02): 7B-2
+
+*Corrected 2026-11-02.* Earlier wording in this file and in `STAGE7_DECISIONS.md` §13 described 7B-2 as NOT approved or waiting for approval. That wording was stale. The accurate status:
+
+- **7B-2 implementation was approved on 2026-11-01**, under the owner's instruction of that date to implement only Stage 7B-2 under the approved R18 design. Scope: `shop_licence_meta`, its guard, and `licence_lock_shop()`. Nothing else.
+- The draft is in `supabase/migrations/0011_licence_foundation.sql`, untracked on `stage7-payments`. It is not applied, not tested and not committed.
+- **Not approved:** staging verification of 7B-2, SQL execution, database access, staging setup and runs, and migration application. Each needs its own approval.
+- **R18 implementation: NOT APPROVED.** The R18 lock-order design is approved (Part 1C). That does not approve R18 implementation or the two-session tests.
+- The O1–O13 proposals in Part 1E remain **PROPOSED — OWNER APPROVAL REQUIRED**. The 2026-11-02 migration-placement approval (Part 1D item 3) is unchanged.
+
+Stale status wording corrected in place: Part 1B (the 7B-2 and 7C sentence), Part 1C (the 7B-2 row), Part 1D (the status sentence), Part 4 (the R18 row), Part 8 (the 7B-2 row), and the 2026-11-01 "Not approved" summary.
 
 ## Part 2. Decide now (owner answers, RECOMMENDED)
 
@@ -139,7 +171,7 @@ Not needed before the 7B design (§15.3): item 5 and Dec 13 to 15; C-6; C-1; C-3
 | Staging evidence S-1 to S-3 | S-1: `anon` cannot call internal helpers (R9). S-2: default grants on new public tables (R17). S-3: the `aal` claim (R16; needs item 5) | Staging approval, after 7B | Run on staging only | Each is UNVERIFIED now. |
 | Runtime evidence S-5 | Worker behaviour when `markPrinting` throws (`agent/src/worker.mjs` lines 258–264). Static reading only so far | Local test approval, before 7F | Test locally first | Runtime behaviour is UNVERIFIED. |
 | Item 33 lock tests | Two-session test of the shop-lock order (R18). The lock-order contract is design-approved (Part 1C) and not built | Staging approval, before 7C and 7F | Run after the 7C design | The lock map of the existing code is recorded (§12B.5). |
-| R18 lock-order contract | Shop meta row → order → agent → jobs (§13 third record; Part 1C). Not built | Separate implementation approval before gate 7B-2 | Design approval: GIVEN (2026-11-01). Implementation approval: NOT GIVEN | Blocks `licence_lock_shop()`, the `shop_licence_meta` writer, and all admin RPCs (7C). The print-side changes (items 23, 24 and rule 10) have their own gates. |
+| R18 lock-order contract | Shop meta row → order → agent → jobs (§13 third record; Part 1C). Not built | 7B-2 approved for implementation 2026-11-01 (scope only). Separate implementation approval for the rest of R18 | Design approval: GIVEN (2026-11-01). R18 implementation approval beyond 7B-2: NOT GIVEN | 7B-2 is not blocked. The rest of the R18 implementation and all admin RPCs (7C) still need separate approval. The print-side changes (items 23, 24 and rule 10) have their own gates. |
 | Item 26 production migration | Applied migration list (read-only, production owner). The owner's decision to apply 0010 or 0011, after staging evidence | Any production migration | Keep the staging path separate | Not a Stage 7 closure requirement (instruction 3). |
 
 ## Part 5. Paid path, pricing and gateway (blocked or deferred; no answer needed now)
@@ -198,7 +230,7 @@ Neither fix is approved, and neither is a 7A to 7F prerequisite by default (§15
 |---|---|---|---|
 | 7A owner inputs | Dec 13 to 16 and 18 to 19. Confirmations for items 6, 7 (backdating and lifetime owner-only) and 13. Item 8 is DECIDED (2026-11-01). Item 16 renewal is DEFERRED and is not a 7A input | Production owner: UUID and MFA status (item 5) | Owner's written answers |
 | 7B-1 schema, migration `0011_licence_foundation.sql` on the origin/main line. File only, unapplied | DECIDED (2026-11-01): C-5; item 8; item 7 basis ranking. Licence unit DECIDED (item 16, decision 1). Renewal DEFERRED and not an input. Numbering per Part 1A | None for file creation. A production migration needs item 26 | File creation approved 2026-11-01. Each staging run needs its own approval |
-| 7B-2 lock helper and meta row (`licence_lock_shop()`, `shop_licence_meta`) | R18 lock-order contract (Part 1C): design approved 2026-11-01 | NOT APPROVED for implementation | Separate implementation approval |
+| 7B-2 lock helper and meta row (`licence_lock_shop()`, `shop_licence_meta`) | R18 lock-order contract (Part 1C): design approved 2026-11-01 | APPROVED for implementation 2026-11-01 (scope only). Draft in 0011: unapplied, untested, uncommitted | Staging verification and SQL execution NOT approved. Each needs its own approval |
 | 7B tests only: Option A or B (Part 4); Decision L and the fixture approach (Part 4) | Local or staging setup; Auth-schema inspection | NOT APPROVED | Separate approval for each step |
 | 7C admin RPCs | 7B on staging; the item 15 ceiling; C-12; the grant-limit inputs (Dec 16; maximum length is closed as none); item 33 lock tests on staging | Item 5 | Separate approval |
 | 7D admin UI | 7C on staging; hosting (Dec 15) | Item 6 visibility check; item 5 | Separate approval |
@@ -237,7 +269,7 @@ These approvals have no open condition. Blocked, conditional and proposed items 
 - Licence unit: per shop (decision 1, owner decision 2026-10-31). Item 16: renewal DEFERRED (decision 2; owner decision 7, 2026-11-01). The unit is DECIDED.
 - 2026-11-01: Stage 7 baseline is origin/main (717717b lineage), numbering from 0011, and local-main 0011–0014 kept separate and unmerged. C-5 accepted. Item 8 accepted (C-8, fixes 5 and 9). Item 7 basis ranking confirmed (lifetime over admin). Dec 16 maximum custom length: none. Renewal deferred and not a 7B blocker.
 - 2026-11-01, second record: next start shown only in SCHEDULED (decision 8); C-9 replacement wording adopted (decision 9); `service_role` stays revoked in 0011 (decision 10); owner-facing state reads use the current time only (decision 11).
-- Not approved (2026-11-01): the superseded advisory-lock admin contract. This refers only to the earlier advisory-lock R18 design. It does not refer to the R18 lock-order design, whose design is APPROVED (Part 1C) and whose implementation is NOT approved. Also not approved: `licence_lock_shop()`, admin RPCs, printing fixes 23 and 24, tests, staging, local setup, commits and pushes.
+- Not approved (2026-11-01): the superseded advisory-lock admin contract. This refers only to the earlier advisory-lock R18 design. It does not refer to the R18 lock-order design, whose design is APPROVED (Part 1C) and whose implementation is NOT approved. Also not approved: admin RPCs, printing fixes 23 and 24, tests, staging, local setup, commits and pushes. (`licence_lock_shop()` was approved for implementation on 2026-11-01, scope only: Part 1F.)
 - 2026-11-01, third record: R18 lock-order contract approved as design only (Part 1C). Implementation is not approved; no code, SQL, test, setup, commit or push is approved.
 
 Not listed here, and still open: §12B.2 B (conditional on C-1 and C-3; EXTERNAL BLOCKER), I (pricing, blocked), K (fix implementation, Part 7), L (local setup first), M1 (proposal), and M8 (policy, legal review needed).
