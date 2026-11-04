@@ -1,6 +1,6 @@
 # Stage 7 owner decision sheet
 
-**Status: documentation only.** Prepared 2026-10-31 from `STAGE7_DECISIONS.md`, corrected after the review of the same date, and updated 2026-11-02 for the O1–O13 record and the consistency pass, and updated 2026-11-04 for the ten decisions in Part 1H. This sheet approves nothing: no decision, gate, setup, migration, test, price, publication, production change or external action. It proposes no price. A "Claude suggests" entry is a suggestion, not a default. Nothing here has been checked against production.
+**Status: documentation only.** Prepared 2026-10-31 from `STAGE7_DECISIONS.md`, corrected after the review of the same date, and updated 2026-11-02 for the O1–O13 record and the consistency pass, and updated 2026-11-04 for the ten decisions in Part 1H and the six Stage 7C decisions in Part 1I, and the AAL2 failure decision in Part 1J. This sheet approves nothing: no decision, gate, setup, migration, test, price, publication, production change or external action. It proposes no price. A "Claude suggests" entry is a suggestion, not a default. Nothing here has been checked against production.
 
 **Item 2 (hold start) is DEFERRED** (owner instruction 1, 2026-10-31). It is not a Stage 7 closure requirement. **Enforcement activation is not a Stage 7 closure requirement** (owner instruction 2).
 
@@ -76,7 +76,7 @@ This part approves no implementation, SQL, staging, migration application, commi
 
 | No. | Owner decision (2026-11-02, OWNER-APPROVED) | Conditions and OPEN items |
 |---|---|---|
-| 1 | AAL2: `aal2` is required for every platform-admin RPC. | OPEN: verified recovery procedure if the admin loses the TOTP factor; hosted and local verification of the `aal` claim (R16, S-3). Both remain prerequisites before 7C. |
+| 1 | AAL2: `aal2` is required for every platform-admin RPC. | OPEN: verified recovery procedure if the admin loses the TOTP factor; hosted and local verification of the `aal` claim (R16, S-3). Both remain prerequisites before 7C. 2026-11-04 (Part 1J): a failed AAL2 check is an authorisation failure, returning a committed `forbidden` result, logged and counted; the protected operation is not executed. 2026-11-04 (A3, Part 1I; timing clarification): the recovery procedure is required before 7C implementation sign-off, not before implementation starts. Hosted and local verification of the `aal` claim is not changed by this clarification and remains a separate prerequisite before 7C, as recorded in this row. |
 | 2 | Item 15: option (a), a provisional ceiling for staging only. | OPEN: the production ceiling value; the remaining C-12 and item 15 details. |
 | 3 | Migration placement P1: `licence_requests` and `licence_denials` go in the existing `0011_licence_foundation.sql`. | Subject to pre-staging review. Not applied. 0011 does not yet contain these tables. Placement is confirmed by O2 (Part 1G). Adding the tables to the file is still a separate implementation step, not approved here. |
 | 4 | Lifetime grants: admin-only. | Replaces the earlier "owner-only" recommendation. Under 0011 as written, any platform admin can grant lifetime, because no role column exists. |
@@ -86,7 +86,7 @@ This part approves no implementation, SQL, staging, migration application, commi
 | 8 | Request ID scope: globally unique. | Replay matching rules are not restated here; they stay as in R5. |
 | 9 | Global enforcement audit (`enforcement_change`): deferred to 7F. | Out of 7C scope. No change to 0011 from this decision. |
 | 10 | Lock enforcement: no GUC marker. No lock-acquiring trigger, unless staging evidence shows a gap and a separate 7B-2 amendment is approved. | OPEN: that staging evidence and that amendment. |
-| 11 | Admin grant arithmetic: Asia/Kolkata calendar arithmetic. | OPEN: month-end clamping, and exact timestamp behaviour. |
+| 11 | Admin grant arithmetic: Asia/Kolkata calendar arithmetic. | OPEN: month-end clamping, and exact timestamp behaviour. Partly decided 2026-11-04 (Part 1I, A2): calendar-based clock time; custom-grant boundaries OPEN. |
 
 **Still OPEN after this record:** the maximum backdating window; the AAL2 recovery procedure and hosted and local claim verification; admin grant month-end arithmetic confirmation; C-12 and the remaining item 15 details; legal review of production retention and personal-data handling.
 
@@ -107,7 +107,7 @@ This part approves no implementation, SQL, staging, migration application, commi
 | O7 | Break-glass writes require a documented lock-first procedure (`licence_lock_shop()` before any write). The procedure is not written here. | DECIDED 2026-11-02: CHANGED |
 | O8 | Staging backdating window: 31 days, staging only. The production window stays OPEN. | DECIDED 2026-11-02: APPROVED (staging only) |
 | O9 | Staging denial ceiling: count and alert, with no automatic refusal. The numeric ceiling stays undecided. | DECIDED 2026-11-02: CHANGED. The wording "count and alert" is superseded (Part 1H, no. 2). |
-| O10 | Accept C-12 limitations for synthetic staging only: above 20 detailed denial rows per user per hour only counts are kept, and calls rejected by the permission check are not counted. Not accepted for production. | DECIDED 2026-11-02: APPROVED WITH CONDITION (synthetic staging only). **Omitted-detail marker: approved 2026-11-04 (Part 1H, no. 3).** Permission-rejected calls are counted within the approved staging cap (2026-11-04). The "not counted" limitation above is superseded for staging. No automatic refusal. The counting mechanism is OPEN. |
+| O10 | Accept C-12 limitations for synthetic staging only: above 20 detailed denial rows per user per hour only counts are kept, and calls rejected by the permission check are not counted. Not accepted for production. | DECIDED 2026-11-02: APPROVED WITH CONDITION (synthetic staging only). **Omitted-detail marker: approved 2026-11-04 (Part 1H, no. 3).** Permission-rejected calls are counted within the approved staging cap (2026-11-04). Superseded for staging by Part 1I (B2): not counted. The "not counted" limitation above is superseded for staging. No automatic refusal. The counting mechanism is OPEN. |
 | O11 | Verify the AAL2 requirement and recovery procedure using hosted staging. Local verification of the `aal` claim stays OPEN. | DECIDED 2026-11-02: APPROVED, OBJECTIVE ONLY |
 | O12 | Use a hosted staging project for SQL and staging tests (recommended). No setup is approved. | DECIDED 2026-11-02: APPROVED, APPROACH ONLY. Cost and setup report provided 2026-11-04 (STAGE7_DECISIONS.md §12D; Part 1H, no. 9). Project creation NOT approved. |
 | O13 | Approve the proposed staging test scope, including the R18 two-session tests, subject to separate setup and execution approval. | DECIDED 2026-11-02: APPROVED, TEST SCOPE ONLY |
@@ -139,7 +139,7 @@ Source: owner confirmation on 2026-11-02 of the draft record and its four clarif
 | O7 | CHANGED. Normal writes go only through the internal SECURITY DEFINER writer and approved RPCs. Owner-role SQL discipline is not the normal control. | Break-glass DB-owner procedure is documented separately and needs separate owner approval before 7C implementation sign-off. |
 | O8 | APPROVED. 31-day backdating window, staging only. | Production window OPEN. |
 | O9 | CHANGED. Count denials; no automatic refusal. | Alerting is not implemented or claimed. The numeric threshold and alert mechanism are OPEN. Corrected wording approved 2026-11-04 (Part 1H, no. 2); alerting is not approved. |
-| O10 | APPROVED WITH CONDITION. C-12 limits for synthetic staging only. | Overflow is recorded as a count per window with a visible omitted-detail marker. Evidence is not silently discarded. Production C-12 OPEN. Omitted-detail marker approved 2026-11-04 and permission-rejected calls counted within the staging cap (Part 1H, no. 3); no automatic refusal; the counting mechanism is OPEN. |
+| O10 | APPROVED WITH CONDITION. C-12 limits for synthetic staging only. | Overflow is recorded as a count per window with a visible omitted-detail marker. Evidence is not silently discarded. Production C-12 OPEN. Omitted-detail marker approved 2026-11-04 and permission-rejected calls counted within the staging cap (Part 1H, no. 3); no automatic refusal; the counting mechanism is OPEN. Superseded for staging by Part 1I (B2): not counted. |
 | O11 | APPROVED, OBJECTIVE ONLY. Verify the `aal` claim and recovery on hosted staging. | Execution is not authorised. Staging and execution are gated separately. Local `aal` check OPEN. |
 | O12 | APPROVED, APPROACH ONLY. Hosted staging project. | Report cost, plan and setup for separate approval before creation. No production data. Report provided 2026-11-04 (STAGE7_DECISIONS.md §12D). Creation not approved. |
 | O13 | APPROVED, TEST SCOPE ONLY. Staging test scope, including the R18 two-session tests. | Does not authorise setup, SQL execution or test execution. R18 implementation NOT APPROVED. |
@@ -154,7 +154,7 @@ These ten owner decisions, dated 2026-11-04, are recorded in `STAGE7_DECISIONS.m
 |---|---|---|---|
 | 1 | O4 scope: option A. Reject overlapping grants of the same kind (admin with admin; lifetime with lifetime). A lifetime grant over an admin grant stays allowed. | New. Closes the O4 scope point. | Lifetime-revocation exposure is documented in §12A.6. Staging tests and 7C sign-off still apply. |
 | 2 | O9 corrected wording: denials are counted; no automatic refusal; alerting is not approved, implemented or claimed; the threshold and mechanism remain OPEN. | New. Approves the corrected wording of the CHANGED decision of 2026-11-02. | "Count and alert" is superseded. |
-| 3 | O10: the visible omitted-detail marker is approved. Permission-rejected calls are counted within the approved staging cap, with no automatic refusal. The overflow-count behaviour is preserved. | Marker: new. Overflow count: previously approved (2026-11-02). Permission-rejected counting: new; supersedes the "not counted" limitation for staging. | A function-level counter cannot see calls rejected before the function runs. The counting mechanism is OPEN and not designed. Production C-12 remains OPEN. |
+| 3 | O10: the visible omitted-detail marker is approved. Permission-rejected calls are counted within the approved staging cap, with no automatic refusal. The overflow-count behaviour is preserved. | Marker: new. Overflow count: previously approved (2026-11-02). Permission-rejected counting: new; supersedes the "not counted" limitation for staging. | A function-level counter cannot see calls rejected before the function runs. The counting mechanism is OPEN and not designed. Production C-12 remains OPEN. Superseded for staging by Part 1I (B2). |
 | 4 | Retention: option R-D selected TEMPORARILY. Cleanup stays disabled until C-1/M1 has legal review and an owner-approved retention policy. | New. Temporary, not final policy. | R-D is one of the retention options R-A to R-D in the 4 November report. It is not the refund options R-a to R-c (§12B.4). |
 | 5 | Legal review is required for customer-file retention and related obligations. | New confirmation. The lawyer rows were already listed in Part 6. | Approves no retention change. |
 | 6 | Migration 0012 (local main, unmerged): read-only review only. | New. | No implementation, SQL, staging application or deployment. Not an approval of item 23 or item 24. |
@@ -167,6 +167,43 @@ These ten owner decisions, dated 2026-11-04, are recorded in `STAGE7_DECISIONS.m
 
 **Correction recorded:** `STAGE7_DECISIONS.md` §15.3 (7C row) read "O9: counted and alerted". It now reads the decided wording.
 
+## Part 1I. Owner decisions recorded 2026-11-04 (Stage 7C)
+
+Six owner decisions on Stage 7C, recorded in `STAGE7_DECISIONS.md` §13 ("Owner decision record (2026-11-04): Stage 7C, A1 to A5 and B2"). They approve no 7C implementation, staging setup or run, test, SQL, migration change (including adding tables to 0011), staging project, commit, push, merge or deployment. O1 and O2 (2026-11-02) are unchanged.
+
+| No. | Owner decision (2026-11-04) | Status | Effect and limits |
+|---|---|---|---|
+| A1 | Different-kind grants may coexist (admin with lifetime). Same-kind overlap restrictions remain. Lifetime coverage takes precedence. | DECIDED | An admin grant over a lifetime grant is allowed. Closes the reading left open in Part 1H no. 1. |
+| A2 | Calendar-based grants (1 month, 1 year) keep the start's clock time, with Asia/Kolkata month-end clamping. | DECIDED for calendar-based grants | Custom-grant boundaries OPEN. The 00:00 IST convention is not treated as decided. |
+| A3 | Written emergency-disable, DB-owner break-glass and admin recovery procedure, required before 7C implementation sign-off. | DECIDED (timing only) | Not required before implementation starts. Procedure text NOT WRITTEN. |
+| A4 | Authorisation failures: committed `forbidden`, logged, counted. Other rejections: specific committed codes, not counted as authorisation denials. | DECIDED | Code names set in implementation review. |
+| A5 | Staff receive no licence information. The owner RPC returns only the D fields. Labels belong to 7E. | DECIDED | Closes staff visibility. Label wording and Android remain open. |
+| B2 | No anon-callable counting wrapper. Calls rejected before RPC execution remain uncounted for staging. Limitation documented. | DECIDED. Staging test expectations follow, subject to separate staging approval | Supersedes Part 1H no. 3 for staging only. Production C-12 remains OPEN. |
+
+**Remaining 7C blockers** (detail in the §13 record):
+
+| Scope | Blocker |
+|---|---|
+| Blocks 7C implementation start | Explicit 7C implementation approval. Adding the three licence tables to 0011, with review (separate approval). Admin RPC lock order (R18 rules 1 to 3; R18 beyond 7B-2 not approved). Custom-grant boundaries (owner to classify). Extend period lengths. Replay-ledger treatment of business rejections. |
+| Blocks 7C sign-off | A3 procedure written and approved. Hosted `aal` and recovery verification (O11; execution not approved). |
+| Blocks 7C staging only | Staging project (O12, §12D). Provisional ceiling value (B1). Staging test expectations for B2 and A4. Item 33 two-session tests. Synthetic admin account, and 0010 on a staging copy. Pre-staging review of 0011. |
+| Blocks production only | Backdating window. Denial ceiling, threshold and alert mechanism (O9). Final C-12 acceptance. Lawyer review of retention and DPDP. Production admin UUID and MFA; admin count. Production migration list and live signatures (dashboard). |
+
+
+## Part 1J. Owner decision recorded 2026-11-04: AAL2 failure handling
+
+Recorded in `STAGE7_DECISIONS.md` §13 ("Owner decision record (2026-11-04): AAL2 failure handling") and §12A.8. It approves no 7C implementation, staging run, test, SQL, migration change, commit, push, merge or deployment.
+
+| No. | Owner decision (2026-11-04) | Status | Effect and limits |
+|---|---|---|---|
+| AAL2-1 | A platform-admin RPC request that fails the required AAL2 assurance check is an authorisation failure. | DECIDED | Consistent with A4 (Part 1I). |
+| AAL2-2 | It returns a committed `forbidden` result. | DECIDED | Committed, as R3 requires. |
+| AAL2-3 | It is logged to `licence_denials` and counted toward the authorisation-denial counter. | DECIDED | Not written to the replay ledger or the audit log. |
+| AAL2-4 | The protected admin operation is not executed. | DECIDED | No coverage, audit or replay-ledger row is written. |
+
+**Still open:** whether a denied request increments `state_version` (§12B.11 and R2 conflict with the denial-before-lock order); handling of a missing or unreadable `aal` claim; hosted and local verification of the claim (O11, R16, S-3); the A3 recovery procedure text.
+
+
 ## Part 2. Decide now (owner answers, RECOMMENDED)
 
 These are defaults the owner can confirm or change. A confirmed answer records a decision and approves no gate.
@@ -178,7 +215,7 @@ These are defaults the owner can confirm or change. A confirmed answer records a
 | Dec 15 | Admin UI hosting (item 6) | RECOMMENDED | A separate private deployment, not linked from the shop app and not published with the public site | 7D needs this decision and the visibility check. |
 | Dec 16 | Backdating and lifetime rules (item 7, 7C validation) | RECOMMENDED. Maximum custom length DECIDED (none, 2026-11-01). 2026-11-02 (Part 1D): backdating needs explicit confirmation; lifetime admin-only; backdating window OPEN | Backdating only with explicit confirmation. Lifetime admin-only (2026-11-02) | These are 7C inputs and do not change the 7B schema. Maximum custom length: none (owner decision 6). |
 | Dec 18 | Grace period (item 13) | RECOMMENDED | No grace period | Printing is blocked in every non-ACTIVE state (§12B.3, from B and C). Queued jobs are held and retries are blocked from the end date. Jobs already printing may finish. Any grace days would change this rule. The wording for the NONE state is also open. |
-| Dec 19 | Shop-facing view: labels (item 13) | RECOMMENDED | Keep the file's position: Active or Inactive only, with no admin-grant label | Approved (§12B.2 D): the owner-only fields are active or inactive, access end or no-expiry, and next start when relevant (next start shown only in SCHEDULED, owner decision 8, 2026-11-01). Still open: the label wording, whether an admin grant may show a label, and staff visibility. The Android view is DEFERRED (Part 9). |
+| Dec 19 | Shop-facing view: labels (item 13) | RECOMMENDED | Keep the file's position: Active or Inactive only, with no admin-grant label | Approved (§12B.2 D): the owner-only fields are active or inactive, access end or no-expiry, and next start when relevant (next start shown only in SCHEDULED, owner decision 8, 2026-11-01). Still open: the label wording, whether an admin grant may show a label, and staff visibility. Staff visibility closed 2026-11-04 (Part 1I, A5). The Android view is DEFERRED (Part 9). |
 | Dec 11 | Advisers (item 19) | RECOMMENDED | Engage an Indian CA and a lawyer before any paid collection | No engagement is evidenced. Their advice is needed for the blockers in Part 6. |
 | Dec 10 | Stage 6 merge order (item 20) | RECOMMENDED | No view given here | Decide whether `stage6-simulated-printer` (885d28b) is merged before Stage 7 is rebased. This affects rebase order only. Nothing is merged by this sheet. |
 | S-4 | Residual 180-second file-link window (item 35) | RECOMMENDED | Accept it, or reduce it before the 7F build | §15.3 requires S-4 accepted before 7F. |
@@ -197,9 +234,9 @@ Not needed before the 7B design (§15.3): item 5 and Dec 13 to 15; C-6; C-1; C-3
 
 | ID | Decision | Needed before | Claude suggests | Consequence |
 |---|---|---|---|---|
-| Item 5, Dec 14 | Production-owner evidence: the admin Auth user UUID (never inferred) and the MFA status. Whether `aal2` is required for admin RPCs. Both are EXTERNAL BLOCKER | 7A, the bootstrap row, 7C, 7D | Require `aal2`. The production owner supplies the UUID | 7A cannot finish without them. The UUID is not put in the migration. 2026-11-02 (Part 1D): `aal2` requirement OWNER-APPROVED. Recovery procedure and hosted and local claim verification OPEN. |
+| Item 5, Dec 14 | Production-owner evidence: the admin Auth user UUID (never inferred) and the MFA status. Whether `aal2` is required for admin RPCs. Both are EXTERNAL BLOCKER | 7A, the bootstrap row, 7C, 7D | Require `aal2`. The production owner supplies the UUID | 7A cannot finish without them. The UUID is not put in the migration. 2026-11-02 (Part 1D): `aal2` requirement OWNER-APPROVED. Recovery procedure and hosted and local claim verification OPEN. A3 (2026-11-04, Part 1I): the written procedure is required before 7C sign-off. AAL2 failure handling decided 2026-11-04 (Part 1J). |
 | Dec 16, maximum length (item 7) | Maximum custom grant length | 7C validation | DECIDED (owner, 2026-11-01): none. No maximum duration | Closed. The 7B schema has no duration cap. The 7C validation must not impose one. |
-| Item 15, C-12 | Global denial ceiling value. Accept count-only records above the cap of 20 per user per hour | 7C | Set the ceiling after staging measures row growth. No value is proposed here. **Circular:** §15.3 requires this ceiling accepted before 7C, but the measurement needs the 7C denial log on staging. Owner to choose: (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. 2026-11-02 (Part 1D): option (a) chosen, a provisional ceiling for staging only. Production ceiling and remaining C-12 details OPEN. | Sets denial-log growth. Detail above the cap is lost, and the owner must accept that. |
+| Item 15, C-12 | Global denial ceiling value. Accept count-only records above the cap of 20 per user per hour | 7C | Set the ceiling after staging measures row growth. No value is proposed here. **Circular:** §15.3 requires this ceiling accepted before 7C, but the measurement needs the 7C denial log on staging. Owner to choose: (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. 2026-11-02 (Part 1D): option (a) chosen, a provisional ceiling for staging only. Production ceiling and remaining C-12 details OPEN. No staging ceiling value is set yet (Part 1I, B1). | Sets denial-log growth. Detail above the cap is lost, and the owner must accept that. |
 | Dec 7 | Deletion schedule: whether licence expiry should change file deletion timing. This is separate from the expiry behaviour already approved (A, B, C) | Enforcement activation, and any retention change | No view given here. The current schedule stays until decided | Open under item 1. The current purge schedule is unverified live (§5C). |
 | C-1 (item 1) | Lawyer's answer on the release rule for held files. Option (i): a new terminal order status, which changes the 0001 transitions and is out of scope so far. Option (ii): a licence-specific file-release rule | Before the owner's C-3 decision, and before M1 | Lawyer answers first. The owner chooses the option afterwards | Without an answer, held files of paid orders in `printing` are never purged (0010 lines 795–798). 2026-11-04 (Part 1H, no. 4): retention option R-D is selected temporarily; cleanup stays disabled until this item has legal review and an owner-approved retention policy. Temporary, not final policy. |
 | C-3 (item 1) | Held files: accept as an interim, or hold enforcement back | The 7F build (C-3 decided). Enabling depends on the choice | Decide after the C-1 answer | Accept as an interim: held files are kept indefinitely until M1 exists. Hold back: enabling waits for M1, for item 2 (reopened) and, where paid orders are affected, for item 10. The build needs C-3 decided, whichever choice is made. 2026-11-04 (Part 1H, no. 4): C-3 is not decided. R-D (temporary) keeps cleanup disabled, so no file is released; this is not the C-3 decision. |
@@ -275,7 +312,7 @@ Neither fix is approved, and neither is a 7A to 7F prerequisite by default (§15
 | 7B-1 schema, migration `0011_licence_foundation.sql` on the origin/main line. File only, unapplied | DECIDED (2026-11-01): C-5; item 8; item 7 basis ranking. Licence unit DECIDED (item 16, decision 1). Renewal DEFERRED and not an input. Numbering per Part 1A | None for file creation. A production migration needs item 26 | File creation approved 2026-11-01. Pre-staging review of 0011 required (O2). Each staging run needs its own approval |
 | 7B-2 lock helper and meta row (`licence_lock_shop()`, `shop_licence_meta`) | R18 lock-order contract (Part 1C): design approved 2026-11-01 | APPROVED for implementation 2026-11-01 (scope only). Draft in 0011: unapplied, untested, uncommitted | Staging verification and SQL execution NOT approved. Each needs its own approval |
 | 7B tests only: Option A or B (Part 4); Decision L and the fixture approach (Part 4) | Local or staging setup; Auth-schema inspection | NOT APPROVED | Separate approval for each step |
-| 7C admin RPCs | 7B on staging; the item 15 ceiling; C-12; the grant-limit inputs (Dec 16; maximum length is closed as none); item 33 lock tests on staging; O1 counter in 0011 after pre-staging review (O2); O9 and O10 limits as recorded | Item 5 (`aal2` approved 2026-11-02) | Separate approval. Before 7C sign-off also: O4 overlap rule documented; O6 emergency disable and recovery procedure approved; O7 break-glass procedure approved |
+| 7C admin RPCs | 7B on staging; the item 15 ceiling; C-12; the grant-limit inputs (Dec 16; maximum length is closed as none); item 33 lock tests on staging; O1 counter in 0011 after pre-staging review (O2); O9 and O10 limits as recorded | Item 5 (`aal2` approved 2026-11-02) | Separate approval. Before 7C sign-off also: O4 overlap rule documented; O6 emergency disable and recovery procedure approved; O7 break-glass procedure approved (A3, 2026-11-04: sign-off items, not implementation-start items) |
 | 7D admin UI | 7C on staging; hosting (Dec 15) | Item 6 visibility check; item 5 | Separate approval |
 | 7E owner status | 7C; the labels (Dec 19, item 13); display rule (item 8) | None | Separate approval |
 | 7F build | 7C and 7E; S-4 accepted; C-1 answered and C-3 decided (item 1; both OPEN, not decided); item 32 kill-switch design approved; the order of items 23 and 24 decided | Item 25 live signatures; S-5 local test | Separate approval to build |
@@ -305,8 +342,8 @@ Each item below is deferred. None is required now.
 These approvals have no open condition. Blocked, conditional and proposed items are not listed here. They are in Parts 3 to 7 and 9.
 
 - §12B.2 A printing-only enforcement. §12B.2 C retries blocked while inactive. §12B.2 G SCHEDULED state.
-- §12B.2 D owner-only status, with the fields approved. Its labels, staff visibility and Android view are open (Parts 2 and 9).
-- M2 refusal after the natural end. M3 denial design (cap of 20 per user per hour; counter `licence_denial_windows`, O1; overflow marker, O10; the build is gate 7C). M4 custom-grant convention. M5 paid-path block. M6 lifetime over paid coverage, as policy (its tests need the paid path). M7 review required for both printing fixes. M3 (2026-11-04, Part 1H, no. 3): for staging, permission-rejected calls count within the cap; no automatic refusal; the counting mechanism is OPEN.
+- §12B.2 D owner-only status, with the fields approved. Its labels, staff visibility and Android view are open (Parts 2 and 9). Staff visibility closed 2026-11-04 (Part 1I, A5).
+- M2 refusal after the natural end. M3 denial design (cap of 20 per user per hour; counter `licence_denial_windows`, O1; overflow marker, O10; the build is gate 7C). M4 custom-grant convention. M5 paid-path block. M6 lifetime over paid coverage, as policy (its tests need the paid path). M7 review required for both printing fixes. M3 (2026-11-04, Part 1H, no. 3): for staging, permission-rejected calls count within the cap; no automatic refusal; the counting mechanism is OPEN. Superseded for staging by Part 1I (B2).
 - Approved, but blocked with the paid path (M5): §12B.2 F, H and J, and the paid term in M4.
 - Approved for design only: §12B.2 E. Enabling stays blocked until item 11 is answered.
 - Licence unit: per shop (decision 1, owner decision 2026-10-31). Item 16: renewal DEFERRED (decision 2; owner decision 7, 2026-11-01). The unit is DECIDED.
@@ -314,5 +351,7 @@ These approvals have no open condition. Blocked, conditional and proposed items 
 - 2026-11-01, second record: next start shown only in SCHEDULED (decision 8); C-9 replacement wording adopted (decision 9); `service_role` stays revoked in 0011 (decision 10); owner-facing state reads use the current time only (decision 11).
 - Not approved (2026-11-01): the superseded advisory-lock admin contract. This refers only to the earlier advisory-lock R18 design. It does not refer to the R18 lock-order design, whose design is APPROVED (Part 1C) and whose implementation is NOT approved. Also not approved: admin RPCs, printing fixes 23 and 24, tests, staging, local setup, commits and pushes. (`licence_lock_shop()` was approved for implementation on 2026-11-01, scope only: Part 1F.)
 - 2026-11-01, third record: R18 lock-order contract approved as design only (Part 1C). Implementation is not approved; no code, SQL, test, setup, commit or push is approved.
+- 2026-11-04, Part 1I (Stage 7C): A1 different-kind grants may coexist; A2 calendar-based grants keep the start's clock time (custom-grant boundaries OPEN); A3 procedure required before 7C implementation sign-off, not before implementation starts; A4 response contract; A5 staff receive no licence information; B2 permission-rejected calls not counted for staging. No gate approved.
+- 2026-11-04, Part 1J: AAL2-1 to AAL2-4 decided. A failed AAL2 check is an authorisation failure: committed `forbidden`, logged and counted, protected operation not executed. No gate approved.
 
 Not listed here, and still open: §12B.2 B (conditional on C-1 and C-3; EXTERNAL BLOCKER), I (pricing, blocked), K (fix implementation, Part 7), L (local setup first), M1 (proposal), and M8 (policy, legal review needed).
