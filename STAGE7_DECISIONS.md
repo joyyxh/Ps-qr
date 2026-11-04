@@ -1,9 +1,9 @@
 # Stage 7 decisions: draft for owner review
 
 **Status:** DRAFT PROPOSAL. This file is not an approval of any business, legal, tax, pricing, or technical decision.
-**Date:** 2026-10-31 (last updated). Final documentation pass 2026-10-30, register and checks 2026-10-31, consistency correction 2026-10-31, four-issue resolution 2026-10-31, owner decisions and correction pass 2026-10-31: corrections are in §13, the decision register in §14, the roadmap in §15 and the exit checklist and verdict in §16. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
+**Date:** 2026-11-02 (last updated: O1–O13 owner decisions and consistency pass; 2026-11-04: ten owner decisions, §13 record, with §12B.13, §12C and §12D added). Earlier passes: final documentation pass 2026-10-30, register and checks 2026-10-31, consistency correction 2026-10-31, four-issue resolution 2026-10-31, owner decisions and correction pass 2026-10-31: corrections are in §13, the decision register in §14, the roadmap in §15 and the exit checklist and verdict in §16. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
 **Worktree:** `/home/claude/joyyxh/ps-qr-stage7`, branch `stage7-payments`, base `origin/main` at `717717b`
-**Committed:** No. Untracked draft.
+**Committed:** The file is tracked on `stage7-payments` (latest commit `2f1f9c3`). The 2026-11-02 O1–O13 edits are uncommitted and need a separate commit instruction. The 2026-11-04 edits are also uncommitted and are not committed or pushed.
 
 **Labels used**
 - **PENDING OWNER APPROVAL:** every undecided item.
@@ -370,7 +370,7 @@ Each item is a proposal, not a decision. Decisions 13–20 (manual licence manag
 10. **Email provider:** whether Supabase Auth uses custom SMTP, and which provider, is not decided. The built-in limit is 2 emails per hour (§3). **PENDING OWNER APPROVAL.**
 11. **Email-volume tier (E):** undecided. Results that depend on it are shown for both Free and Pro (§5A). **PENDING OWNER APPROVAL.**
 12. **Super-admin identity:** the owner's Supabase Auth user UUID is required and has not been inferred. Bootstrap is a one-time owner-run SQL row (§12A.3). **PENDING OWNER APPROVAL.**
-13. **Admin MFA and admin UI hosting:** the owner confirms MFA status and chooses hosting (§12A, decisions 14 and 15). **PENDING OWNER APPROVAL.**
+13. **Admin MFA and admin UI hosting:** the `aal2` requirement for admin RPCs is APPROVED on 2026-11-02 (§13, item 1). The owner still confirms MFA status on the Supabase account, and chooses hosting (§12A, decision 15). **Hosting: PENDING OWNER APPROVAL.**
 
 ---
 
@@ -410,7 +410,7 @@ Access date: 2026-10-29, unless stated. The correction pass accessed no external
 
 ## 12. Status
 
-- DRAFT ONLY. Not committed. Not approved.
+- DRAFT. Not approved as a whole. Tracked on `stage7-payments`; the 2026-11-02 O1–O13 edits are uncommitted.
 - Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13.
 - The correction pass accessed no external source.
 - `CLAUDE.md` is untouched and still untracked.
@@ -421,13 +421,14 @@ Access date: 2026-10-29, unless stated. The correction pass accessed no external
 - Stage 7 decision record added 2026-10-29 (§12B). Documentation only. No implementation, setup, tests, migration, or commit.
 - Final documentation pass 2026-10-30. Corrections are in §13. The decision register is §14, the roadmap is §15 and the exit checklist and verdict are §16.
 - No commit, push, merge, deployment, migration, test, Docker, Supabase, production or live-setting action was taken. The protected main checkout, its three modified files and `stash@{0}` (b559dce) are untouched.
+- 2026-11-02: commits `608265f` and `2f1f9c3` were made on explicit owner instruction (docs only). No push, merge, deployment, migration, SQL, test or database action has been taken.
 - **Ready for final owner review. Not approved.** §16 gives the verdict and its reasons.
 
 ---
 
 ## 12A. Manual licence management and admin-granted access (design, added 2026-10-29)
 
-**Status: DESIGN ONLY. Nothing is implemented.** No migration, Edge Function, admin UI, shop-app screen, or licence enforcement exists or is approved. Decisions in this section are **PENDING OWNER APPROVAL** unless §12B.2 or §12B.3 records a status. No licence state below is approved policy, except as recorded in §12B. Next free migration number on the origin/main line: 0011 (CLAUDE.md; owner decision 1, 2026-11-01). Local main's 0011 is a different, unmerged file (owner decision 2). **Update 2026-10-29:** the decisions in §12B supersede conflicting text in this section. Corrections are marked *Corrected 2026-10-29*. Decision status is in §12B.3.
+**Status: DESIGN ONLY. Nothing is implemented.** No migration, Edge Function, admin UI, shop-app screen, or licence enforcement exists or is approved. Decisions in this section are **PENDING OWNER APPROVAL** unless §12B.2, §12B.3 or the 2026-11-02 records in §13 record a status. No licence state below is approved policy, except as recorded in §12B. Next free migration number on the origin/main line: 0011 (CLAUDE.md; owner decision 1, 2026-11-01). Local main's 0011 is a different, unmerged file (owner decision 2). **Update 2026-10-29:** the decisions in §12B supersede conflicting text in this section. Corrections are marked *Corrected 2026-10-29*. Decision status is in §12B.3.
 
 ### 12A.1 Scope
 
@@ -450,12 +451,12 @@ Access date: 2026-10-29, unless stated. The correction pass accessed no external
 - Admin status is not granted by email address, client-editable `user_metadata`, a hardcoded client flag, or shop membership.
 - Rows are added only by a one-time SQL statement that the owner runs in the Supabase dashboard, using the owner's Auth user UUID. No API or UI path adds admins. **No user UUID has been identified or assumed.** The owner must supply it.
 - RLS on `platform_admins` is enabled with no policies for `anon` or `authenticated`. Admin checks use a `SECURITY DEFINER` function, `is_platform_admin()`, keyed on `auth.uid()`.
-- Break-glass: a documented dashboard SQL statement sets `disabled_at` on an admin row. Not automated.
+- Break-glass: a documented dashboard SQL statement sets `disabled_at` on an admin row. Not automated. Under O6 and O7 (2026-11-02), an emergency disable and recovery procedure is required before 7C implementation sign-off, and the break-glass DB-owner procedure needs separate owner approval before 7C implementation sign-off. Neither procedure is written in this file.
 - **Needed from the owner:** the Auth user UUID, or confirmation that a dedicated admin user will be created; whether a second admin is wanted (decision 13); whether MFA is enabled on the Supabase account and the admin user (decision 14).
 
 ### 12A.4 Architecture
 
-- **Database:** new licence tables with RLS deny-all for client roles. All writes go through `SECURITY DEFINER` RPCs. Each RPC first checks `is_platform_admin()`, and if decision 14 is yes, `auth.jwt()->>'aal' = 'aal2'`. Each RPC writes its audit row in the same transaction. `EXECUTE` is revoked from `public`, `anon`, `authenticated`, and `service_role` on internal helpers. Migration 0011 also revokes all table privileges from the same four roles. Owner decision 10 (2026-11-01): `service_role` stays revoked, which differs from 0010 by design (§13). Admin RPCs are granted to `authenticated` only, and each checks admin status and aal2 itself. *Corrected 2026-10-29 (R9, §12B.5).*
+- **Database:** new licence tables with RLS deny-all for client roles. All writes go through `SECURITY DEFINER` RPCs. Each RPC first checks `is_platform_admin()`, and requires `auth.jwt()->>'aal' = 'aal2'` (decision 14, approved 2026-11-02). Each RPC writes its audit row in the same transaction. `EXECUTE` is revoked from `public`, `anon`, `authenticated`, and `service_role` on internal helpers. Migration 0011 also revokes all table privileges from the same four roles. Owner decision 10 (2026-11-01): `service_role` stays revoked, which differs from 0010 by design (§13). Admin RPCs are granted to `authenticated` only, and each checks admin status and aal2 itself. *Corrected 2026-10-29 (R9, §12B.5).*
 - **Why RPCs rather than an Edge Function with the service key:** the check, the write, and the audit happen in one transaction, and no service key is needed. This matches the existing RPC pattern (`set_order_payment`, `set_shop_features`). An Edge Function stays an option if a later stage needs one.
 - **Admin UI:** a separate private app (hosting, decision 15). It holds the publishable key and the admin's session only. It calls admin RPCs and nothing else. The shop app has no link to it.
 - **Shop read:** `shop_licence_status(p_shop_id)` returns only: active or inactive; the access end date and time in Asia/Kolkata, or no-expiry; and the next start date when relevant (the next start is shown only in SCHEDULED, owner decision 8; §12A.6). *Decision D, §12B.* Owner only, through `is_shop_owner()`. Staff receive nothing. It never returns basis, reasons, actor IDs, payment references, notes, audit rows, or coverage IDs.
@@ -475,14 +476,21 @@ Access date: 2026-10-29, unless stated. The correction pass accessed no external
 - **`shop_licence_meta`:** one row per shop holding `state_version`. *Corrected 2026-10-29 (R1, R2):* the row is created lazily through `licence_lock_shop` (no trigger on `shops`). The version is incremented once per admin RPC request, inside the RPC, not by triggers. Admin RPCs take `expected_state_version` and reject stale requests.
 - **`shop_licence_state(shop_id, at)`:** a deterministic SQL function that derives state from the coverage rows (§12A.6). Internal only: no client role is granted EXECUTE (R9, R10).
 - **`licence_lock_shop(shop_id)`:** internal helper. Creates the `shop_licence_meta` row if it is missing and takes the shop lock. No client role is granted EXECUTE (R1, R9).
-- **`licence_requests`:** proposed replay ledger for consequential admin mutations (R5, §12B.8). Stores the request ID, action, payload hash, and a non-personal result summary. Stores `actor_user_id` only where replay prevention needs it. Not deleted at 90 days (M8). Columns to be fixed in review.
-- **`licence_denials`:** proposed denial log (M3, §12B.7). Stores the actor UUID, function name, time, request ID if supplied, and denial code. Detailed rows are capped at 20 per user per hour. Kept 90 days, subject to review (M8). Columns to be fixed in review.
+- **`licence_requests`:** replay ledger for consequential admin mutations (R5, §12B.8). Placement in `0011_licence_foundation.sql` is approved (decision 3; O2). Not yet in the file. Stores the request ID, action, payload hash, and a non-personal result summary. Stores `actor_user_id` only where replay prevention needs it. Not deleted at 90 days (M8). Columns to be fixed in review.
+- **`licence_denials`:** denial log (M3, §12B.7). Placement in `0011_licence_foundation.sql` is approved (decision 3; O2). Stores the actor UUID, function name, time, request ID if supplied, and denial code. Detailed rows are capped at 20 per user per hour. Above the cap, counts are kept per window with a visible omitted-detail marker (O10, synthetic staging only). Kept 90 days, subject to review (M8). Columns to be fixed in review.
+- **`licence_denial_windows`:** counter table for licence denials, replacing the `consume_rate_limit` design (O1, approved 2026-11-02). Counts per actor and globally, per UTC hour. Counts only. Placement in `0011_licence_foundation.sql` alongside `licence_requests` and `licence_denials` is approved (O2). The table is not yet in the file, and pre-staging review of 0011 is required before any staging run. Retention is not decided (§12B.8).
 
 ### 12A.6 Access states and precedence
 
 A coverage record `c` is effective at time `t` if `c.starts_at <= t`, `t < c.ends_at` (or it has no end, for lifetime), and `t < c.revoked_at` (if revoked). Intervals are half-open: at exactly `ends_at` or `revoked_at`, the coverage is no longer effective. Owner-facing reads evaluate `t` at the current time only; historical state queries are not supported (owner decision 11, 2026-11-01). History comes from `licence_audit_log`.
 
-**Access** is granted if any coverage is effective at `t`. Overlaps are allowed and do not add time.
+**Access** is granted if any coverage is effective at `t`. Overlaps do not add time.
+
+*O4 (approved with condition, 2026-11-02).* Overlapping grants and duplicate non-revoked lifetime grants are rejected. The half-open overlap test: coverages `[a1, b1)` and `[a2, b2)` overlap if and only if `a1 < b2` and `a2 < b1`. The rule is documented here before 7C implementation sign-off and is tested only in separately approved staging. **Scope to confirm (open):** O4 is read as applying to grants of the same kind (admin with admin, lifetime with lifetime). A lifetime grant over an admin grant stays allowed, because item 7 (basis ranking, 2026-11-01) and the test in §12A.11 require it. The owner must confirm this reading before 7C implementation sign-off.
+
+*Decided 2026-11-04 (no. 1, option A):* O4 applies to grants of the same kind only. Overlapping admin grants are rejected. Overlapping non-revoked lifetime grants are rejected. A lifetime grant over an admin grant stays allowed (item 7 and the test in §12A.11). The 2026-11-04 decision does not address an admin grant placed over an existing lifetime grant. Under the same-kind rule that grant is allowed; the owner must confirm this reading before 7C sign-off. The rule is documented here. Staging tests and 7C sign-off still apply.
+
+**Lifetime revocation exposure (documented 2026-11-04).** Revoking a lifetime grant can expose admin coverage that was already valid. (a) Admin coverage effective at the revocation instant becomes the basis, and access continues with basis `admin_grant` (§12A.11). (b) Admin coverage that starts after the revocation instant is not changed by the revocation; while no coverage is effective, the state is SCHEDULED (item 8). (c) Admin coverage that ended before the revocation instant is not revived. (d) The revocation is one update of `revoked_at` on the lifetime coverage (§12B.5, R6). Proposed requirement for 7E review: when the basis changes to an admin grant, the owner-facing view shows that grant's end date, so the change in access is visible.
 
 *Corrected 2026-10-29 (state-machine fixes 1–11, §12B.5).* The **state** is chosen in this order. The first match wins. Only ACTIVE grants access.
 
@@ -499,7 +507,7 @@ A coverage cancelled before its start is stored with `revoked_at` set to the can
 **Operations**, each recorded as a coverage change:
 
 - **Grant** (1 month, 1 year, custom, or lifetime): the new coverage starts now, unless an explicitly confirmed backdate is given (decision 16). A custom grant needs a start and an end, with the end after the start. *Approved convention (M4):* custom dates are entered as Asia/Kolkata calendar dates. The start is inclusive at 00:00 IST, and the end is exclusive at 00:00 IST on the entered end date. A custom grant is an administrative grant, not a paid transaction, and has no `payment_id`.
-- **Extend:** a new coverage starting at the current latest effective end (or now, if none). The old record's end is never edited.
+- **Extend:** a new coverage starts at `greatest(v_now, latest non-revoked coverage end)` (O3, approved 2026-11-02), where `v_now` is the clock timestamp taken after the shop lock. Extend is rejected while lifetime coverage is active (§13, 2026-11-02 item 6). The old record's end is never edited.
 - **Revoke:** sets `revoked_at` on one coverage record, effective now. Not retroactive. Other coverages are untouched. *Approved (M2):* refused when the coverage's natural end has already passed. Cancelling a future period is allowed (fix 1).
 - **Replace:** in one transaction, revokes the named coverage (effective now) and creates the new coverage starting now. The revoke step follows the M2 rule: it is refused when the named coverage's natural end has already passed. The two audit rows share one `request_id`. A replace that names a `paid_verified` coverage is deferred with the paid path (M5).
 - Revoking a `paid_verified` period is deferred with the paid path (M5). Payment reversal revokes its linked coverage (H, §12B). No revocation refunds anything.
@@ -518,11 +526,12 @@ Rules:
 
 ### 12A.8 Rules for all admin RPCs
 
-- Every admin RPC: (a) runs `is_platform_admin()`; (b) requires a non-empty reason for grants, revocations, replacements, and reversals; (c) requires `confirm = true`; (d) requires `expected_state_version`; (e) requires a `request_id` (uuid). A repeated `request_id` with the same payload hash returns the original result without a second change. The same `request_id` with a different payload is a conflict (R5). (f) writes an audit row in the same transaction; (g) on denial, returns `{ok: false, code: 'forbidden'}` as a committed result, not a raised error, so the denial record and the rate-limit counter survive (R3). The same code is returned for every denial reason. Detailed denial records and their cap are in §12B.7 (M3).
+- Every admin RPC: (a) runs `is_platform_admin()`; (b) requires a non-empty reason for grants, revocations, replacements, and reversals; (c) requires `confirm = true`; (d) requires `expected_state_version`; (e) requires a `request_id` (uuid), globally unique (§13, 2026-11-02 item 8). A repeated `request_id` with the same payload hash returns the original result without a second change. The same `request_id` with a different payload is a conflict (R5). (f) writes an audit row in the same transaction; (g) on denial, returns `{ok: false, code: 'forbidden'}` as a committed result, not a raised error, so the denial record and the denial counter (`licence_denial_windows`, O1) survive (R3). The same code is returned for every denial reason. Detailed denial records and their cap are in §12B.7 (M3).
 - Shop owners and staff can call only `shop_licence_status`. They cannot call any write RPC.
 - A platform admin cannot act as a shop user, and a shop owner cannot act as a platform admin. Platform admin status is not shop membership. If the owner also owns a shop, the owner can grant that shop, and the action is logged the same way.
 - The typed shop-slug confirmation is a UI step. The server checks only `confirm = true`, the state version, and admin identity.
-- *Added 2026-10-29 (R11):* an admin cannot disable their own admin row, and the last active admin cannot be disabled. Disabling through the RPC is audited. The break-glass SQL in §12A.3 remains the only other path.
+- *Added 2026-10-29 (R11):* an admin cannot disable their own admin row, and the last active admin cannot be disabled. These rules apply to any future disable path.
+- **Admin disable is outside 7C (O6, approved with condition, 2026-11-02).** No disable RPC is part of 7C. Until a documented emergency disable and recovery procedure is approved, the break-glass SQL in §12A.3 is the only disable route. That procedure is required before 7C implementation sign-off.
 
 ### 12A.9 Audit log
 
@@ -537,7 +546,7 @@ Rules:
 - Expiry is computed at read time from `ends_at`. Access needs no cron job. A notice job is a later stage.
 - *Corrected 2026-10-29 (decisions A, B, C; §12B.2):* once enforcement exists, it applies to printing only. For SCHEDULED, EXPIRED, REVOKED, and NONE shops: no new print jobs, no retries, queued jobs held until ACTIVE, jobs already printing finish, the agent receives no claims, and `mark_printing` refuses. Customer checkout and order placement are not blocked. Owners keep read and CSV export. Enforcement is not started and needs its own approval (7F).
 - Revocation takes effect at `revoked_at`. It does not alter orders, customer files, or statistics. Its only effect on printing is through the 7F gate.
-- Licence expiry or revocation does not itself delete any data. The file retention rules in §5C are separate. Their live deployment is unverified. *Proposal M1 (§12B.6), not approved for implementation:* a job held only because the licence is inactive fails after 7 days. Whether its file then becomes purgeable is an open conflict (§12B.9 C-1).
+- Licence expiry or revocation does not itself delete any data. The file retention rules in §5C are separate. Their live deployment is unverified. *Proposal M1 (§12B.6), not approved for implementation:* a job held only because the licence is inactive fails after 7 days. Whether its file then becomes purgeable is an open conflict (§12B.9 C-1). *Retention position (2026-11-04, temporary):* retention option R-D is selected temporarily. Cleanup stays disabled until C-1/M1 has legal review and an owner-approved retention policy. This is temporary, not final policy (§13, 2026-11-04 record).
 - Grace period: decision 18.
 
 ### 12A.11 Required tests (before any stage is approved to ship)
@@ -548,13 +557,13 @@ SQL tests run only on a staging copy (CLAUDE.md). Minimum matrix:
 - Admin 1 month, then time passes, gives EXPIRED. Revocation mid-period gives REVOKED. (The paid fallback case is deferred with M5.)
 - Lifetime plus an expiring admin grant gives ACTIVE with basis lifetime. Revoking the lifetime grant while an admin grant is still effective gives ACTIVE with basis admin grant.
 - Half-open boundaries: `t = ends_at` and `t = revoked_at` are not effective.
-- An extension starts exactly at the old end, with no gap and no added overlap.
+- An extension starts at `greatest(v_now, latest non-revoked coverage end)` (O3). When the old end is in the future, it starts exactly there, with no gap and no overlap. When the old end has passed, it starts at now.
 - Replace is atomic: a failure partway leaves the old coverage in place.
 - Revoking an already revoked coverage is rejected.
 - A backdated grant without explicit confirmation is rejected.
 - A stale `expected_state_version` is rejected. The same `request_id` returns the original result.
-- A non-admin caller of any write RPC is denied, and a denial record is written to `licence_denials` within the cap (§12B.7). Denials are not written to `licence_audit_log`. A shop owner cannot grant themselves access.
-- An admin JWT without `aal2` is denied, if decision 14 is yes.
+- A non-admin caller of any write RPC is denied, and a denial record is written to `licence_denials` within the cap, and above the cap the count is kept with the omitted-detail marker (§12B.7, O10). Denials are not written to `licence_audit_log`. A shop owner cannot grant themselves access.
+- An admin JWT without `aal2` is denied (decision 14, approved 2026-11-02).
 - Audit rows cannot be updated or deleted.
 - Coverage rows accept only the one-time revocation update.
 - Licence actions leave `orders` unchanged. A checksum of the `orders` payment columns (`payment_status`, `payment_channel`, `paid_at`, `refunded_at`, `refund_paise`, `payment_verified_by`, `payment_verified_at`) and the `order_events` row count is taken before and after. *Corrected 2026-10-29: `order_payments` does not exist in any migration.*
@@ -564,20 +573,20 @@ SQL tests run only on a staging copy (CLAUDE.md). Minimum matrix:
 ### 12A.12 Implementation stages (proposed; none started or approved)
 
 - **7A. Owner inputs:** decisions 13–20; the Auth user UUID; MFA confirmation; admin UI hosting. No code.
-- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, and `shop_licence_meta`. Excludes `paid_verified`, `trial`, and `licence_payments` (M5; C-5, DECIDED 2026-11-01). **Split on 2026-11-01:** 7B-1 (file only, unapplied, `supabase/migrations/0011_licence_foundation.sql`) covers the tables, triggers, RLS deny-all, `is_platform_admin()` and `shop_licence_state()`. 7B-2 (`licence_lock_shop()` and `shop_licence_meta`) was approved for implementation on 2026-11-01, for that scope only, because it takes the shop lock. The R18 lock-order contract is design-approved (§13, third record). Its implementation is not approved. Built to the corrections in §12B.5 and the tests in §12B.11. SQL tests on staging only, after separate approvals for local setup and for migration creation.
-- **7C. Admin RPCs and the read RPC:** grant, extend, revoke (with the M2 rule), and replace; `shop_licence_status` (owner read RPC); denial logging (M3, M8). Manual payment record, verify, and reverse are deferred (M5). Matrix from §12A.11 and §12B.11 on staging.
+- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, and `shop_licence_meta`. Excludes `paid_verified`, `trial`, and `licence_payments` (M5; C-5, DECIDED 2026-11-01). **Split on 2026-11-01:** 7B-1 (file only, unapplied, `supabase/migrations/0011_licence_foundation.sql`) covers the tables, triggers, RLS deny-all, `is_platform_admin()` and `shop_licence_state()`. `licence_requests`, `licence_denials` and `licence_denial_windows` are approved for placement in this file (decision 3; O2) but are not yet in it. Pre-staging review of 0011 is required before any staging run. 7B-2 (`licence_lock_shop()` and `shop_licence_meta`) was approved for implementation on 2026-11-01, for that scope only, because it takes the shop lock. The R18 lock-order contract is design-approved (§13, third record). Its implementation is not approved. Built to the corrections in §12B.5 and the tests in §12B.11. SQL tests on staging only, after separate approvals for local setup and for migration creation.
+- **7C. Admin RPCs and the read RPC:** grant, extend, revoke (with the M2 rule), and replace; `shop_licence_status` (owner read RPC); denial logging (M3, M8; counters in `licence_denial_windows`, O1). Admin disable is not in 7C (O6). Manual payment record, verify, and reverse are deferred (M5). Matrix from §12A.11 and §12B.11 on staging.
 - **7D. Admin UI:** a separate private app with login, shop search, grant, extend, revoke, and replace forms with confirmation, and an audit view. Payment entry is deferred (M5). Browser smoke test on staging.
 - **7E. Shop read-only status:** owner web view with the minimal fields in decision D. Android is DEFERRED (item 13). No enforcement.
 - **7F. Enforcement (printing only, decision A):** gates on approve, retry, claim, and `mark_printing` (§12B.4). Order intake is not gated. Separate approval gate. The refund and claim fix and the duplicate-print fix are separate gates (§12B.4). The 7-day hold rule (M1) is a separate gate (§12B.6).
 - Gateway payments (Stripe, Razorpay) come later. They depend on §9 decision 9 and on the external access checks in §4.
 - Each stage needs explicit approval before it starts. No commit, push, merge, or deploy without it.
 
-### 12A.13 New owner decisions (all PENDING OWNER APPROVAL, except where §12B.3 records a status)
+### 12A.13 New owner decisions (all PENDING OWNER APPROVAL, except where §12B.3 or the 2026-11-02 records in §13 record a status)
 
 13. **Admin accounts (PENDING OWNER APPROVAL):** one owner account only (recommended), or additional super-admins? Each extra admin needs an owner-run SQL row.
-14. **MFA (PENDING OWNER APPROVAL):** require `aal2` (TOTP) for all admin RPCs (recommended)? The owner confirms whether MFA is enabled on the Supabase account and the admin user.
+14. **MFA (`aal2` requirement APPROVED 2026-11-02, §13 item 1; recovery procedure and claim verification OPEN):** require `aal2` (TOTP) for all admin RPCs (recommended)? The owner confirms whether MFA is enabled on the Supabase account and the admin user.
 15. **Admin UI hosting (PENDING OWNER APPROVAL):** (a) a separate private deployment, not linked from the shop app and not published with the public shop site (recommended), or (b) another host, to be named. The public GitHub Pages site is not recommended for the admin UI.
-16. **Grant limits (PENDING OWNER APPROVAL):** which durations are allowed (1 month, 1 year, custom, lifetime); whether backdating is allowed at all (recommended: only with explicit confirmation); maximum custom length (decided 2026-11-01: none, owner decision 6); whether lifetime is owner-only. Dates are entered and shown in Asia/Kolkata and stored in UTC. Proposed: "1 month" and "1 year" start at the time of grant.
+16. **Grant limits (PENDING OWNER APPROVAL):** which durations are allowed (1 month, 1 year, custom, lifetime); whether backdating is allowed at all (recommended: only with explicit confirmation); maximum custom length (decided 2026-11-01: none, owner decision 6); whether lifetime is owner-only. *2026-11-02 (§13 items 4 and 5):* lifetime grants are admin-only, and backdating requires explicit confirmation. The maximum backdating window is OPEN. Dates are entered and shown in Asia/Kolkata and stored in UTC. Proposed: "1 month" and "1 year" start at the time of grant.
 17. **Revoking verified paid periods (PENDING OWNER APPROVAL):** allowed with a reason and confirmation, with no automatic refund (recommended), or only through replace?
 18. **Expiry and grace (PENDING OWNER APPROVAL):** no grace period (proposed), or N days? Shop-visible wording for the NONE state.
 19. **Shop-facing licence view (PENDING OWNER APPROVAL):** which fields show (state label, expiry date); whether an admin grant appears as "Admin grant", "Active", or another label; web only or also Android. Reasons, actor IDs, and payment references are never shown to shops.
@@ -634,11 +643,11 @@ The §3 row still says "the government sets UPI MDR at 0%". The MoF FAQ shows th
 | L | Read-only inspection of the local Auth schema, only after separate local setup approval. Synthetic fixture only after its columns are verified and the approach is reviewed. | **BLOCKED** until local setup is approved separately | Nothing inspected. No user created. |
 | M1 | Jobs held only because the licence is inactive fail after a proposed 7-day limit, with a stated reason. Their files then become eligible under the existing purge rules. Files required by actively printing jobs are never deleted. The effect on paid orders is documented. Tests before implementation. | PROPOSAL. Not approved for implementation. Review and tests required first | §12B.6. Conflicts C-1 and C-2 must be resolved first. |
 | M2 | Refuse manual revocation of coverage whose natural end has already passed. Payment reversal stays a separate, audited operation. | APPROVED | Resolves state-machine fix 2 (§12B.5). |
-| M3 | Detailed denial records capped at 20 per user per hour, with rate limiting and aggregate counts for excess attempts. Limitations documented. | APPROVED as design. NOT IMPLEMENTED | §12B.7. |
+| M3 | Detailed denial records capped at 20 per user per hour, with rate limiting and aggregate counts for excess attempts. Limitations documented. | APPROVED as design (O1, O9, O10, 2026-11-02). NOT IMPLEMENTED | §12B.7. The counter is `licence_denial_windows` (O1), not `consume_rate_limit`. Above the cap: a count per window with a visible omitted-detail marker (O10, synthetic staging only). O9: counted, no automatic refusal. Alerting is not approved, implemented or claimed (2026-11-04). |
 | M4 | Paid term: 12 calendar months, Asia/Kolkata arithmetic, from the exact server timestamp after the shop lock. Custom admin dates use the same timezone convention with explicit start and end semantics. A custom grant is not a paid transaction. | Custom-grant convention APPROVED. Paid term APPROVED, BLOCKED with the paid path (M5) | Custom grant: start inclusive at 00:00 IST, end exclusive at 00:00 IST. Stacking question: C-4. |
 | M5 | The paid-coverage implementation is left out of 7C and 7D until pricing, minimum amount, tax treatment, and the payment-recording policy are reviewed and approved. No invented price. No unconfigured payment path grants access. Complimentary admin grants stay independently available. | APPROVED (blocking condition) | `paid_verified` and `licence_payments` are excluded from 7B (C-5). C-5 was confirmed by the owner on 2026-11-01. `trial` is excluded under C-10. |
 | M6 | Lifetime may be granted over existing paid coverage. Paid records are preserved and never refunded, deleted, rewritten, or automatically revoked. Lifetime takes precedence while active. If lifetime is later revoked, a still-valid paid period may give access. | APPROVED as policy. State transitions to be tested | Applies only when paid records exist, so it becomes testable with the paid path (M5). Compatible with F (C-7). |
-| M7 | Stop-and-review for the refund and claim fix. The duplicate-print fix needs targeted tests and must not change unrelated printing behaviour. | APPROVED (review requirement confirmed) | No fix implemented. Diff review pending. |
+| M7 | Stop-and-review for the refund and claim fix. The duplicate-print fix needs targeted tests and must not change unrelated printing behaviour. | APPROVED (review requirement confirmed) | No fix implemented. Diff review pending. The 0012 read-only review approved 2026-11-04 (no. 6) is not a fix approval. |
 | M8 | Separate retention: detailed denial records 90 days, subject to review; successful replay records kept until an independently safe replay-prevention mechanism exists; audit records kept separate from denial logs; personal data minimised. No retention job. No deletion. | APPROVED as policy proposal. LEGAL REVIEW REQUIRED | §12B.8. |
 
 ### 12B.3 Owner decisions 13–20 (§12A.13): status after 2026-10-29
@@ -646,9 +655,9 @@ The §3 row still says "the government sets UPI MDR at 0%". The MoF FAQ shows th
 | Decision | Status |
 |---|---|
 | 13 Admin accounts | PENDING OWNER APPROVAL. Recommended default: one owner account. Not approved. |
-| 14 MFA (`aal2`) | PENDING. The owner must confirm MFA status. Admin RPCs cannot run without aal2 if it is required. |
+| 14 MFA (`aal2`) | APPROVED 2026-11-02 (§13 item 1): `aal2` is required for every platform-admin RPC. OPEN: the recovery procedure, and hosted and local verification of the claim (O11). The owner still confirms MFA status on the Supabase account. |
 | 15 Admin UI hosting | PENDING. |
-| 16 Grant limits | PARTLY APPROVED: custom-date convention (M4). Maximum custom length: none (owner, 2026-11-01). Lifetime ranks above admin grants (item 7, 2026-11-01). PENDING: backdating and lifetime owner-only. |
+| 16 Grant limits | PARTLY APPROVED: custom-date convention (M4). Maximum custom length: none (owner, 2026-11-01). Lifetime ranks above admin grants (item 7, 2026-11-01). 2026-11-02 (§13 items 4 and 5): lifetime grants are admin-only, and backdating needs explicit confirmation. OPEN: the maximum backdating window. |
 | 17 Revoking paid periods | PARTLY APPROVED through H and M2 (reversal; refusal after end). Standalone revocation of an active paid period is PENDING and deferred with M5. |
 | 18 Expiry and grace | PARTLY: B and C block printing in every non-ACTIVE state, so no grace is implied. PENDING: any grace days, and the wording for NONE. |
 | 19 Shop-facing view | PARTLY APPROVED: fields as in D. PENDING: Android, and whether an admin grant may show a label. D shows active or inactive only. |
@@ -672,7 +681,7 @@ The §3 row still says "the government sets UPI MDR at 0%". The MoF FAQ shows th
   - **R-a:** in the refund path and in the ready or completed transition, mark the order's queued jobs `failed` with a specific reason code. Uses existing states. Changes the body of `set_order_payment` (the 0006 body on the origin/main line; the 0013 body on local main, unmerged) and the order status update path. Touches the customer payment ledger.
   - **R-b:** add a `cancelled` job status and cancel jobs in the same paths. Schema change, plus the same body changes.
   - **R-c:** claim-side eligibility only (order `printing` and `paid`). Ineligible jobs stay `queued`, so they pin their files indefinitely (0010 lines 795–798). **Not acceptable without a retention decision (C-1).**
-- Local main migration 0012 (unmerged; not on this line) combines R-b with claim and mark checks. It is not one of R-a, R-b or R-c as written, and it has not been reviewed. Its effect on retention (cancelled jobs are not in the 0010 keep-list) is open under C-1.
+- Local main migration 0012 (unmerged; not on this line) combines R-b with claim and mark checks. It is not one of R-a, R-b or R-c as written, and it has not been reviewed. Its effect on retention (cancelled jobs are not in the 0010 keep-list) is open under C-1. *Read-only review approved 2026-11-04 (no. 6): no implementation, SQL, staging application or deployment. The review does not approve R-b or any fix. The 0012 header says retention keeps failed jobs; 0010 does not list `failed` in its keep rules (the file is kept only through the open-order claimed-file rule), so the header is to be corrected in review.*
 - Recommendation for review: R-a, with the state transitions shown in the diff and a test that a refunded order's files are not claimed. The exact diff must be presented before any implementation.
 - State-transition effects to review under R-a: queued → failed (new reason code) on refund or on the ready or completed transition. Claimed and printing jobs are unchanged in this option. To be confirmed in the diff review.
 
@@ -700,7 +709,7 @@ The §3 row still says "the government sets UPI MDR at 0%". The MoF FAQ shows th
 |---|---|---|
 | R1 | Meta row creation: no trigger on `shops`. Created lazily by `licence_lock_shop`. | Design resolved; not tested. Verify the upsert on staging. |
 | R2 | Versioning: one increment per RPC request, inside the RPC. Triggers only enforce immutability. | Design resolved; not tested. The versioning test in §12B.11 reflects this. |
-| R3 | Denials: an admin denial returns a committed result. Print refusals may raise. The rate-limit counter follows the same rule. | Design resolved; not tested. |
+| R3 | Denials: an admin denial returns a committed result. Print refusals may raise. The licence denial counter (`licence_denial_windows`, O1) follows the same rule. | Design resolved; not tested. |
 | R4 | Atomic success: one function, with no exception after the audit insert. | Design resolved; not tested. Enforce by test. |
 | R5 | Idempotency: same `request_id` and payload hash returns the stored result. Different payload is a conflict. Ledger retention per M8. | Design resolved; not tested. Retention: §12B.8. |
 | R6 | Revocation immutability: compare `to_jsonb` with the three revocation keys removed. | Design resolved; not tested. UNVERIFIED on staging. |
@@ -733,34 +742,34 @@ The §3 row still says "the government sets UPI MDR at 0%". The MoF FAQ shows th
 
 ### 12B.7 Denial logging design (M3)
 
-- **Detailed records:** the first 20 denied calls per authenticated user per hour are written to a `licence_denials` table (proposed). Fields: actor UUID, function name, time, `request_id` if supplied, and the denial code.
-- **Excess attempts:** counted in an hourly aggregate per user, using the rate-limit mechanism (`consume_rate_limit`, key `licence:denied:<uid>`). The aggregate records only a count.
+- **Detailed records:** the first 20 denied calls per authenticated user per hour are written to a `licence_denials` table (placement in 0011 approved, O2). Fields: actor UUID, function name, time, `request_id` if supplied, and the denial code.
+- **Excess attempts:** counted in `licence_denial_windows` (O1, approved 2026-11-02): counts per actor and globally, per UTC hour. This replaces the earlier `consume_rate_limit` design. The counter records only a count, and `consume_rate_limit` is not used for licence denials.
 - **Response:** the same `forbidden` code for every denial, so a caller cannot tell whether the cap was reached.
 - **Commit rule:** the counter and the detailed row are committed, as R3 requires.
 - **Limitations (documented, not solved):**
-  - Anonymous calls are rejected at the grant level before the function runs (§12A.4 grants to `authenticated` only). Those attempts are not logged.
+  - Anonymous calls are rejected at the grant level before the function runs (§12A.4 grants to `authenticated` only). Those attempts are not logged. *Superseded for staging (2026-11-04 no. 3):* permission-rejected calls are counted within the approved staging cap. The counting mechanism is not designed. A function-level counter cannot see calls that fail before the function runs, so a mechanism outside the function is needed (OPEN).
   - A caller with many accounts gets a separate cap for each account.
-  - Above the cap, the details of a burst are lost. Only counts remain (C-12).
+  - Above the cap, the details of a burst are lost. Only counts remain (C-12). O10 (approved for synthetic staging only, 2026-11-02): overflow is recorded as a count per window with a visible omitted-detail marker, and evidence is not silently discarded. Production C-12 is OPEN.
   - `purge_old_rate_limits` exists (0010). `cleanup-files` calls it (`index.ts` line 81), and that daily workflow's live deployment is **UNVERIFIED** (§5C).
-  - `consume_rate_limit` is granted to `service_role` only (0010 line 868). Calling it from a licence function needs a staging check before use.
-- **Status:** APPROVED as design. NOT IMPLEMENTED.
+  - `consume_rate_limit` is granted to `service_role` only (0010 line 868). That is one reason it is not used for licence denials (O1).
+- **Status:** APPROVED as design (O1, O9, O10, 2026-11-02). NOT IMPLEMENTED. O9: denials are counted, there is no automatic refusal, and alerting is not implemented or claimed. The numeric threshold and the alert mechanism are OPEN.
 
 ### 12B.8 Retention (M8)
 
 | Record | Proposed retention | Status |
 |---|---|---|
 | Detailed denial records (`licence_denials`) | 90 days | Subject to security and legal review. No deletion job. |
-| Denial aggregate counters | Expire with their rate-limit window. `purge_old_rate_limits` runs from `cleanup-files` (`index.ts` line 81), which the daily workflow calls. Live deployment UNVERIFIED. | UNVERIFIED |
+| `licence_denial_windows` counters (O1) | Retention not decided. `purge_old_rate_limits` purges the rate-limit table, not this table, so it does not apply here. No purge job for these counters is approved. | Retention OPEN |
 | Replay records (`licence_requests`) for consequential mutations | Kept until an independently safe replay-prevention mechanism exists. Store the request ID, action, payload hash, and a non-personal result summary. Not deleted at 90 days. | Policy proposal. Period to be set in review. |
 | Consequential audit log (`licence_audit_log`) | Kept as needed for administrative and financial records. Personal data minimised. | Lawyer review (decision 20, DPDP). |
-| Customer files and print jobs | Unclaimed: one day after upload (0003 line 41). Claimed: 30 days after the order is completed, cancelled or rejected, with purge exclusions (0010 lines 785–810). **Code in repo; live deployment UNVERIFIED** (§5C). M1 would add a licence-driven failure path. | Separate decision (C-1). |
+| Customer files and print jobs | Unclaimed: one day after upload (0003 line 41). Claimed: 30 days after the order is completed, cancelled or rejected, with purge exclusions (0010 lines 785–810). **Code in repo; live deployment UNVERIFIED** (§5C). M1 would add a licence-driven failure path. | Separate decision (C-1). R-D selected temporarily (2026-11-04, no. 4): cleanup disabled until legal review and an owner-approved retention policy. Lawyer review required (no. 5). |
 
 `licence_requests` stores `actor_user_id`, which is personal data. Store the user ID only where replay prevention needs it.
 
 ### 12B.9 Contradictions, open conditions, and security weaknesses
 
 **Contradictions and open conditions**
-- **C-1 (M1 vs the purge rule).** M1 assumes a failed job makes the file eligible. The purge rule does not, for orders that remain `printing` (§12B.6). Options: a new terminal order status, which changes the 0001 transitions and is out of scope so far; or a licence-specific file-release rule. **Not decided.**
+- **C-1 (M1 vs the purge rule).** M1 assumes a failed job makes the file eligible. The purge rule does not, for orders that remain `printing` (§12B.6). Options: a new terminal order status, which changes the 0001 transitions and is out of scope so far; or a licence-specific file-release rule. **Not decided.** *2026-11-04:* retention option R-D is selected temporarily, so cleanup stays disabled until legal review (C-1/M1) and an owner-approved retention policy. The release option is still not decided. Lawyer review required.
 - **C-2 (M1 mechanics).** The hold-start clock is unresolved. A purge scheduler exists in the repository (`cleanup-files.yml`; deployment UNVERIFIED). No scheduler exists for held-job timeouts (§12B.6). The owner must choose the hold start (option a or b), and any scheduled job needs separate approval. Deferred with item 2 (owner instruction 1, 2026-10-31). It reopens under §14.2 item 2.
 - **C-3 (B vs retention).** Until M1 is implemented, held jobs keep customer files indefinitely. Two separate questions. **Decision:** the owner accepts this as an interim, or holds enforcement back. **Requirement:** holding enforcement back makes M1 a prerequisite of enabling, with item 2 and, where paid orders are affected, item 10. The 7F build needs C-1 answered and C-3 decided (§15.3 7F). Stage 7 closure needs C-3 decided, not enforcement enabled (§16.1(e)).
 - **C-4 (M4 vs J stacking).** M4 says the term is calculated from "the exact server-side verification timestamp". J and the anchor rule start a new paid term at the end of an existing paid term when that end is later. The two differ while a paid term is still running. Recommended: keep stacking, so there is no overlap. **Owner confirmation needed.** Applies only when the paid path is approved.
@@ -771,7 +780,7 @@ The §3 row still says "the government sets UPI MDR at 0%". The MoF FAQ shows th
 - **C-9 (§9 item 7 wording).** Owner decision 9 (2026-11-01) adopts this replacement wording: "C-9 confirmed. In §9 item 7, 'no new customer orders', 'in-flight paid orders finish' and 'the print agent claims no new jobs' are replaced by §12B.2 A, B and C. Checkout is not blocked, queued jobs are held while the shop is not ACTIVE, jobs already printing may finish, and retries are refused while inactive." **Status: DECIDED (owner, 2026-11-01).** The superseded passages are in §9 item 7 only. The §12A.10 correction note (A, B, C) is separate and unchanged. Other original text in §9 item 7 remains. B keeps its own condition (C-1 and C-3), which this decision does not change.
 - **C-10 (trials).** §9 item 5 and §12A.5–12A.6 mention trials. Trials are deferred out of Stage 7 under the 2026-10-29 direction (the earlier chat plan is not reproduced in this file). **Owner confirmed 2026-10-31:** trials are deferred out of Stage 7, not permanently removed. Trial terms are not approved. Reopening needs a new owner decision on product and pricing terms.
 - **C-11 (refunds).** The refund policy (§9 item 6) is open. M1's effect on paid orders depends on it. Lawyer review required.
-- **C-12 (denial design).** M3 accepts counts-only records above the cap. **Owner must accept** that detail is lost above the cap.
+- **C-12 (denial design).** M3 accepts counts-only records above the cap. O10 (2026-11-02): accepted for synthetic staging only. Overflow is recorded as a count per window with a visible omitted-detail marker. Production C-12 is OPEN.
 - **C-13 (blocked item I).** The paid path and pricing are blocked, so Stage 7 cannot sell paid licences after 7C and 7D. This is expected under M5. No paid licence can be offered until I is approved.
 - **C-14 (E).** Enabling enforcement needs the existing-shop policy. **BLOCKED.**
 - **C-15 (email and authentication).** The email sign-in and sign-up decisions in §2 are not changed. Admin login relies on Supabase Auth, and therefore on the MFA answer (C-6).
@@ -798,11 +807,11 @@ The earlier chat plan is not reproduced in this file. The items below record its
 ### 12B.11 Required tests (updated; none run; staging only)
 
 - **States:** NONE; ACTIVE by admin grant; SCHEDULED; EXPIRED; REVOKED. Boundaries: start inclusive, end and revocation exclusive. A future period cancelled before its start is dropped. Revocation after the natural end is refused (M2). `access_until` covers contiguous blocks. Lifetime precedence, and its revocation. SCHEDULED after revocation (G). Tie-break (fix 5).
-- **Admin RPCs:** a non-admin is denied, with a committed denial row and counter. aal2 is required. A stale state version is rejected. A reason is required. A replay returns the stored result. A conflicting payload is rejected. No self-disable. The last admin is protected. Custom grant boundaries at 00:00 IST. One-month and one-year grants start at the time of the grant.
+- **Admin RPCs:** a non-admin is denied, with a committed denial row and counter. aal2 is required. A stale state version is rejected. A reason is required. A replay returns the stored result. A conflicting payload is rejected. No self-disable. The last admin is protected. Both rules apply to any future disable path, because admin disable is outside 7C (O6). Custom grant boundaries at 00:00 IST. One-month and one-year grants start at the time of the grant.
 - **Privileges:** admin RPCs are callable only by an authenticated admin with aal2. Internal helpers are denied to `public`, `anon`, and `authenticated`. No default grants on licence tables (staging inspection).
 - **Triggers:** the revocation whitelist. One revocation only. DELETE and TRUNCATE blocked on coverage and audit tables. Denial and audit rows are append-only.
 - **Versioning:** exactly one increment per RPC request. No increment on reads.
-- **Denial cap:** 20 detailed rows, then aggregates. Identical response. The counter persists after a denial.
+- **Denial cap:** 20 detailed rows, then a count per window with the omitted-detail marker (O10). Identical response. The counter persists after a denial. Permission-rejected calls are to be counted within the staging cap (2026-11-04 no. 3). The test is written after the counting mechanism is designed.
 - **Concurrency:** a two-session test. The second writer waits on the shop lock.
 - **Orders unchanged:** checksum over the `orders` payment columns and the `order_events` row count, before and after licence actions.
 - **Checkout unaffected (A):** `place_order` succeeds while the licence is inactive, with enforcement on. Migrations define two signatures (three arguments in 0001 and 0003; four arguments in 0008 and 0009). No migration drops either. Which overloads exist on a live database is UNVERIFIED. Test every overload that exists. The three-argument version is granted to `anon` and `authenticated` (0003 lines 277–278). The four-argument version is granted to both as well (0008 line 115; 0009 line 81), and it calls the three-argument version (0008 line 75; 0009 line 62). Test both signatures as an anonymous caller and as an authenticated caller.
@@ -824,7 +833,126 @@ The earlier chat plan is not reproduced in this file. The items below record its
 6. Separate approval for the refund and claim fix (M7), after diff review.
 7. Separate approval for each of 7C, 7D, 7E, and 7F. The M1 rule has its own review (§12B.6).
 
+### 12B.13 Completion, queued jobs, cancellation and reprint: comparison for owner decision (2026-11-04)
+
+*Comparison only. No option is selected or approved (2026-11-04 no. 7). Nothing here is implemented, tested or run.*
+
+**Facts from reading the code (not run)**
+- Approval (`approve_order_for_print`, 0010 lines 439–498) creates a `queued` job for each item that has no job yet, and moves an `approved` order to `printing` in the same transaction. An order that is already `printing` keeps that status.
+- An order in `printing` may move only to `ready` or `completed` (0001 lines 153–155). `cancelled` is reachable only from `pending` or `approved`, and `rejected` only from `pending` (0001 lines 153–154). An order with queued jobs is in `printing`, so an owner status change cannot cancel or reject it.
+- The claim (`agent_claim_next_job`, 0010 lines 630–686) selects `queued` jobs for the shop whose file is not deleted. It checks neither the order status nor the payment status.
+- A refund (`set_order_payment`, action `refund`, 0006 lines 213–219) changes payment fields only. The order status and `print_jobs` are unchanged (§12B.4).
+- Moving an order to `ready` or `completed` changes no `print_jobs` row. Queued jobs of a completed order therefore stay `queued` and remain claimable.
+- `retry_print_job` (0010 lines 502–552) accepts only `failed` or `needs_check` source jobs, and requires the order to be `printing` and `paid`. A `ready`, `completed`, `cancelled` or `rejected` order cannot be retried.
+- The owner app's job labels (`web/src/logic.js`, `JOB_STATUS_LABELS`) have no `cancelled` entry. `printJobLabel` shows the raw status.
+- 0012 (local main, unmerged, not reviewed) adds a `cancelled` job status and a `cancel_unprintable_jobs()` trigger that cancels queued jobs when the order is not printable (refunded, cancelled or rejected, not paid, or completed). The description is from reading only.
+
+**Scope of the queued-job defect.** The defect is reachable through refund and through completion (`ready` or `completed`) while a job is still queued. Cancellation and rejection are not reachable from `printing` under 0001, so they are not part of the defect as the current transitions stand.
+
+**Comparison**
+
+| Event | Option 1: no change | Option 2: queued jobs become `failed` (R-a shape) | Option 3: new `cancelled` job status (R-b, 0012 shape) | Option 4: claim-side check only (R-c shape) |
+|---|---|---|---|---|
+| Completion (`ready` or `completed`) with a queued job | Job stays `queued`; the agent can still print it. | Job becomes `failed` with a reason code; it is no longer claimable. | Job becomes `cancelled`; it is no longer claimable. | Job stays `queued`; the claim refuses it because the order is not `printing`. |
+| Refund with queued jobs | Job stays `queued`; it can still print (§12B.4). | Job becomes `failed`; the order status is unchanged. | Job becomes `cancelled` (0012 trigger). | Job stays `queued`; the claim refuses it. |
+| Reprint of the item | None. `retry_print_job` refuses any order that is not `printing`. | None without a new path. The retry rule needs the order to be `printing` and `paid`. | None without a new path. `cancelled` is not a retry source. | Not needed for the job, which is never printed. |
+| Files and retention | Queued jobs pin their files (0010 lines 795–798). | Follows the existing purge rule (§12B.8). C-1 applies while the order stays `printing`. | As option 2. `cancelled` is not in the purge keep-list. | Queued jobs pin their files indefinitely (C-1). |
+| Owner display | Shows `queued` for a completed order. | Shows `failed`. A reason code is needed so it is not read as a print error. | Needs a new `cancelled` label; none exists today. | Shows `queued` for a completed order, which is misleading. |
+| Code and schema | None. | Changes `set_order_payment` (0006) and the order-status path. No schema change. | Changes the `print_jobs` status check (0010 line 59) and the claim, mark and retry bodies. 0012 implements this shape and is unreviewed. | Changes the claim and mark bodies. No schema change. |
+| Recorded status | Defect open (item 24; S-8). | Recommended in §12B.4 (R-a), subject to diff review. | Local main 0012 only; not reviewed. | Not acceptable without a retention decision (§12B.4; C-1). |
+
+**Points that apply under every option**
+1. Any new job state needs an owner-app label.
+2. Items 23 and 24 keep their own gates, and the M7 review applies to both (§12B.4). The 0012 review (no. 6) approves no option.
+3. No file is released under any option until C-1 is decided and the retention position is settled. R-D (temporary) keeps cleanup disabled (no. 4).
+4. No reprint path exists for a completed or cancelled order. Creating one is a separate design and approval.
+
+**Owner decision needed (not made here).** Choose option 1, 2, 3 or 4 for completion and refund behaviour. Decide whether cancellation after approval is needed at all, since 0001 does not reach it from `printing`. Decide whether a reprint path is needed.
+
+### 12C. Agent token lifecycle: proposal (2026-11-04)
+
+*Proposal only (2026-11-04 no. 8). Not approved for implementation. Rotation implementation is deferred until separately approved. No migration, function, agent or secret change is approved.*
+
+**Current behaviour (read from 0010, not run)**
+- Only the SHA-256 hash of an agent token is stored (`print_agents.token_hash`, line 28).
+- `agent_for_token` (lines 166–186) checks the hash format and that the agent is not revoked. It checks no expiry and no idle time.
+- `last_seen_at` is set by heartbeat (line 620) and by each claim (line 643). The "online" flag is true within 2 minutes (line 343).
+- `revoke_print_agent` (lines 378–409) sets `revoked_at`.
+- `agent_mark_printing` (line 688) and `agent_finish_job` (line 714) resolve the token through `agent_for_token`.
+- Pairing codes expire after 10 minutes and are single-use (`consume_print_pairing`).
+
+**Proposed policy**
+1. **Idle expiry:** a token expires 30 days after its agent last checked in (`last_seen_at`).
+2. **Maximum lifetime:** a token expires 180 days after it was issued, whatever the activity.
+3. **Rotation overlap:** after a rotation, the old token stays valid for 10 minutes after the new one is issued.
+4. **In-flight exemption:** a finish call (`agent_finish_job`) for a job claimed before expiry is accepted after expiry, so claimed work can still be closed.
+
+Consequences that follow from expiry, to confirm: after expiry, new claims and heartbeats are refused, and the agent is re-paired with a new 10-minute pairing code.
+
+**Not decided**
+- Whether `agent_mark_printing` is also exempt after expiry. The owner's decision names only finish calls.
+- Whether rotation is started by the owner or by the agent.
+- What "in flight" means exactly. This proposal reads it as a job whose lease is still open (`claimed` or `printing`).
+
+**Before any implementation (separate approval).** Change `agent_for_token` and the claim path; add a rotation function; change the agent to store and use the new token; add staging tests for idle expiry, the lifetime cap, the overlap window, a finish call after expiry for a claimed job, and a claim refused after expiry.
+
+### 12D. O12 hosted staging: cost and setup report (2026-11-04)
+
+*Report only (2026-11-04 no. 9). Creating a project, adding credentials, running SQL or tests, applying migrations and deploying are NOT approved. Each needs its own approval (O11, O12, O13).*
+
+**Prices.** From the Supabase pricing page, retrieved 2026-11-04. USD, before tax. Supabase applies tax by billing address. Check again at project creation.
+- **Free:** $0 a month. Limit of 2 active projects. A free project pauses after 1 week of inactivity. 500 MB database, 1 GB file storage, 50,000 monthly active users, 1-day log retention. Basic MFA is included.
+- **Pro:** from $25 a month, first project included. Additional projects from $10 a month. Includes $10 a month of compute credit, enough for one Micro instance. The spend cap is on by default. Projects on Pro are not paused for inactivity. Daily backups are kept for 7 days.
+- **Compute:** Micro $10 a month (shared CPU, 1 GB RAM; 60 direct and 200 pooled connections). Small $15 a month (2 GB RAM).
+- **Branching:** $0.01344 per branch per hour on Pro (about $9.81 for a 730-hour month). Not assessed further: how a branch is seeded, and whether it holds production data, is not verified.
+
+**Not verified.** The organisation's current plan, the production project's compute size and the number of projects in use. Claude has not checked them. The owner should confirm them in the dashboard. Until then the figures above cannot be applied to this organisation.
+
+**Options**
+
+| Option | Approximate cost | Points to confirm |
+|---|---|---|
+| A. A free-plan project, if the organisation can add one within its 2-project limit | $0 | Pauses after 1 week of inactivity, so tests need it unpaused; 1-day log retention; no point-in-time recovery |
+| B. An additional Micro project on Pro | About $10 a month more, unless the $10 credit is unused | Organisation is on Pro; production compute size; spend cap stays on |
+
+Claude does not recommend a plan until the organisation's current plan is known.
+
+**Setup requirements (to confirm before approval)**
+1. A separate project. The live production project must not be used or reused.
+2. Synthetic data only. No production data, customer files, secrets or service-role keys.
+3. The spend cap stays on. Set the budget before creation.
+4. SQL and tests run only against the staging project (`CLAUDE.md`). A localhost name does not prove a test database.
+5. Migration 0011 needs pre-staging review (O2) before any staging run. Applying 0010 to a staging copy needs its own approval (§15.3, 7B).
+6. Any test account, including an admin account for the O11 `aal2` check, needs explicit approval (§15.2). Basic MFA (TOTP) is included on every plan.
+7. Credentials are not stored in the repository, `web/`, `mobile/` or any committed file (`CLAUDE.md`).
+8. The owner decides the organisation, plan, project name, region, budget and who holds access.
+
+**Not approved by this report:** project creation, credentials, SQL execution, test runs, migration application, deployment, commit and push.
+
+---
+
 ## 13. Revision log
+
+### Owner decision record (2026-11-04)
+
+Source: owner instruction in this session on 2026-11-04, ten items, numbered 1 to 10 here. These are decisions only. They approve no implementation, SQL, migration change or application, staging setup or run, project creation, test execution, deployment, secret change, commit or push. Each gate named below needs its own explicit approval.
+
+| No. | Decision (2026-11-04) | Label | Recorded in |
+|---|---|---|---|
+| 1 | O4 scope: option A. Overlapping grants of the same kind are rejected. A lifetime grant over an admin grant stays allowed. Lifetime-revocation exposure documented. | New. Closes the O4 scope point. | §12A.6; sheet Part 1H; O4 rows in §13 |
+| 2 | O9: corrected wording approved. Denials are counted; no automatic refusal; alerting is not approved, implemented or claimed; the threshold and mechanism remain OPEN. | New. Approves the corrected CHANGED wording. | §12B.7; §13 O9 rows; §15.3 7C row |
+| 3 | O10: the visible omitted-detail marker is approved. Permission-rejected calls are counted within the approved staging cap; no automatic refusal; the overflow-count behaviour is preserved. | Marker: new. Overflow count: previously approved 2026-11-02. Permission-rejected counting: new; supersedes "not counted" for staging. | §12B.7; §12B.11; §13 O10 rows |
+| 4 | Retention: option R-D selected TEMPORARILY. Cleanup stays disabled until C-1/M1 has legal review and an owner-approved retention policy. Not final policy. | New. Temporary. | §12A.10; §12B.8; §12B.9 C-1; §14.2 items 1 and 27; §14.3 C-1; §15.3 M1 |
+| 5 | Legal review is required for customer-file retention and related obligations. | New confirmation. Lawyer rows already listed. | §14.2 items 1, 15 and 30; §14.3 C-1; §15.3 M1 |
+| 6 | Migration 0012 (local main, unmerged): read-only review only. No implementation, SQL, staging application or deployment. | New. | §12B.4; §12B.2 M7; §14.2 items 23 and 24 |
+| 7 | Completion behaviour: not decided. Comparison prepared for owner approval. | New. Deferred. | §12B.13 |
+| 8 | Agent token: proposed 30-day idle expiry, 180-day maximum lifetime, 10-minute rotation overlap, in-flight exemption for finish calls after expiry. Rotation implementation deferred until separately approved. | New proposal, not decided. | §12C |
+| 9 | Staging: NOT approved. O12 cost and setup report provided first. | New. The O12 approach was previously approved; no setup is approved. | §12D; §13 O12 rows |
+| 10 | Live database queries: NOT approved. The owner checks migration state and live jobs through the dashboard. | New. | §14.2 items 25 and 26 |
+
+**Counts and approvals.** No item changed status, and the §14.2 counts are unchanged. Earlier approvals are not withdrawn. Where this record supersedes earlier wording for staging (O9 "count and alert"; O10 "not counted"), the earlier text is kept and annotated.
+
+**Correction.** The §15.3 7C row read "O9: counted and alerted". It now reads the decided wording (no. 2).
 
 ### Status correction (2026-11-02): 7B-2 implementation
 
@@ -834,7 +962,7 @@ The earlier chat plan is not reproduced in this file. The items below record its
 - The draft is in `supabase/migrations/0011_licence_foundation.sql`, untracked on `stage7-payments`. It is not applied, not tested and not committed.
 - **Not approved:** staging verification of 7B-2, SQL execution, database access, staging setup and runs, and migration application. Each needs its own approval.
 - **R18 implementation: NOT APPROVED.** The R18 lock-order design is approved (third record, 2026-11-01). That approval does not cover R18 implementation or the two-session tests.
-- The O1–O13 proposals in the 2026-11-02 section below remain **PROPOSED — OWNER APPROVAL REQUIRED**. The 2026-11-02 migration-placement approval (decision 3) is unchanged.
+- The O1–O13 proposals in the 2026-11-02 section below were decided by the owner on 2026-11-02 (see the decision record in that section). The 2026-11-02 migration-placement approval (decision 3) is unchanged.
 
 ### Owner decisions (2026-11-02): Stage 7C recommendations (OWNER-APPROVED)
 
@@ -845,11 +973,11 @@ This record approves the decisions below, and nothing else. It does **not** appr
 | # | Decision (OWNER-APPROVED, 2026-11-02) | Conditions and OPEN items | Applied to |
 |---|---|---|---|
 | 1 | AAL2: `aal2` is required for every platform-admin RPC. | OPEN: a verified recovery procedure if the admin loses the TOTP factor; hosted and local verification of the `aal` claim (R16, S-3). Both remain prerequisites before 7C. | Decision 14; item 5; §12A.4; §12A.11 |
-| 2 | Item 15: option (a), a provisional ceiling for staging only. | OPEN: the production ceiling value; the remaining C-12 and item 15 details. The §15.3 wording that separates staging from production is not yet amended. | Item 15; C-12; §15.3 |
+| 2 | Item 15: option (a), a provisional ceiling for staging only. | OPEN: the production ceiling value; the remaining C-12 and item 15 details. The §15.3 7C row now separates staging from production (this pass). | Item 15; C-12; §15.3 |
 | 3 | Migration placement P1: `licence_requests` and `licence_denials` are included in `supabase/migrations/0011_licence_foundation.sql`. | Subject to pre-staging review. Not applied. 0011 does not yet contain these tables. Adding them is a separate step and is not approved by this record. | §12A.12 7B; §15.3 7B |
 | 4 | Lifetime grants: admin-only. | Replaces the earlier "owner-only" recommendation. Under 0011 as written, any platform admin can grant lifetime, because no role column exists. | Decision 16; item 7 |
 | 5 | Backdating: explicit confirmation required. | OPEN: the maximum backdating window. | Decision 16; item 7 |
-| 6 | Extend: rejected while lifetime coverage is active. | Not addressed by this record: the extend start rule when no lifetime coverage is active. | §12A.6; §12B.11 |
+| 6 | Extend: rejected while lifetime coverage is active. | Not addressed by this record. The start rule is O3 (later record below). | §12A.6; §12B.11 |
 | 7 | Denied requests: not written to the replay ledger. A later valid request may reuse the same request ID. | Denial rows (detail or count) are unchanged. | R5; M3; §12B.7 |
 | 8 | Request ID scope: globally unique. | Replay matching rules are not restated here; they stay as in R5. | R5; §12A.8 |
 | 9 | Global enforcement audit (`enforcement_change`): deferred to 7F. | Out of 7C scope. No change to 0011 from this decision. | §12A.9; §15.3 7F |
@@ -865,27 +993,67 @@ This record approves the decisions below, and nothing else. It does **not** appr
 
 **Status after this record:** 7C implementation NOT approved. 7C staging NOT approved. *Corrected 2026-11-02:* 7B-2 implementation APPROVED on 2026-11-01 for its scope only (§13, status correction). R18 implementation NOT APPROVED (unchanged). Two-session tests OUTSTANDING. Migration 0011 NOT applied, and this record does not edit it. Item statuses and counts in §14.2 are unchanged, because no item changed status.
 
-### Proposed decisions (2026-11-02): awaiting owner approval
+### Proposed decisions (2026-11-02): decided by owner (see decision record below)
 
-**PROPOSED — OWNER APPROVAL REQUIRED.** The 13 items below are proposals. None is an approved decision. Each needs its own explicit owner approval. They change no status, gate, count or migration. They approve no 7C implementation, SQL, database access, staging setup or runs, tests, migration application, commit, push, merge or deployment. The approved 2026-11-02 record above is unchanged, including decision 3 (migration placement).
+**Decided by owner, 2026-11-02.** These 13 items were proposals. Their decisions are in the status column below and in the decision record that follows. The decisions approve no 7C implementation, staging setup or runs, SQL execution, test execution, migration application, commit, push, merge or deployment. The approved 2026-11-02 record above is unchanged, including decision 3 (migration placement).
 
 | # | Proposal | Status | Relation to approved decisions and open points |
 |---|---|---|---|
-| O1 | Use a separate `licence_denial_windows` table for licence denial counters. | PROPOSED — OWNER APPROVAL REQUIRED | Would replace the `consume_rate_limit` counter design in §12B.7. Its placement is not decided here (see O2). |
-| O2 | Keep the 2026-11-02 placement: `licence_requests` and `licence_denials` stay in `0011_licence_foundation.sql` and are not moved to a new migration. The `licence_denial_windows` table needs separate placement approval. | PROPOSED — OWNER APPROVAL REQUIRED | Restates approved decision 3. Adds no table to 0011. |
-| O3 | Extend starts at `greatest(v_now, latest non-revoked coverage end)`. | PROPOSED — OWNER APPROVAL REQUIRED | Fills the open start-rule point in decision 6. §12A.6 is not edited here; it would need a matching edit if approved. |
-| O4 | Reject overlapping grants and duplicate non-revoked lifetime grants. | PROPOSED — OWNER APPROVAL REQUIRED | The decision docs have no current rule for either case. The exact overlap test is not written here. |
-| O5 | Accept PostgreSQL month-end clamping for admin grant arithmetic. | PROPOSED — OWNER APPROVAL REQUIRED | Partly fills decision 11. The exact timestamp behaviour stays OPEN. |
-| O6 | Defer admin disable from 7C. | PROPOSED — OWNER APPROVAL REQUIRED | §12A.8 still describes a disable RPC and is not edited here. If approved, that text moves out of 7C scope. |
-| O7 | Break-glass writes require a documented lock-first procedure: `licence_lock_shop()` is called before any write. | PROPOSED — OWNER APPROVAL REQUIRED | The procedure is not written here. Decision 10 (no GUC marker, no lock-acquiring trigger) is unchanged. |
-| O8 | Staging backdating window: 31 days, staging only. | PROPOSED — OWNER APPROVAL REQUIRED | The production window stays OPEN (decision 5). |
-| O9 | Staging denial ceiling: count and alert, with no automatic refusal. | PROPOSED — OWNER APPROVAL REQUIRED | The numeric ceiling stays undecided. Item 15 stays on option (a) (decision 2). |
-| O10 | Accept the C-12 limitations for synthetic staging only. The limitations: above 20 detailed denial rows per user per hour, only counts are kept; calls rejected by the permission check before the function runs (for example anon, which has no EXECUTE on admin RPCs) are not counted. | PROPOSED — OWNER APPROVAL REQUIRED | Not accepted for production. The production C-12 position stays OPEN. |
-| O11 | Verify the AAL2 requirement and the recovery procedure using hosted staging. | PROPOSED — OWNER APPROVAL REQUIRED | Local verification of the `aal` claim is not covered and stays OPEN (decision 1). |
-| O12 | Use a hosted staging project for SQL and staging tests (recommended). | PROPOSED — OWNER APPROVAL REQUIRED | No project, credentials or setup are approved. |
-| O13 | Approve the proposed staging test scope, including the R18 two-session tests (item 33). | PROPOSED — OWNER APPROVAL REQUIRED | Subject to separate setup approval and separate execution approval. Two-session tests stay OUTSTANDING. |
+| O1 | Use a separate `licence_denial_windows` table for licence denial counters. | DECIDED 2026-11-02: APPROVED | Would replace the `consume_rate_limit` counter design in §12B.7. Applied to §12B.7, §12A.5 and §12B.2 M3. Placement: O2. |
+| O2 | Keep the 2026-11-02 placement: `licence_requests` and `licence_denials` stay in `0011_licence_foundation.sql` and are not moved to a new migration. The `licence_denial_windows` table is proposed for the same file (approved as O2 below). | DECIDED 2026-11-02: APPROVED | Restates approved decision 3 for `licence_requests` and `licence_denials`. Extended to `licence_denial_windows` by the decision record below (O2). The tables are not yet in the file. |
+| O3 | Extend starts at `greatest(v_now, latest non-revoked coverage end)`. | DECIDED 2026-11-02: APPROVED | Fills the open start-rule point in decision 6. Applied to §12A.6 and §12A.11 in this pass. |
+| O4 | Reject overlapping grants and duplicate non-revoked lifetime grants. | DECIDED 2026-11-02: APPROVED WITH CONDITION | No rule existed for either case. The half-open test is documented in §12A.6. Scope to confirm: whether O4 applies to same-kind grants only, since lifetime over admin stays allowed (item 7). Scope decided 2026-11-04 (no. 1): same-kind grants only. |
+| O5 | Accept PostgreSQL month-end clamping for admin grant arithmetic. | DECIDED 2026-11-02: APPROVED | Partly fills decision 11. The exact timestamp behaviour stays OPEN. |
+| O6 | Defer admin disable from 7C. | DECIDED 2026-11-02: APPROVED WITH CONDITION | Applied to §12A.8, §12A.12 and §15.3 in this pass: admin disable is outside 7C. |
+| O7 | Break-glass writes require a documented lock-first procedure: `licence_lock_shop()` is called before any write. | DECIDED 2026-11-02: CHANGED | The break-glass procedure is not written here, and needs separate owner approval before 7C sign-off (O7). Decision 10 (no GUC marker, no lock-acquiring trigger) is unchanged. |
+| O8 | Staging backdating window: 31 days, staging only. | DECIDED 2026-11-02: APPROVED (staging only) | The production window stays OPEN (decision 5). |
+| O9 | Staging denial ceiling: count and alert, with no automatic refusal. | DECIDED 2026-11-02: CHANGED | Applied to item 15, §12B.7 and §15.3 in this pass. Alerting is not implemented or claimed. The numeric ceiling stays undecided. Item 15 stays on option (a) (decision 2). The phrase "count and alert" in this proposal is superseded (2026-11-04 no. 2). |
+| O10 | Accept the C-12 limitations for synthetic staging only. The limitations: above 20 detailed denial rows per user per hour, only counts are kept; calls rejected by the permission check before the function runs (for example anon, which has no EXECUTE on admin RPCs) are not counted. | DECIDED 2026-11-02: APPROVED WITH CONDITION (synthetic staging only) | Overflow is recorded as a count per window with a visible omitted-detail marker. Not accepted for production. The production C-12 position stays OPEN. 2026-11-04 (no. 3): the "not counted" limitation above is superseded for staging. Permission-rejected calls are to be counted within the cap; the counting mechanism is OPEN. |
+| O11 | Verify the AAL2 requirement and the recovery procedure using hosted staging. | DECIDED 2026-11-02: APPROVED, OBJECTIVE ONLY | Local verification of the `aal` claim is not covered and stays OPEN (decision 1). |
+| O12 | Use a hosted staging project for SQL and staging tests (recommended). | DECIDED 2026-11-02: APPROVED, APPROACH ONLY | No project, credentials or setup are approved. |
+| O13 | Approve the proposed staging test scope, including the R18 two-session tests (item 33). | DECIDED 2026-11-02: APPROVED, TEST SCOPE ONLY | Subject to separate setup approval and separate execution approval. Two-session tests stay OUTSTANDING. |
 
-**Status after these proposals:** unchanged from "Status after this record" above.
+**Status after these decisions:** the gates in the decision record below remain outstanding. The status of 7C, staging and production is otherwise unchanged from "Status after this record" above.
+
+### Owner decision record (2026-11-02): O1–O13 confirmed
+
+Source: owner confirmation in this session on 2026-11-02 of the draft decision record of the same date, including its four clarifications. These are decisions only. They approve no implementation, staging, setup, SQL, test execution, migration application, commit, push, merge or deployment. Each gate listed below needs its own explicit approval.
+
+**Approved decisions**
+
+| ID | Owner decision (2026-11-02) | Conditions and limits | Outstanding gate |
+|---|---|---|---|
+| O1 | APPROVED. A separate `licence_denial_windows` table holds licence denial counters per actor and globally, per UTC hour. It replaces the `consume_rate_limit` design for licence denials (§12B.7). | Counts only. Print rate limits are unchanged. | 7C implementation |
+| O2 | APPROVED. `licence_denial_windows` is placed in `0011_licence_foundation.sql` with `licence_requests` and `licence_denials`, extending the 2026-11-02 placement (decision 3). | Pre-staging review of 0011 is required. This record does not edit 0011. | Pre-staging review; 7C implementation |
+| O3 | APPROVED. Extend starts at `greatest(v_now, latest non-revoked coverage end)`. | Closes the start-rule point left open in decision 6. §12A.6 wording is corrected at implementation. | 7C implementation |
+| O4 | APPROVED WITH CONDITION. Overlapping grants and duplicate non-revoked lifetime grants are rejected. | Before 7C implementation sign-off, the half-open overlap rule is explicitly documented. During separately approved staging, the rule is tested. Scope to confirm before 7C sign-off: whether O4 applies to same-kind grants only (§12A.6). Scope decided 2026-11-04 (no. 1): same-kind grants only. | Rule documentation before 7C sign-off; staging test |
+| O5 | APPROVED. PostgreSQL month-end clamping for admin grant arithmetic. | The exact timestamp behaviour remains OPEN (decision 11). | 7C implementation; timestamp decision |
+| O6 | APPROVED WITH CONDITION. Admin disable is deferred from 7C. | Before 7C implementation sign-off, a documented emergency disable and recovery procedure is required. Break-glass SQL remains the only disable route until then. | Procedure approval before 7C sign-off |
+| O7 | CHANGED. Normal licence writes go only through the internal SECURITY DEFINER writer and the approved RPCs. Owner-role SQL discipline is not the normal security control. | Break-glass DB-owner access is documented in a separate procedure. That procedure needs separate owner approval before 7C implementation sign-off. This replaces the earlier "documented lock-first procedure" proposal as the normal control. | Break-glass procedure approval before 7C sign-off |
+| O8 | APPROVED. 31-day backdating window, staging only. | The production window remains OPEN (decision 5). | Staging execution; production value |
+| O9 | CHANGED. Denials are counted. There is no automatic refusal. | Alerting is not implemented and must not be claimed. The numeric threshold and the alert mechanism are OPEN. This replaces "count and alert" in the proposal. 2026-11-04 (no. 2): corrected wording approved; alerting is not approved, implemented or claimed. | Threshold and alert mechanism decision |
+| O10 | APPROVED WITH CONDITION. C-12 limits accepted for synthetic staging only. | Overflow is recorded as a count per window, with a visible omitted-detail marker. Evidence is not silently discarded. Production C-12 remains OPEN. 2026-11-04 (no. 3): the omitted-detail marker is approved; permission-rejected calls are counted within the staging cap; no automatic refusal; the counting mechanism is OPEN. | 7C implementation of the marker; staging evidence; production acceptance |
+| O11 | APPROVED, OBJECTIVE ONLY. Verify the `aal` claim and recovery on hosted staging. | Execution is not authorised by this decision. Staging and execution are gated separately. Local `aal` verification remains OPEN (decision 1). | Hosted staging project (O12); execution approval |
+| O12 | APPROVED, APPROACH ONLY. Hosted staging project. | Before creating any project, report the expected cost, plan and setup requirements for separate approval. No production data. | Project creation approval |
+| O13 | APPROVED, TEST SCOPE ONLY. Staging test scope, including the R18 two-session tests (item 33). | Does not authorise staging setup, SQL execution or test execution. R18 implementation remains NOT APPROVED. | Setup, SQL execution and test execution, each separately |
+
+**Outstanding gates (not approved)**
+
+- 7C implementation. It requires: the O4 rule documentation, the O6 emergency procedure, the O7 break-glass approval, the timestamp decision (decision 11), and an explicit implementation approval. The O2 pre-staging review of 0011 is required before any staging run.
+- 7C staging, including the R18 two-session tests (item 33).
+- 7B-2 staging verification, which needs its own approval.
+- Hosted staging project creation, after the cost and plan report.
+- Staging setup, SQL execution and test execution.
+- R18 implementation beyond 7B-2.
+- Migration application, commit, push, merge and deployment.
+- Production, all OPEN: backdating window; ceiling value; denial threshold and alert mechanism; legal review of 90-day denial retention and deletion, replay ledger retention, audit retention and DPDP; admin UUID and MFA status (item 5); production migration list (item 26); final C-12 acceptance.
+
+**Preserved approvals (unchanged)**
+
+- 7B-2 implementation, approved 2026-11-01, scope only.
+- R18 design approved. R18 implementation NOT APPROVED.
+- The 11 approvals of 2026-11-02 in the table above.
+- No §14.2 status or count is changed by this record.
 
 ### Owner decisions (2026-11-01): baseline, C-5, items 7 and 8, Dec 16, renewal
 
@@ -1219,13 +1387,13 @@ Count (2026-11-01): 7 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 6
 
 | No. | Item and references | Status | Group | Open parts and who acts | Blocks |
 |---|---|---|---|---|---|
-| 1 | Held-job file retention; C-1, C-3; M1 file effect (§12B.6, §12B.9) | EXTERNAL BLOCKER | none listed | A held paid order that stays in `printing` never reaches a terminal status, so its file is not purged (0010 lines 795–798). A lawyer reviews when such a file may be released. The owner then chooses the C-1 option and decides C-3 (accept held files as an interim, or hold enforcement back). | M1; the 7F build (requires C-1 answered and C-3 decided; neither is decided). Enabling needs M1, with item 2 and item 10 where paid orders are affected, if C-3 holds enforcement back. Not 7B. Stage 7 closure: §16.1(e). |
+| 1 | Held-job file retention; C-1, C-3; M1 file effect (§12B.6, §12B.9) | EXTERNAL BLOCKER | none listed | A held paid order that stays in `printing` never reaches a terminal status, so its file is not purged (0010 lines 795–798). A lawyer reviews when such a file may be released. The owner then chooses the C-1 option and decides C-3 (accept held files as an interim, or hold enforcement back). 2026-11-04 (no. 4): retention option R-D is selected temporarily; cleanup stays disabled until legal review and an owner-approved retention policy. Not final policy. | M1; the 7F build (requires C-1 answered and C-3 decided; neither is decided). Enabling needs M1, with item 2 and item 10 where paid orders are affected, if C-3 holds enforcement back. Not 7B. Stage 7 closure: §16.1(e). |
 | 2 | Hold start and scheduler; C-2 (§12B.6) | DEFERRED | B, D | Deferred by owner instruction 1 (2026-10-31). Reopening trigger: C-3 holds enforcement back, or M1 is put forward for build. The owner then chooses the hold start: (a) the job's `created_at`, which can fail a job a day into a lapse, or (b) the time the shop left ACTIVE, stored as a marker. Option (b) is recommended. The purge scheduler exists (§5C), but it does not time out held jobs. A marker, timeout code or new scheduled job needs its own gate (§15.3). | M1. Enabling only if C-3 holds enforcement back. Not a Stage 7 closure requirement (§16.1(e)). |
 | 3 | Paid-term stacking; C-4 (M4, J) | RECOMMENDED | A | The owner confirms stacking, so paid terms do not overlap. | Paid path only (M5). |
 | 4 | Pricing, minimum payment, tax treatment, paid path and the 0011 paid-table scope; I, M5, C-5, C-13 (§7, §12B.2) | EXTERNAL BLOCKER | A, C, D, E | Price, minimum and tax treatment need two answers first: the CA's tax answer (item 18), and the owner's collection-channel answer, either manual collection or a named processor. Decision 9 (gateway) stays DEFERRED, and integration (item 17) is not needed. If a named processor is chosen, its eligibility evidence and fee basis are needed before pricing. The exclusion of `paid_verified` and `licence_payments` from 0011 (C-5) was confirmed by the owner on 2026-11-01. It no longer gates 7B. See the dependency note below the table. | Paid coverage and any published price. 7B only through C-5. |
-| 5 | Admin identity, MFA and the Auth UUID (decisions 13, 14; C-6, C-15; §10 items 12–13; §12A.3) | EXTERNAL BLOCKER | A, B, E | The production owner supplies the owner's Auth user UUID from their own account. It is never inferred. The production owner also records the MFA status on the Supabase account. One owner admin (decision 13) and `aal2` for admin RPCs (decision 14) are recommended. `aal2` behaviour needs staging evidence (S-3). | 7A; the bootstrap row; 7C to 7D. |
+| 5 | Admin identity, MFA and the Auth UUID (decisions 13, 14; C-6, C-15; §10 items 12–13; §12A.3) | EXTERNAL BLOCKER | A, B, E | The production owner supplies the owner's Auth user UUID from their own account. It is never inferred. The production owner also records the MFA status on the Supabase account. One owner admin (decision 13) is recommended. `aal2` for admin RPCs (decision 14) is APPROVED 2026-11-02 (§13 item 1). Its recovery procedure and claim verification remain OPEN, and `aal2` behaviour needs staging evidence (S-3; O11, objective only). | 7A; the bootstrap row; 7C to 7D. |
 | 6 | Admin UI hosting: a separate private deployment outside `web/` (decision 15) | RECOMMENDED | A, B | The owner confirms a separate private deployment, not linked from the shop app. `pages.yml` publishes `web/` publicly on pushes to `main` that change `web/**` or the workflow. The repository visibility and plan (§3, GitHub Pages row) are a production-owner check. The check affects the hosting cost, not the recommendation. | 7D. |
-| 7 | Lifetime, complimentary and grant limits (M4, M5, M6, F, H; C-7; decision 16) | RECOMMENDED | A | Approved: the custom-date convention, complimentary-grant independence, M6 as policy, and F and H (paid parts blocked by M5). Open for 7C validation: the owner confirms that backdating needs explicit confirmation and that lifetime is owner-only. Confirmed by the owner on 2026-11-01 for 7B: a lifetime grant ranks above an admin grant in the basis (§12A.6). M6 covers paid coverage only. C-7 (access continues through a valid paid period after a lifetime revocation) matters only once the paid path is approved. The maximum custom length is DECIDED by the owner on 2026-11-01: none, with no maximum duration. It is a 7C validation input. The 7B schema has no maximum-length check. It is proposed not to check `starts_at` against `created_at`, so backdating is enforced in the 7C RPC. | 7C grant validation (duration, backdating, lifetime owner-only, maximum length); 7B state function (basis ranking); paid transition tests. |
+| 7 | Lifetime, complimentary and grant limits (M4, M5, M6, F, H; C-7; decision 16) | RECOMMENDED | A | Approved: the custom-date convention, complimentary-grant independence, M6 as policy, and F and H (paid parts blocked by M5). For 7C validation (2026-11-02, §13 items 4 and 5): backdating needs explicit confirmation (approved), and lifetime grants are admin-only (approved; this replaces "owner-only"). The maximum backdating window is OPEN. Confirmed by the owner on 2026-11-01 for 7B: a lifetime grant ranks above an admin grant in the basis (§12A.6). M6 covers paid coverage only. C-7 (access continues through a valid paid period after a lifetime revocation) matters only once the paid path is approved. The maximum custom length is DECIDED by the owner on 2026-11-01: none, with no maximum duration. It is a 7C validation input. The 7B schema has no maximum-length check. It is proposed not to check `starts_at` against `created_at`, so backdating is enforced in the 7C RPC. | 7C grant validation (duration, backdating, lifetime admin-only, maximum length); 7B state function (basis ranking); paid transition tests. |
 | 8 | Revocation and future coverage (C-8, G; fixes 5 and 9; decision 17) | DECIDED (owner, 2026-11-01) | A, D | Confirmed by the owner on 2026-11-01: revoking current coverage does not cancel future coverage (C-8), a same-instant tie gives REVOKED (fix 5), and the exclusive end is displayed (fix 9). Approved: refusal after the natural end (M2) and reversal (H). Standalone revocation of an active paid period is DEFERRED with the paid path (decision 17). | 7B state function, revocation design and state tests; 7E wording. |
 | 9 | Trial policy (decision 5; C-10) | DEFERRED | A, D | Deferred out of Stage 7 (owner instruction 4, 2026-10-31). Postponed, not deleted. Trial terms are not approved. Reopening trigger: a new owner decision on product and pricing terms. | Nothing while deferred. |
 | 10 | Refund policy (§9 item 6; C-11) | EXTERNAL BLOCKER | C | A lawyer reviews first, then the owner decides. The processor and dispute fees in §9 item 6 are facts, not policy. | Paid path; refund tests; the M1 effect on paid orders. |
@@ -1233,7 +1401,7 @@ Count (2026-11-01): 7 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 6
 | 12 | Email-volume tier E (§5A; §10 item 11) | RECOMMENDED | B | The owner estimates emails per order from real data. Both the Free and Pro scenarios stay until then. | Projections only. Not Stage 7 code. |
 | 13 | Expiry, grace and the shop-facing view (decisions 7, 18, 19) | RECOMMENDED | A, D | Approved: printing-only enforcement, held queued jobs and no retries while inactive (A, B, C). The "no new customer orders" wording is superseded by A and B (C-9, DECIDED 2026-11-01, owner decision 9; see §12B.9). Approved (§12B.2 D): owner-only status with the fields listed there. Open: staff visibility (§12B.2 D); the owner confirms no grace period (decision 18); and the labels, Active or Inactive, with no admin-grant label (decision 19). The Android view is DEFERRED. Reopening trigger for it: a new owner decision to show the licence view in the Android app. The deletion-schedule question under decision 7 sits in item 1. | 7E wording. |
 | 14 | Manual payments, verification and audit (decision 20; §12A.7; §12B.8) | EXTERNAL BLOCKER | A, C, D | The payment-method list is recommended (UPI direct, bank transfer, cash, cheque, other), but it is DEFERRED with the paid path (M5). A CA advises on GST invoices for manual receipts. A lawyer advises on personal data in audit rows and their retention. | Paid path (M5); any audit-retention job (none approved). |
-| 15 | Denial and replay retention; denial growth (M3, M8; C-12; decision 20) | EXTERNAL BLOCKER | A, B, E | Approved: detailed denial records capped at 20 per user per hour, with count-only records above the cap (M3, design only). A lawyer reviews the retention periods (90 days for denial records; replay records kept until a safe mechanism exists; M8). Staging measures row growth. The owner accepts the global ceiling (no value is proposed here) and the count-only limitation (C-12). Circular: §15.3 requires the ceiling accepted before 7C, but the measurement needs 7C denial logging on staging. The owner chooses (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. Not decided. 2026-11-02 (§13): option (a) chosen, a provisional ceiling for staging only. The production ceiling value and the remaining C-12 and item 15 details remain OPEN. Status unchanged. | 7C denial logging; retention in 7C. |
+| 15 | Denial and replay retention; denial growth (M3, M8; C-12; decision 20) | EXTERNAL BLOCKER | A, B, E | Approved: detailed denial records capped at 20 per user per hour, with count-only records above the cap (M3, design only). A lawyer reviews the retention periods (90 days for denial records; replay records kept until a safe mechanism exists; M8). Staging measures row growth. The owner accepts the global ceiling (no value is proposed here) and the count-only limitation (C-12). Circular: §15.3 requires the ceiling accepted before 7C, but the measurement needs 7C denial logging on staging. The owner chooses (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. Not decided. 2026-11-02 (§13): option (a) chosen, a provisional ceiling for staging only. The production ceiling value and the remaining C-12 and item 15 details remain OPEN. O9 (2026-11-02): denials are counted with no automatic refusal; alerting is not implemented or claimed; the numeric threshold and alert mechanism are OPEN. O10: C-12 limits are accepted for synthetic staging only. Status unchanged. | 7C denial logging; retention in 7C. |
 | 16 | Licence unit and term (decisions 1, 2; §9 items 1–2) | DEFERRED (renewal part; unit DECIDED) | A | Unit: DECIDED, per shop (decision 1, owner decision 2026-10-31; §13). Term: 12 months, approved as policy (M4). Renewal (decision 2): DEFERRED by owner decision 7 (2026-11-01). It does not block 7B. Its proposal is manual renewal with no automatic renewal. | Paid path (renewal rule). The unit no longer blocks 7B. |
 | 17 | Processor and gateway (decision 9; §3; §4) | DEFERRED | C, D | The gateway is deferred. §12A.1 records that the owner collects licence payments manually for now. Stripe is invite-only for new Indian businesses (§3, verified). Razorpay India signup is unverified. When the gateway is reopened, processor eligibility evidence and CA advice are needed first. If a named processor is chosen for pricing (item 4), its eligibility evidence and fee basis are needed before pricing; that does not reopen integration. | Gateway work (later stage; §12A.12); the fee basis for pricing if a named processor is chosen (item 4). Reopening trigger: a new owner decision to reopen decision 9. |
 | 18 | GST route, exemption, input credit, reverse charge, TDS and invoices (decision 4; §10 item 3) | EXTERNAL BLOCKER | C | The CA decides the registration route, the current status of Notification 10/2017-IT, input credit, reverse charge on foreign services, TDS and invoicing. | Pricing tax treatment (I); invoices; paid path. |
@@ -1242,16 +1410,16 @@ Count (2026-11-01): 7 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 6
 | 21 | Premium features (decision 12) | DEFERRED | A, D | None built. Option C's added value is undefined. A feature list and build plan are needed first. | Option C; any tier logic. Reopening trigger: the owner names the features to build and approves a feature list and build plan (decision 12). |
 | 22 | Email provider and custom SMTP (§10 item 10; §3, Supabase built-in limit of 2 an hour) | DEFERRED | D | Deferred until before production sign-up volume. The production owner sets custom SMTP if it is chosen. Not Stage 7 code. | Production sign-up growth. Reopening trigger: the owner chooses custom SMTP, or production sign-up volume is about to start (§3 limit: 2 emails an hour). |
 | 23 | Duplicate-print defect (K, M7; S-7; §12B.4) | IMPLEMENTATION GATE | none listed | Confirmed from code, not reproduced. Next: diff review of the proposed change (M7). Only after that review, targeted local tests for a `sent` sibling, the latest-attempt rule, and failed or confirmed `needs_check` jobs remaining retryable (owner instruction 5, 2026-10-31). Staging tests need a separate explicit approval. The implementation needs its own approval. | Printing change only. Not 7B. Ordering against the 7F build is an owner decision (§15.3). |
-| 24 | Refund-and-claim defect (K, M7; S-8; §12B.4) | IMPLEMENTATION GATE | B | Confirmed from code, not reproduced. Next: diff review. Only then does the owner choose R-a, R-b or R-c. R-a is recommended, and it touches the customer payment ledger. | Printing change under its own gate (§15.3). Not a 7F prerequisite by default. Ordering against the 7F build is an owner decision (§15.3). |
-| 25 | Second `place_order` signature (§2; §12B.11) | EXTERNAL BLOCKER | B, E | The production owner lists the live function signatures and grants, read-only. Both signatures are in the migration chain, and the three-argument version is granted to `anon` and `authenticated` (0003 lines 277–278). Keeping it is the default. Retiring it is a checkout change that needs separate approval. | The "checkout unaffected" test; 7F. |
-| 26 | Live migration state and 0010 sequencing (§2; `docs/PRINTING_STATUS.md` line 54; README) | EXTERNAL BLOCKER | B, E | The production owner lists the applied migrations, read-only. The owner then decides whether 0010 may be applied, after staging evidence. | Production application of 0010 and 0011 (the live list comes first; owner instruction 3). Not a Stage 7 closure requirement. Staging tests of print paths. Not needed for 7B on staging. |
-| 27 | Purge deployment, secrets and capacity (§5C; `.github/workflows/cleanup-files.yml`) | EXTERNAL BLOCKER | B | The production owner records, read-only, whether `cleanup-files` is deployed, whether `QRQUICK_CLEANUP_URL` and `CLEANUP_SECRET` are set, and its recent runs. Capacity is 2,000 files per run and is reached near 3,000 shops. A capacity change is DEFERRED until growth needs it, and it needs separate approval. Reopening trigger: shop count nears about 3,000. | Any claim that the purge runs (§5C; §8); growth beyond about 3,000 shops. |
+| 24 | Refund-and-claim defect (K, M7; S-8; §12B.4) | IMPLEMENTATION GATE | B | Confirmed from code, not reproduced. Next: diff review. Only then does the owner choose R-a, R-b or R-c. R-a is recommended, and it touches the customer payment ledger. 0012 (local main, unmerged) is approved for read-only review only (2026-11-04 no. 6). It is not a fix approval. | Printing change under its own gate (§15.3). Not a 7F prerequisite by default. Ordering against the 7F build is an owner decision (§15.3). |
+| 25 | Second `place_order` signature (§2; §12B.11) | EXTERNAL BLOCKER | B, E | The production owner lists the live function signatures and grants, read-only. Both signatures are in the migration chain, and the three-argument version is granted to `anon` and `authenticated` (0003 lines 277–278). Keeping it is the default. Retiring it is a checkout change that needs separate approval. The owner checks the live signatures through the dashboard (2026-11-04 no. 10); Claude does not query live data. | The "checkout unaffected" test; 7F. |
+| 26 | Live migration state and 0010 sequencing (§2; `docs/PRINTING_STATUS.md` line 54; README) | EXTERNAL BLOCKER | B, E | The production owner lists the applied migrations, read-only. The owner then decides whether 0010 may be applied, after staging evidence. The owner checks migration state through the dashboard (2026-11-04 no. 10); Claude does not query live data. | Production application of 0010 and 0011 (the live list comes first; owner instruction 3). Not a Stage 7 closure requirement. Staging tests of print paths. Not needed for 7B on staging. |
+| 27 | Purge deployment, secrets and capacity (§5C; `.github/workflows/cleanup-files.yml`) | EXTERNAL BLOCKER | B | The production owner records, read-only, whether `cleanup-files` is deployed, whether `QRQUICK_CLEANUP_URL` and `CLEANUP_SECRET` are set, and its recent runs. Capacity is 2,000 files per run and is reached near 3,000 shops. A capacity change is DEFERRED until growth needs it, and it needs separate approval. Reopening trigger: shop count nears about 3,000. 2026-11-04 (no. 4): cleanup stays disabled until legal review (C-1/M1) and an owner-approved retention policy. | Any claim that the purge runs (§5C; §8); growth beyond about 3,000 shops. |
 | 28 | Google Play payment policy for any in-app licence purchase (§8A; `mobile/`) | EXTERNAL BLOCKER | C | A lawyer checks the current Play policy text. No Android licence payment is approved. | Any Android licence purchase or payment instruction. |
 | 29 | Privacy policy, terms, refund text, intermediary and takedown duties, consent (§4) | EXTERNAL BLOCKER | C | A lawyer drafts and reviews. The owner approves publication. A search of the worktree on 2026-10-31 found no privacy policy, terms, consent, grievance, takedown or DPDP text. | Published terms; paid collection. |
-| 30 | Customer-document sensitivity and retention (§4; README passport-photo layout) | EXTERNAL BLOCKER | C | A lawyer classifies sensitivity and DPDP applicability (§4). Engineering reviews storage and link handling, including the 180-second window (S-4). | Retention rules (item 1); privacy text (item 29). |
+| 30 | Customer-document sensitivity and retention (§4; README passport-photo layout) | EXTERNAL BLOCKER | C | A lawyer classifies sensitivity and DPDP applicability (§4). Engineering reviews storage and link handling, including the 180-second window (S-4). Legal review of customer-file retention and related obligations is required (2026-11-04 no. 5). | Retention rules (item 1); privacy text (item 29). |
 | 31 | Live Auth settings and Supabase configuration (§4; README next steps item 6; `supabase/config.toml`) | EXTERNAL BLOCKER | B, E | The production owner records, read-only, the live leaked-password protection, Site URL, SMTP and MFA settings. Versioning the configuration (`supabase/config.toml`, created by `supabase init`) is DEFERRED until local setup is approved. | MFA decision (item 5). Configuration versioning waits for local setup. |
 | 32 | Rollback and enforcement kill switch (§12A.10; §12B) | IMPLEMENTATION GATE | B, E | No design exists. Engineering designs it, and the owner approves before 7F. Without it, 7F has no designed off switch. 0011 has no production rollback plan. | 7F approval. |
-| 33 | Lock-order contract (R18; §12B.5) | IMPLEMENTATION GATE | B, E | The per-RPC lock map of the existing code is in §12B.5. The lock-order contract (meta → order → agent → jobs) is design-APPROVED (2026-11-01, §13 third record) and not built. It is NOT approved for implementation (owner, 2026-11-01). Two-session tests on staging need separate approval. The 7B-2 helper and meta row (`licence_lock_shop()`, `shop_licence_meta`) are approved for implementation (2026-11-01, scope only). That approval does not approve the R18 implementation above or these tests. | 7B-2, 7C and 7F. |
+| 33 | Lock-order contract (R18; §12B.5) | IMPLEMENTATION GATE | B, E | The per-RPC lock map of the existing code is in §12B.5. The lock-order contract (meta → order → agent → jobs) is design-APPROVED (2026-11-01, §13 third record) and not built. It is NOT approved for implementation (owner, 2026-11-01). Two-session tests on staging need separate approval. The 7B-2 helper and meta row (`licence_lock_shop()`, `shop_licence_meta`) are approved for implementation (2026-11-01, scope only). That approval does not approve the R18 implementation above or these tests. O13 (2026-11-02) approves the staging test scope only, including these two-session tests. It does not authorise setup, SQL execution or test execution. | 7B-2, 7C and 7F. |
 | 34 | Test data and demo seed on live (README lines 397 and 463; `supabase/seed/demo_seed.sql`) | EXTERNAL BLOCKER | B, D | The production owner confirms whether `demo_seed.sql` ever ran on live. Deleting the test rows listed in the README is destructive and needs explicit owner go-ahead. That deletion is DEFERRED. Reopening trigger: the owner's explicit go-ahead. | Shop count N (item 11). |
 | 35 | Other numbered items: R1 to R19, S-1 to S-8, M1 to M8 (§12B) | EXTERNAL BLOCKER | D, E | Each ID has its own status in §14.4 to §14.7. The item takes the status of its first outside step: a lawyer reviews the M8 and S-6 retention periods (item 15). | As listed per ID. |
 
@@ -1276,7 +1444,7 @@ Apart from C-5, items 4 (pricing and channel), 10, 14, 17 and 18 are not prerequ
 
 | ID | Status | Item | Note |
 |---|---|---|---|
-| C-1 | EXTERNAL BLOCKER | 1 | M1 against the purge rule. A lawyer reviews a release rule. The owner chooses an option. |
+| C-1 | EXTERNAL BLOCKER | 1 | M1 against the purge rule. A lawyer reviews a release rule. The owner chooses an option. R-D selected temporarily (2026-11-04 no. 4): cleanup stays disabled until legal review and an owner-approved retention policy. Not final policy. |
 | C-2 | DEFERRED | 2 | The hold-start choice, deferred with item 2 (owner instruction 1, 2026-10-31). The premise is corrected (§5C): a scheduler exists for the purge, not for held-job timeouts. |
 | C-3 | RECOMMENDED | 1 | Two separate questions. The decision: accept held files as an interim (kept until M1 exists), or hold enforcement back. The requirement: holding enforcement back makes M1 a prerequisite of enabling, with item 2 and, where paid orders are affected, item 10 (§15.3). The 7F build needs only C-3 decided. |
 | C-4 | RECOMMENDED | 3 | Stacking. Applies only once the paid path is approved. |
@@ -1287,7 +1455,7 @@ Apart from C-5, items 4 (pricing and channel), 10, 14, 17 and 18 are not prerequ
 | C-9 | DECIDED | 13 | Owner decision 9 (2026-11-01): replacement wording adopted (§12B.9). The superseded passages are in §9 item 7 only. |
 | C-10 | DEFERRED | 9 | Owner confirmed 2026-10-31: trials are deferred out of Stage 7, not permanently removed. Trial terms are not approved. |
 | C-11 | EXTERNAL BLOCKER | 10 | The refund policy needs a lawyer. |
-| C-12 | RECOMMENDED | 15 | The owner accepts count-only records above the cap. |
+| C-12 | RECOMMENDED | 15 | Accepted for synthetic staging only (O10, 2026-11-02): count-only records above the cap, with a visible omitted-detail marker. Production acceptance is OPEN. Permission-rejected counting within the staging cap approved 2026-11-04 (no. 3); mechanism OPEN. |
 | C-13 | EXTERNAL BLOCKER | 4 | The paid path and pricing are blocked. This is expected under M5. |
 | C-14 | EXTERNAL BLOCKER | 11 | Enabling enforcement needs N and the existing-shop policy. |
 | C-15 | EXTERNAL BLOCKER | 5 | Admin login relies on Supabase Auth, and therefore on the MFA answer. |
@@ -1315,7 +1483,7 @@ Apart from C-5, items 4 (pricing and channel), 10, 14, 17 and 18 are not prerequ
 | M4 | DECIDED | 7, 16 | Custom-grant convention approved. Paid term approved and blocked by M5. |
 | M5 | DECIDED | 4 | The paid-path block is approved as a blocking condition. |
 | M6 | DECIDED | 7 | Lifetime over paid coverage, approved as policy. Its tests need the paid path. |
-| M7 | DECIDED | 23, 24 | The review requirement for both fixes is approved. No fix is implemented. |
+| M7 | DECIDED | 23, 24 | The review requirement for both fixes is approved. No fix is implemented. 0012 read-only review approved 2026-11-04 (no. 6); not a fix. |
 | M8 | EXTERNAL BLOCKER | 15 | Policy proposal approved. Legal review is needed before the periods are fixed. |
 
 ### 14.6 Decisions 1 to 20 (§9, §12A.13, §12B.3)
@@ -1392,8 +1560,8 @@ Item 4's owner parts (collection channel, price and minimum) follow the CA's tax
 | Gate | Scope | Prerequisites | Approval needed | Tests (§12A.11, §12B.11) | Rollback |
 |---|---|---|---|---|---|
 | 7A Owner inputs | Decisions 13 to 16 and 18 to 19; owner confirmations for items 6, 7, 8, 13, 16; the production-owner UUID and MFA answers (item 5) | Owner's written answers; production-owner checks | The owner's written answers | None. No code | None needed |
-| 7B Schema, migration 0011 (staging only) | 7B-1 (file only, unapplied): licence tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`. 7B-2 (approved for implementation 2026-11-01, scope only; R18 contract design-approved 2026-11-01; R18 implementation NOT approved): `licence_lock_shop()`, `shop_licence_meta`, and the guard. Paid tables excluded (C-5, decided 2026-11-01) | Gate 1 or staging setup, with 0010 applied to the staging copy under its own approval; the owner inputs listed below the gate table (C-5, item 8, and the basis ranking in item 7, all decided 2026-11-01; the licence unit in item 16 was decided 2026-10-31). For tests only: the R15 fixture approach (decision L) and the R17 default-privilege check. Item 26's live list is needed before any production migration, not for staging | File creation for 7B-1 approved 2026-11-01. Separate approval for each staging run and for any application. 7B-2 implementation approved 2026-11-01 (scope only) | State, trigger, privilege and regression tests | Drop the 0011 objects on staging. No production rollback plan exists (item 32) |
-| 7C Admin RPCs and owner read RPC | Grant, extend, revoke (M2), replace; denial logging (M3); idempotency (R5); owner read (decision D) | 7B on staging; the lock map confirmed by a two-session test (item 33); the global denial ceiling accepted (item 15; circular with its measurement, see §14.2 item 15); the count-only limitation accepted (C-12); item 5; the decision 16 validation inputs (duration, backdating, lifetime owner-only, and maximum custom length, decided as none by owner decision 6) | Separate approval | Admin, privilege, concurrency and denial-cap tests | Revoke `EXECUTE` on the admin RPCs (needs a migration). This rollback changes no coverage row (§15.5) |
+| 7B Schema, migration 0011 (staging only) | 7B-1 (file only, unapplied): licence tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`. 7B-2 (approved for implementation 2026-11-01, scope only; R18 contract design-approved 2026-11-01; R18 implementation NOT approved): `licence_lock_shop()`, `shop_licence_meta`, and the guard. Paid tables excluded (C-5, decided 2026-11-01). `licence_requests`, `licence_denials` and `licence_denial_windows` are approved for placement in this file (decision 3; O2) but are not yet in it. Pre-staging review of 0011 is required before any staging run | Gate 1 or staging setup, with 0010 applied to the staging copy under its own approval; the owner inputs listed below the gate table (C-5, item 8, and the basis ranking in item 7, all decided 2026-11-01; the licence unit in item 16 was decided 2026-10-31). For tests only: the R15 fixture approach (decision L) and the R17 default-privilege check. Item 26's live list is needed before any production migration, not for staging | File creation for 7B-1 approved 2026-11-01. Separate approval for each staging run and for any application. 7B-2 implementation approved 2026-11-01 (scope only) | State, trigger, privilege and regression tests | Drop the 0011 objects on staging. No production rollback plan exists (item 32) |
+| 7C Admin RPCs and owner read RPC | Grant, extend, revoke (M2), replace; denial logging (M3; `licence_denial_windows`, O1); idempotency (R5); owner read (decision D). Admin disable is not in 7C (O6) | 7B on staging; the lock map confirmed by a two-session test (item 33); a staging-only provisional denial ceiling for measurement (item 15 option (a), approved 2026-11-02; the production ceiling is OPEN; O9: denials counted, with no automatic refusal; alerting is not approved, implemented or claimed (corrected 2026-11-04)); C-12 accepted for synthetic staging only (O10; production OPEN); `licence_denial_windows` (O1) in 0011 after pre-staging review (O2); the item 5 `aal2` requirement (approved 2026-11-02; recovery procedure OPEN); before 7C sign-off, the O4 half-open overlap rule documented, the O6 emergency disable and recovery procedure approved, and the O7 break-glass procedure approved; the decision 16 validation inputs (duration, backdating with explicit confirmation, lifetime admin-only, and maximum custom length, decided as none by owner decision 6) | Separate approval | Admin, privilege, concurrency and denial-cap tests | Revoke `EXECUTE` on the admin RPCs (needs a migration). This rollback changes no coverage row (§15.5) |
 | 7D Admin UI, separate private deployment | Login, shop search, grant, extend, revoke, replace with confirmation, audit view; MFA enrolment if decision 14 requires it | 7C on staging; the hosting decision (item 6); the visibility check (item 6); item 5 | Separate approval | Browser smoke test on staging; static scan that no service key is in the bundle | Take the deployment down. No database change, and no coverage row changes (§15.5) |
 | 7E Owner read-only status, web | Fields as in decision D; labels (item 13); display rule (item 8) | 7C; the label decision (item 13); the display rule (item 8) | Separate approval | Owner status returns only the D fields whatever the enforcement state; staff denied (§12B.2 D) | Remove the owner status UI. Revoke `EXECUTE` on `shop_licence_status` only if the read RPC must be withdrawn (needs a migration). The rollback changes no coverage row and grants or revokes no licence (§15.5) |
 | 7F Enforcement, printing only | Gates on approve, retry, claim and `mark_printing` (decisions A, B, C) | 7C and 7E; S-4 accepted (item 35); item 33 lock tests; item 25 tests of both signatures; item 32 kill switch approved; item 1 for the build (requires C-1 answered and C-3 decided; neither is decided, §14.3). Before enabling only: item 11 (existing-shop policy); M1 and item 2 (reopened), if C-3 holds enforcement back. Ordering of items 23 and 24 against this build is an owner decision; neither is a prerequisite by default | Separate approval to build, and a separate approval to enable | Printing and checkout tests (§12B.11) | A designed kill switch is needed (item 32). None exists yet |
@@ -1405,13 +1573,13 @@ Item 4's owner parts (collection channel, price and minimum) follow the CA's tax
 3. Item 16: the licence unit, DECIDED as per shop (decision 1, 2026-10-31). It sets the `shop_id` model. The term does not change the schema.
 4. Item 7: the basis ranking of a lifetime grant over an admin grant (§12A.6). M6 covers paid coverage only.
 
-**Not needed for the 7B design:** the maximum custom length, backdating, the durations and lifetime owner-only (7C validation, decision 16); C-7 and the other paid-path items (paid path only); items 1 and 2 (M1 only); item 5 (the admin UUID is inserted by a one-time owner-run row, and the migration must not contain it); decision 13 (the table holds any number of admin rows) and decision 14 (`aal2` is checked in the 7C RPCs); item 26 (its live list is needed before any production migration, not for staging). The R15 fixture approach and the R17 privilege check are needed for 7B tests, not for the design.
+**Not needed for the 7B design:** the maximum custom length, backdating, the durations and lifetime admin-only (7C validation, decision 16; approved 2026-11-02); C-7 and the other paid-path items (paid path only); items 1 and 2 (M1 only); item 5 (the admin UUID is inserted by a one-time owner-run row, and the migration must not contain it); decision 13 (the table holds any number of admin rows) and decision 14 (`aal2` is checked in the 7C RPCs); item 26 (its live list is needed before any production migration, not for staging). The R15 fixture approach and the R17 privilege check are needed for 7B tests, not for the design.
 
 **Separate gates (none authorised):**
 
 | Gate | Scope | Prerequisites | Approval | Tests |
 |---|---|---|---|---|
-| M1 held-job rule | 7-day failure for licence holds | Item 1 decided (requires C-1 answered and C-3 decided; neither is decided, §14.3); item 2 reopened and the hold start chosen (a or b); item 10 (effect on paid orders); a file-release rule under C-1; a hold-start marker or scheduler, separately approved | Separate review, then implementation approval | §12B.11 held-job tests |
+| M1 held-job rule | 7-day failure for licence holds | Item 1 decided (requires C-1 answered and C-3 decided; neither is decided, §14.3); item 2 reopened and the hold start chosen (a or b); item 10 (effect on paid orders); a file-release rule under C-1; a hold-start marker or scheduler, separately approved | Separate review, then implementation approval. Lawyer review required before implementation (2026-11-04 no. 5). R-D temporary: cleanup stays disabled until legal review and an owner-approved retention policy | §12B.11 held-job tests |
 | Held-job marker or scheduler (item 2) | A stored marker when the shop leaves ACTIVE; any scheduled timeout job | Item 2 reopened (§14.2); the owner's hold-start choice; C-2 | Separate | Staging tests of the hold start |
 | Duplicate-print fix (item 23) | Body of `retry_print_job` only | Diff review (M7) first. Targeted local tests only after that review. Staging tests need separate explicit approval | Separate approval for local tests; separate approval for staging and for implementation | A `sent` sibling is refused; the latest-attempt rule holds; failed and confirmed `needs_check` jobs stay retryable; existing printing tests unchanged |
 | Refund-and-claim fix (item 24) | Option R-a, R-b or R-c | Diff review, then the owner's choice | Separate | A refunded or ineligible order's files are not claimed |
@@ -1442,7 +1610,7 @@ Item 4's owner parts (collection channel, price and minimum) follow the CA's tax
 
 ## 16. Exit checklist, closure criteria and verdict (added 2026-10-30; rebuilt 2026-10-31)
 
-Answers are as of 2026-10-31. "NO" means the question is not yet satisfied.
+Answers are as of 2026-11-02, after the O1–O13 record. "NO" means the question is not yet satisfied.
 
 | # | Question | Answer | Evidence and what is missing |
 |---|---|---|---|
@@ -1451,7 +1619,7 @@ Answers are as of 2026-10-31. "NO" means the question is not yet satisfied.
 | 3 | Is every open ID given one status? | YES | Items 1 to 35, groups A to E, decisions A to L and 1 to 20, M1 to M8, C-1 to C-15, S-1 to S-8 and R1 to R19 are each in §14. |
 | 4 | Are external blockers identified with their outside party? | YES | The 17 EXTERNAL BLOCKER items in §14.2 name the party. The answers are not in the repository. |
 | 5 | Are factual claims supported by repository evidence? | PARTLY | Repository facts are re-checked with line numbers (§2, §4, §5C, §12A.2, §12B.4 to §12B.9). Live state, README statements and external sources are labelled and not verified. |
-| 6 | Is the implementation scope frozen? | NO | The 7B-1 inputs (C-5, item 8, item 7 basis ranking) were decided on 2026-11-01. 7B-2 implementation was approved on 2026-11-01 for its scope only (R18 contract design-approved 2026-11-01; R18 implementation NOT approved). Staging waits on a copy with 0010 applied and its own approval. The licence unit (item 16) is decided. Item 26 is needed only before a production migration. 7F build waits on 7C and 7E, on item 1 (requires C-1 answered and C-3 decided; neither is decided), and on items 25, 32, 33 and S-4. Before enabling only: item 11, and M1 and item 2 if C-3 holds enforcement back. |
+| 6 | Is the implementation scope frozen? | NO | The 7B-1 inputs (C-5, item 8, item 7 basis ranking) were decided on 2026-11-01. 7B-2 implementation was approved on 2026-11-01 for its scope only (R18 contract design-approved 2026-11-01; R18 implementation NOT approved). Staging waits on a copy with 0010 applied and its own approval. The licence unit (item 16) is decided. Item 26 is needed only before a production migration. 7F build waits on 7C and 7E, on item 1 (requires C-1 answered and C-3 decided; neither is decided), and on items 25, 32, 33 and S-4. Before enabling only: item 11, and M1 and item 2 if C-3 holds enforcement back. The 2026-11-02 record adds 7C sign-off conditions: the O4 overlap rule, the O6 emergency disable and recovery procedure, and the O7 break-glass procedure. Each needs approval before 7C sign-off. |
 | 7 | Are setup, staging, production and deployment permissions still separate? | YES | §15.2, §15.3 and §15.5. No approval exists for any of them. The main checkout and `stash@{0}` are untouched. |
 | 8 | Are the Stage 7 closure criteria met? | NO | See §16.1. |
 
