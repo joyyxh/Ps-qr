@@ -1,0 +1,1755 @@
+diff --git a/web/package.json b/web/package.json
+index bc0ca70..3acacac 100644
+--- a/web/package.json
++++ b/web/package.json
+@@ -5,7 +5,7 @@
+   "type": "module",
+   "description": "QRquick customer printing page (static, no build step)",
+   "scripts": {
+-    "test": "node --test tests/logic.test.js tests/api.test.js tests/owner-logic.test.js tests/auth.test.js tests/owner-registration.test.js tests/order-refresh.test.js tests/owner-api.test.js tests/orders.test.js tests/stats.test.js tests/qr-features.test.js tests/ui.test.js tests/print-logic.test.js",
++    "test": "node --test tests/logic.test.js tests/api.test.js tests/owner-logic.test.js tests/auth.test.js tests/owner-registration.test.js tests/order-refresh.test.js tests/owner-api.test.js tests/orders.test.js tests/stats.test.js tests/qr-features.test.js tests/ui.test.js tests/print-logic.test.js tests/licence-status.test.js",
+     "start": "python3 -m http.server 5173"
+   }
+ }
+diff --git a/web/src/owner-api.js b/web/src/owner-api.js
+index 7f6c30a..f20d796 100644
+--- a/web/src/owner-api.js
++++ b/web/src/owner-api.js
+@@ -251,6 +251,16 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
+       return rows[0];
+     },
+ 
++    // ----- licence status (read only) -----
++
++    // The owner's view of the shop's licence (migration 0012). This is the only licence
++    // read the browser makes: it never queries the licence tables and has no write call.
++    // The database returns {ok:false, code:'forbidden'} unless the caller owns the shop,
++    // and {ok:true, active, no_expiry, access_end, next_start} otherwise (decision D).
++    shopLicenceStatus(shopId) {
++      return request('POST', 'rpc/shop_licence_status', { body: { p_shop_id: shopId } });
++    },
++
+     // ----- automatic printing -----
+ 
+     // The printing computers of this shop and its recent print jobs.
+diff --git a/web/src/owner.js b/web/src/owner.js
+index e39b13c..df12caa 100644
+--- a/web/src/owner.js
++++ b/web/src/owner.js
+@@ -48,6 +48,7 @@ import {
+   retryOptions,
+ } from './logic.js';
+ import { createStatsPages } from './owner-stats.js';
++import { createLicencePages } from './owner-licence.js';
+ import { PRINTER_RETRY_MS, browserVisibility, createOrderRefresher, printerRetryDue } from './order-refresh.js';
+ import { qrCanvas, qrSvg } from './qr.js';
+ 
+@@ -64,6 +65,10 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+   let managed = null; // { shop, services } for the shop page on screen
+   let orderView = null; // { shop, orders, showAll, printing, jobsByItem, pairing } for the orders page on screen
+   const statsPages = createStatsPages({ app, ownerApi, messageFor });
++  // The licence view is off in the Android owner bundle (config.ownerApp is set by mobile/scripts/copy-web.mjs),
++  // because the Android view is deferred (STAGE7_DECISIONS.md item 13 / decision 19). Off means no button, no route and no request.
++  const licenceEnabled = config.ownerApp !== true;
++  const licencePages = createLicencePages({ app, ownerApi, enabled: licenceEnabled });
+ 
+   // Automatic refresh of the orders page (order-refresh.js). The page is only redrawn when the data changed.
+   let navigation = 0; // counts page changes, so a slow load cannot draw over a page the owner has left
+@@ -142,6 +147,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+   }
+ 
+   async function signOut() {
++    licencePages.close(); // no licence data is kept after sign-out, and a check still running is dropped
+     await auth.signOut();
+     go([]);
+   }
+@@ -151,6 +157,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+   async function render(parts = []) {
+     navigation += 1;
+     liveOrders.stop(); // leaving a page ends its automatic refresh
++    licencePages.close(); // leaving the licence page drops its data and any check still running
+     current = parts;
+     show('<p class="muted">Loading…</p>');
+     const [page = '', value = '', section = ''] = parts;
+@@ -632,6 +639,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+     }
+     if (section === 'orders') return renderOrdersFor(shop);
+     if (section === 'stats') return statsPages.open(shop);
++    if (section === 'licence' && licenceEnabled) return licencePages.open(shop);
+ 
+     const [services, catalog] = await Promise.all([
+       ownerApi.listServices(shop.id),
+@@ -700,7 +708,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+           ${shop.is_open ? 'Open for orders' : 'Closed. Customers can see prices but cannot order.'}
+         </p>
+         <p><a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/orders">Orders</a>
+-           <a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/stats">Statistics</a></p>
++           <a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/stats">Statistics</a>
++           ${shop.role === 'owner' && licenceEnabled ? `<a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/licence">Licence</a>` : ''}</p>
+         <p><button type="button" data-action="toggle-open" data-label="${shop.is_open ? 'Close shop' : 'Open shop'}">
+           ${shop.is_open ? 'Close shop' : 'Open shop'}
+         </button></p>
+diff --git a/web/styles.css b/web/styles.css
+index e80b80e..8f696ad 100644
+--- a/web/styles.css
++++ b/web/styles.css
+@@ -288,3 +288,7 @@ main { max-width:1180px; padding:clamp(22px,4vw,54px) 20px 70px; gap:24px; }.car
+ @media (max-width:720px) { .qr-home-hero { grid-template-columns:1fr; min-height:0; }.qr-home-art { height:170px; margin-top:10px; transform:rotate(-5deg) scale(.75); transform-origin:right center; }.track-entry { align-items:stretch; flex-direction:column; }.track-inline { width:100%; }.topbar nav { display:none; }.choice-grid { grid-template-columns:1fr; } }
+ @media (max-width:720px) { .owner-dashboard-head { align-items:flex-start; flex-direction:column; }.owner-dashboard-head .button { align-self:stretch; text-align:center; }.owner-summary-grid { grid-template-columns:1fr 1fr; }.owner-summary-grid .card:last-child { grid-column:1/-1; }.owner-shops-section > .between { align-items:flex-start; flex-direction:column; }.owner-shops-section > .between .button { width:100%; text-align:center; }.owner-shop-actions { flex-wrap:wrap; } .bottom-nav { display:flex; } }
+ @media (max-width:430px) { .track-inline { flex-direction:column; }.order-stepper { gap:5px; font-size:.72rem; }.order-stepper i { min-width:10px; }.order-stepper span { gap:4px; }.qr-home-hero { border-radius:20px; }.hero-actions { flex-direction:column; align-items:stretch; } }
++/* Licence status screen (Stage 7E, read only) */
++.licence-badge { display:inline-block; margin:0 0 8px; font-weight:750; }.licence-badge.ok { color:var(--ok); }.licence-badge.warn { color:var(--warn-ink); }.licence-badge.error { color:var(--err); }.licence-badge.muted { color:var(--muted); }
++.licence-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }.licence-foot p { margin:0; max-width:46ch; }
++@media (max-width:430px) { .licence-foot { flex-direction:column; align-items:stretch; }.licence-foot button { width:100%; } }
+diff --git a/web/tests/browser/README.md b/web/tests/browser/README.md
+index a5dc1be..e77b502 100644
+--- a/web/tests/browser/README.md
++++ b/web/tests/browser/README.md
+@@ -7,7 +7,8 @@ not the live backend.
+ 
+ | Script | What it checks | Last result |
+ |---|---|---|
+-| `owner-smoke.cjs` | Owner sign-in, shop details, services, orders, customer address | 39 of 39 |
++| `owner-smoke.cjs` | Owner sign-in, shop details, services, orders, customer address | 31 of 34 when run on 2026-11-08 (3 checks fail and the run stops at check 34); the same failures occur at baseline `5c82d37`. See `docs/STAGE7E_LICENCE_STATUS.md` |
++| `licence-smoke.cjs` | Owner licence screen (Stage 7E): each state, refresh, offline, shop switch, sign-out, staff view, and the Android owner bundle (licence view off). Serve `web/` on port 5174 | 33 of 33 |
+ | `features-smoke.cjs` | Yes/no features, payment QR upload and removal, customer page features and gating | 24 of 24 |
+ | `qr-smoke.cjs` | Shop QR code on screen and as a PNG download, decoded with OpenCV | 16 of 16 |
+ | `stats-smoke.cjs` | Statistics page: periods, weekly report, actions, CSV export | 26 of 26 |
+diff --git a/web/tests/owner-api.test.js b/web/tests/owner-api.test.js
+index 73ad93c..a768f8d 100644
+--- a/web/tests/owner-api.test.js
++++ b/web/tests/owner-api.test.js
+@@ -173,3 +173,33 @@ test('the browser code never contains a service-role or secret key', () => {
+     assert.doesNotMatch(text, /service_role|sb_secret_|SERVICE_ROLE/, `${file.pathname} must not hold a privileged key`);
+   }
+ });
++
++// Stage 7E: the owner licence read (mocked; the database check is in fixtures/licence-status-rpc.json).
++test('shopLicenceStatus calls the owner read RPC with the shop id and the owner token only', async () => {
++  const { calls, fetchImpl } = fakeFetch({ ok: true, active: false, no_expiry: false, access_end: null, next_start: null });
++  const api = createOwnerApi({ config, auth: signedIn, fetchImpl });
++
++  const reply = await api.shopLicenceStatus('shop-1');
++
++  assert.equal(reply.ok, true);
++  assert.equal(calls.length, 1);
++  assert.equal(calls[0].url, 'https://example-project.supabase.co/rest/v1/rpc/shop_licence_status');
++  assert.equal(calls[0].init.method, 'POST');
++  assert.equal(calls[0].init.headers.Authorization, 'Bearer owner-token');
++  assert.deepEqual(JSON.parse(calls[0].init.body), { p_shop_id: 'shop-1' });
++});
++
++test('shopLicenceStatus sends no request for a signed-out user', async () => {
++  const { calls, fetchImpl } = fakeFetch({});
++  const api = createOwnerApi({ config, auth: signedOut, fetchImpl });
++
++  await assert.rejects(api.shopLicenceStatus('shop-1'), (err) => err.status === 401);
++  assert.equal(calls.length, 0);
++});
++
++test('shopLicenceStatus surfaces a missing function as an error with its HTTP status', async () => {
++  const { fetchImpl } = fakeFetch({ code: 'PGRST202', message: 'Could not find the function' }, 404);
++  const api = createOwnerApi({ config, auth: signedIn, fetchImpl });
++
++  await assert.rejects(api.shopLicenceStatus('shop-1'), (err) => err.status === 404 && err.code === 'PGRST202');
++});
+diff --git a/web/src/licence-status.js b/web/src/licence-status.js
+new file mode 100644
+index 0000000..cf10ee8
+--- /dev/null
++++ b/web/src/licence-status.js
+@@ -0,0 +1,330 @@
++// Licence status for the owner's read-only licence screen (Stage 7E).
++//
++// The only data source is the owner RPC public.shop_licence_status(p_shop_id)
++// (migration 0012). Its reply is checked here against that contract. A reply that
++// does not match it, a failed request and a missing session all count as
++// "unavailable". None of them is ever shown as an active licence.
++//
++// This file has no DOM and makes no requests itself. owner-licence.js draws the
++// result. Keeping the rules here lets them be tested without a browser.
++
++export const VIEW = Object.freeze({
++  IDLE: 'idle', // no shop is open
++  LOADING: 'loading', // a check is running; nothing from earlier checks is shown
++  READY: 'ready', // the last check returned a valid status
++  UNAVAILABLE: 'unavailable', // the last check failed, or its reply was not understood
++});
++
++export const STATE = Object.freeze({
++  ACTIVE: 'active',
++  SCHEDULED: 'scheduled',
++  // The RPC does not say whether coverage expired, was revoked or never existed.
++  // All three arrive as this one state, so the screen cannot name them.
++  INACTIVE: 'inactive',
++});
++
++export const REASON = Object.freeze({
++  OFFLINE: 'offline', // this device is offline; no request was sent
++  NETWORK: 'network', // the request did not reach the server
++  SERVER: 'server', // the server failed or is busy (5xx, 408, 429)
++  SERVICE_MISSING: 'service_missing', // the RPC does not exist on this server (404)
++  AUTH: 'auth', // no session, or the server rejected it (401, 403)
++  FORBIDDEN: 'forbidden', // the RPC refused: the signed-in user is not an owner of this shop
++  MALFORMED: 'malformed', // the reply does not match the contract
++  UNKNOWN: 'unknown', // any other failure
++});
++
++// ISO 8601 with a stated offset or Z. Without one, Date.parse reads local time,
++// which would make the result depend on the device.
++const TIMESTAMP_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
++const REPLY_KEYS = ['ok', 'active', 'no_expiry', 'access_end', 'next_start'];
++
++const MALFORMED = Object.freeze({ ok: false, reason: REASON.MALFORMED });
++const FORBIDDEN = Object.freeze({ ok: false, reason: REASON.FORBIDDEN });
++
++function isPlainObject(value) {
++  return value !== null && typeof value === 'object' && !Array.isArray(value);
++}
++
++function isNullOrString(value) {
++  return value === null || typeof value === 'string';
++}
++
++// Milliseconds for a timestamp that states its zone, or NaN.
++function instantMs(value) {
++  if (typeof value !== 'string' || !TIMESTAMP_WITH_ZONE.test(value)) return NaN;
++  return Date.parse(value);
++}
++
++// Checks one reply of shop_licence_status. Returns { ok: true, state, lifetime,
++// accessEndMs, nextStartMs } or { ok: false, reason }. Only the shapes the
++// database can produce are accepted. Anything else is malformed. A missing or
++// unclear field is never read as active.
++export function parseLicenceStatus(raw) {
++  if (!isPlainObject(raw)) return MALFORMED;
++  if (raw.ok === false) return raw.code === 'forbidden' ? FORBIDDEN : MALFORMED;
++  if (raw.ok !== true) return MALFORMED;
++  if (!REPLY_KEYS.every((key) => key in raw)) return MALFORMED;
++
++  const { active, no_expiry: noExpiry, access_end: accessEnd, next_start: nextStart } = raw;
++  if (typeof active !== 'boolean' || typeof noExpiry !== 'boolean') return MALFORMED;
++  if (!isNullOrString(accessEnd) || !isNullOrString(nextStart)) return MALFORMED;
++
++  if (active) {
++    // ACTIVE has no next start. It has either no expiry (lifetime) or an end time, never both.
++    if (nextStart !== null) return MALFORMED;
++    if (noExpiry) {
++      if (accessEnd !== null) return MALFORMED;
++      return { ok: true, state: STATE.ACTIVE, lifetime: true, accessEndMs: null, nextStartMs: null };
++    }
++    const endMs = instantMs(accessEnd);
++    if (Number.isNaN(endMs)) return MALFORMED;
++    return { ok: true, state: STATE.ACTIVE, lifetime: false, accessEndMs: endMs, nextStartMs: null };
++  }
++
++  // Not active: no end time and no lifetime flag.
++  if (noExpiry || accessEnd !== null) return MALFORMED;
++  if (nextStart === null) {
++    return { ok: true, state: STATE.INACTIVE, lifetime: false, accessEndMs: null, nextStartMs: null };
++  }
++  const startMs = instantMs(nextStart);
++  if (Number.isNaN(startMs)) return MALFORMED;
++  return { ok: true, state: STATE.SCHEDULED, lifetime: false, accessEndMs: null, nextStartMs: startMs };
++}
++
++// Why a request failed. Offline is decided by the device, before any request is sent,
++// so it is never mistaken for an inactive licence.
++export function failureReason(err, online = true) {
++  if (online === false) return REASON.OFFLINE;
++  if (err instanceof TypeError) return REASON.NETWORK; // fetch rejects with a TypeError when no reply arrives
++  const status = err?.status;
++  if (status === 401 || status === 403) return REASON.AUTH;
++  if (status === 404 || err?.code === 'PGRST202') return REASON.SERVICE_MISSING;
++  if (status === 408 || status === 429 || (status >= 500 && status <= 599)) return REASON.SERVER;
++  return REASON.UNKNOWN;
++}
++
++// True when a checked status has a time that is now in the past. The status was
++// true when it was checked, so the screen asks for a refresh rather than
++// presenting it as current. Lifetime and inactive never pass.
++export function timeHasPassed(status, nowMs) {
++  if (!status || status.lifetime) return false;
++  if (status.state === STATE.ACTIVE) return status.accessEndMs <= nowMs;
++  if (status.state === STATE.SCHEDULED) return status.nextStartMs <= nowMs;
++  return false;
++}
++
++const IST_FORMAT = new Intl.DateTimeFormat('en-IN', {
++  timeZone: 'Asia/Kolkata',
++  day: 'numeric',
++  month: 'short',
++  year: 'numeric',
++  hour: '2-digit',
++  minute: '2-digit',
++  hour12: false,
++});
++
++// For example "1 Jan 2028, 00:00 IST". The end of access is exclusive: the stated
++// moment is the first moment without access (decision 9). The access line wording is approved
++// (owner decision 2, 2026-11-09). The other display labels were approved by the owner on the same
++// date (item 13 / decision 19).
++export function formatIst(ms) {
++  return `${IST_FORMAT.format(ms)} IST`;
++}
++
++const REASON_TEXT = Object.freeze({
++  [REASON.OFFLINE]: 'This device is offline, so the status could not be checked. Nothing from earlier checks is shown.',
++  [REASON.NETWORK]: 'The server could not be reached, so the status could not be checked. Nothing from earlier checks is shown.',
++  [REASON.SERVER]: 'The server is busy or unavailable, so the status could not be checked. Try again shortly.',
++  [REASON.SERVICE_MISSING]: 'The licence status service is not available on this server yet, so the status could not be checked.',
++  [REASON.AUTH]: 'Your session has ended. Sign in again to check the licence status.',
++  [REASON.FORBIDDEN]: 'Your account cannot see the licence status for this shop.',
++  [REASON.MALFORMED]: 'The server sent a reply this page cannot read, so the status could not be checked.',
++  [REASON.UNKNOWN]: 'The status could not be checked. Try again.',
++});
++
++// Turns the view state into plain text and flags for the page. Nothing here is
++// HTML; the page escapes every value it draws. An unavailable view never shows an active licence.
++// There is no printing-permitted line: it is removed until Stage 7F enforcement exists (owner, 2026-11-09).
++export function describeView(view, nowMs) {
++  const base = {
++    badge: '',
++    tone: 'muted',
++    summary: '',
++    nextStart: '', // the next access start, shown on its own line (scheduled only)
++    needsRefresh: false,
++    signIn: false,
++    checkedText: '',
++    busy: false,
++  };
++  if (!view || view.phase === VIEW.IDLE) return base;
++
++  if (view.phase === VIEW.LOADING) {
++    return { ...base, badge: 'Checking…', summary: 'Checking the licence status…', busy: true };
++  }
++
++  if (view.phase === VIEW.UNAVAILABLE) {
++    return {
++      ...base,
++      badge: 'Status unavailable',
++      tone: 'error',
++      summary: REASON_TEXT[view.reason] ?? REASON_TEXT[REASON.UNKNOWN],
++      signIn: view.reason === REASON.AUTH,
++      checkedText: `Last attempt ${formatIst(view.attemptedAt)}. No status from earlier checks is shown.`,
++    };
++  }
++
++  // READY
++  const status = view.status;
++  const checkedText = `Last checked ${formatIst(view.checkedAt)}.`;
++  const passed = timeHasPassed(status, nowMs);
++
++  if (status.state === STATE.ACTIVE) {
++    if (status.lifetime) {
++      return {
++        ...base,
++        badge: 'Active',
++        tone: 'ok',
++        summary: 'Lifetime access. No expiry.',
++        checkedText,
++      };
++    }
++    if (passed) {
++      return {
++        ...base,
++        badge: 'Check again',
++        tone: 'warn',
++        summary: `The end time (${formatIst(status.accessEndMs)}) has passed since the last check. Refresh to see the current status.`,
++        needsRefresh: true,
++        checkedText,
++      };
++    }
++    return {
++      ...base,
++      badge: 'Active',
++      tone: 'ok',
++      summary: `Access until ${formatIst(status.accessEndMs)}.`,
++      checkedText,
++    };
++  }
++
++  if (status.state === STATE.SCHEDULED) {
++    if (passed) {
++      return {
++        ...base,
++        badge: 'Check again',
++        tone: 'warn',
++        summary: `The start time (${formatIst(status.nextStartMs)}) has passed since the last check. Refresh to see the current status.`,
++        needsRefresh: true,
++        checkedText,
++      };
++    }
++    return {
++      ...base,
++      badge: 'Not active',
++      tone: 'muted',
++      summary: 'No access is active now.',
++      nextStart: `The next access starts ${formatIst(status.nextStartMs)}.`,
++      checkedText,
++    };
++  }
++
++  // INACTIVE: the RPC gives no reason, so none is shown.
++  return {
++    ...base,
++    badge: 'Not active',
++    tone: 'muted',
++    summary: 'No printing access is active for this shop.',
++    checkedText,
++  };
++}
++
++// Owns the state of the licence screen. It runs the checks and keeps only the
++// reply that matches the current request. Every open and every close starts a new
++// generation, so a reply from an earlier shop or from before sign-out is dropped.
++// Overlapping refresh presses share one request.
++//
++//   loadStatus(shopId) -> the raw RPC reply (rejects on HTTP or network errors)
++//   now()              -> milliseconds (injected for tests)
++//   isOnline()         -> false when the device reports no connection
++//   onChange(view)     -> called with a copy of the view after each change
++export function createLicenceStatusController({
++  loadStatus,
++  now = () => Date.now(),
++  isOnline = () => globalThis.navigator?.onLine !== false,
++  onChange = () => {},
++}) {
++  let generation = 0;
++  let inFlight = null;
++  let view = emptyView();
++
++  function emptyView() {
++    return { phase: VIEW.IDLE, shopId: null, status: null, reason: null, checkedAt: null, attemptedAt: null };
++  }
++
++  // A copy, including the status, so a caller cannot change the state by editing what it was given.
++  function snapshot() {
++    return { ...view, status: view.status ? { ...view.status } : null };
++  }
++
++  function publish(next) {
++    view = next;
++    onChange(snapshot());
++    return snapshot();
++  }
++
++  // Shows a shop and checks its status. A reply for an earlier shop is dropped.
++  function open(shopId) {
++    generation += 1;
++    inFlight = null;
++    publish({ ...emptyView(), shopId });
++    return refresh();
++  }
++
++  // Checks again for the open shop. A press while a check is running gets the same promise.
++  function refresh() {
++    if (!view.shopId) return Promise.resolve(snapshot());
++    if (inFlight) return inFlight;
++    const token = generation;
++    const shopId = view.shopId;
++    publish({ ...emptyView(), shopId, phase: VIEW.LOADING });
++    inFlight = settle(token, shopId);
++    return inFlight;
++  }
++
++  async function settle(token, shopId) {
++    let next;
++    if (!isOnline()) {
++      next = unavailable(shopId, REASON.OFFLINE);
++    } else {
++      try {
++        const parsed = parseLicenceStatus(await loadStatus(shopId));
++        next = parsed.ok ? ready(shopId, parsed) : unavailable(shopId, parsed.reason);
++      } catch (err) {
++        next = unavailable(shopId, failureReason(err, isOnline()));
++      }
++    }
++    if (token !== generation) return snapshot(); // the owner moved on; this reply is not shown
++    inFlight = null;
++    return publish(next);
++  }
++
++  function ready(shopId, status) {
++    const at = now();
++    return { phase: VIEW.READY, shopId, status, reason: null, checkedAt: at, attemptedAt: at };
++  }
++
++  function unavailable(shopId, reason) {
++    return { phase: VIEW.UNAVAILABLE, shopId, status: null, reason, checkedAt: null, attemptedAt: now() };
++  }
++
++  // Ends whatever is open (page left, shop closed or sign-out). Any reply still
++  // in flight is dropped when it arrives.
++  function close() {
++    generation += 1;
++    inFlight = null;
++    return publish(emptyView());
++  }
++
++  return { open, refresh, close, getView: snapshot };
++}
+diff --git a/web/src/owner-licence.js b/web/src/owner-licence.js
+new file mode 100644
+index 0000000..31880a5
+--- /dev/null
++++ b/web/src/owner-licence.js
+@@ -0,0 +1,85 @@
++// The licence screen for one shop (Stage 7E). It is read only: it shows the status
++// the database returns for the shop and has one action, Refresh. It has no controls to
++// grant, extend, revoke or replace a licence, and it shows no admin, audit, payment or
++// coverage data. The state rules live in licence-status.js.
++
++import { createLicenceStatusController, describeView } from './licence-status.js';
++import { escapeHtml } from './logic.js';
++
++export function createLicencePages({
++  app,
++  ownerApi,
++  enabled = true, // false in the Android owner bundle: the licence view is deferred (STAGE7_DECISIONS.md item 13 / decision 19)
++  now = () => Date.now(),
++  isOnline = () => globalThis.navigator?.onLine !== false,
++}) {
++  let shop = null; // the shop on screen; null while this page is closed
++
++  const controller = createLicenceStatusController({
++    loadStatus: (shopId) => ownerApi.shopLicenceStatus(shopId),
++    now,
++    isOnline,
++    onChange: (view) => {
++      if (shop && view.shopId === shop.id) draw(shop, view);
++    },
++  });
++
++  // Called by owner.js for #/owner/shop/<slug>/licence. Staff are told that the
++  // status is for owners, and no request is sent for them.
++  function open(nextShop) {
++    shop = null; // a check for an earlier shop must not draw over this one
++    controller.close();
++    if (!enabled) return Promise.resolve(); // switched off: no request and nothing drawn
++    shop = nextShop;
++    if (nextShop.role !== 'owner') {
++      draw(nextShop, null);
++      return Promise.resolve();
++    }
++    return controller.open(nextShop.id);
++  }
++
++  // Called by owner.js when the owner leaves this page or signs out. Any check still
++  // running is dropped when it arrives, and no licence data is kept.
++  function close() {
++    shop = null;
++    controller.close();
++  }
++
++  function refresh() {
++    if (shop?.role === 'owner') controller.refresh();
++  }
++
++  function draw(current, view) {
++    app.innerHTML = pageHtml(current, view);
++    app.querySelector('[data-action="licence-refresh"]')?.addEventListener('click', refresh);
++  }
++
++  function pageHtml(current, view) {
++    const back = `<p class="small"><a href="#/owner/shop/${encodeURIComponent(current.slug)}">← Back to ${escapeHtml(current.name)}</a></p>`;
++    if (current.role !== 'owner') {
++      return `<section class="card">${back}
++        <h1>Licence</h1>
++        <p class="muted">The licence status is shown to the shop owner only.</p>
++      </section>`;
++    }
++
++    const model = describeView(view, now());
++    return `<section class="card licence-page">
++      ${back}
++      <h1>Licence</h1>
++      <p class="muted small">Read only. This shows the licence the server holds for this shop. Nothing on this page changes it.</p>
++      <div class="licence-status" role="status" aria-live="polite">
++        ${model.badge ? `<p class="licence-badge ${model.tone}">${escapeHtml(model.badge)}</p>` : ''}
++        ${model.summary ? `<p>${escapeHtml(model.summary)}</p>` : ''}
++        ${model.nextStart ? `<p>${escapeHtml(model.nextStart)}</p>` : ''}
++        ${model.signIn ? '<p><a class="button secondary" href="#/owner">Sign in again</a></p>' : ''}
++      </div>
++      <div class="licence-foot">
++        <p class="muted small">${escapeHtml(model.checkedText)}</p>
++        <button type="button" data-action="licence-refresh" data-label="Refresh"${model.busy ? ' disabled' : ''}>${model.busy ? 'Checking…' : 'Refresh'}</button>
++      </div>
++    </section>`;
++  }
++
++  return { open, close, refresh };
++}
+diff --git a/web/tests/browser/licence-smoke.cjs b/web/tests/browser/licence-smoke.cjs
+new file mode 100644
+index 0000000..753c838
+--- /dev/null
++++ b/web/tests/browser/licence-smoke.cjs
+@@ -0,0 +1,346 @@
++// Browser check for the owner licence screen (Stage 7E), at phone width.
++// Supabase is replaced by an in-memory mock (page.route), so this checks the screen,
++// the requests it sends and the states it shows. It does NOT test the database.
++// The database reply shapes are checked separately (web/tests/fixtures).
++//
++// Run by hand, like the other smoke scripts: serve web/ on port 5174, then run this file.
++//   cd web && python3 -m http.server 5174 --bind 127.0.0.1 &
++//   node tests/browser/licence-smoke.cjs
++const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
++const { readFileSync } = require('fs');
++const path = require('path');
++const CONFIG_PATH = path.join(__dirname, '..', '..', 'config.js'); // web/config.js
++
++const BASE = 'http://127.0.0.1:5174/';
++const ALPHA = { id: 'aaaaaaaa-0000-0000-0000-00000000000a', slug: 'alpha-print', name: 'Alpha Print' };
++const BETA = { id: 'bbbbbbbb-0000-0000-0000-00000000000b', slug: 'beta-print', name: 'Beta Print' };
++
++const DAY = 86400000;
++const now = Date.now();
++const iso = (ms) => new Date(ms).toISOString().replace('Z', '+00:00');
++const ACTIVE_DATED = { ok: true, active: true, no_expiry: false, access_end: iso(now + 90 * DAY), next_start: null };
++const ACTIVE_LIFETIME = { ok: true, active: true, no_expiry: true, access_end: null, next_start: null };
++const SCHEDULED = { ok: true, active: false, no_expiry: false, access_end: null, next_start: iso(now + 30 * DAY) };
++const INACTIVE = { ok: true, active: false, no_expiry: false, access_end: null, next_start: null };
++const FORBIDDEN = { ok: false, code: 'forbidden' };
++
++// What the mock returns for each shop. A spec may add delayMs, abort or status.
++const state = {
++  role: 'owner',
++  licence: {
++    [ALPHA.id]: { body: ACTIVE_DATED },
++    [BETA.id]: { body: SCHEDULED },
++  },
++  requests: [],
++};
++
++const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
++const licenceCalls = () => state.requests.filter((r) => r.path.endsWith('/rpc/shop_licence_status'));
++
++const SESSION = {
++  access_token: 'owner-token',
++  refresh_token: 'refresh-1',
++  expires_at: Math.floor(now / 1000) + 3600,
++  user: { id: 'owner-1', email: 'owner@example.com' },
++};
++
++function shopRow(shop) {
++  return {
++    id: shop.id,
++    slug: shop.slug,
++    name: shop.name,
++    phone: null,
++    address: null,
++    is_open: true,
++    features: {},
++    payment_qr_path: null,
++    cash_payment_timing: 'at_pickup',
++    minimum_order_paise: 0,
++  };
++}
++
++async function handleSupabase(route) {
++  const req = route.request();
++  const url = new URL(req.url());
++  if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS, body: '' });
++
++  let body = null;
++  try {
++    body = req.postData() ? JSON.parse(req.postData()) : null;
++  } catch {
++    body = null;
++  }
++  state.requests.push({ method: req.method(), path: url.pathname, auth: req.headers()['authorization'] ?? null, body });
++
++  const json = (status, data) =>
++    route.fulfill({ status, headers: { ...CORS, 'Content-Type': 'application/json' }, body: data === null ? '' : JSON.stringify(data) });
++
++  if (url.pathname === '/auth/v1/logout') return json(204, null);
++  if (url.pathname === '/rest/v1/shop_memberships') {
++    return json(
++      200,
++      [ALPHA, BETA].map((shop) => ({ role: state.role, shop: shopRow(shop) }))
++    );
++  }
++  if (url.pathname === '/rest/v1/services') return json(200, []);
++  if (url.pathname === '/rest/v1/feature_catalog') return json(200, []);
++  if (url.pathname === '/rest/v1/rpc/shop_licence_status') {
++    const spec = state.licence[body?.p_shop_id];
++    if (!spec) return json(200, FORBIDDEN);
++    if (spec.delayMs) await sleep(spec.delayMs);
++    if (spec.abort) return route.abort('failed');
++    if (spec.status) return json(spec.status, { code: 'PGRST000', message: 'simulated server failure' });
++    return json(200, spec.body);
++  }
++  return json(404, { message: `not mocked: ${url.pathname}` });
++}
++
++const CORS = {
++  'Access-Control-Allow-Origin': '*',
++  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, prefer, x-client-info',
++  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
++};
++
++const results = [];
++let failures = 0;
++function check(name, ok, detail = '') {
++  results.push({ name, ok });
++  if (!ok) failures += 1;
++  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
++}
++
++// The licence page's own text, as a single string (buttons and status lines).
++async function screenText(page) {
++  return page.locator('#app').innerText();
++}
++async function buttonLabels(page) {
++  return page.locator('#app button').allInnerTexts();
++}
++async function waitForText(page, text, timeout = 8000) {
++  await page.waitForFunction((t) => document.querySelector('#app')?.innerText.includes(t), text, { timeout });
++}
++async function waitForCalls(count, timeout = 8000) {
++  const start = Date.now();
++  while (licenceCalls().length < count) {
++    if (Date.now() - start > timeout) throw new Error(`timed out waiting for ${count} licence request(s)`);
++    await sleep(25);
++  }
++}
++
++(async () => {
++  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
++  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
++  // Seed the owner session once for this tab, the same way a signed-in owner has it.
++  await context.addInitScript((session) => {
++    if (!sessionStorage.getItem('__licence_smoke_seeded')) {
++      sessionStorage.setItem('qrquick.owner.session', JSON.stringify(session));
++      sessionStorage.setItem('__licence_smoke_seeded', '1');
++    }
++  }, SESSION);
++  const page = await context.newPage();
++  page.setDefaultTimeout(8000);
++
++  const problems = [];
++  page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`));
++  page.on('console', (msg) => {
++    const text = msg.text();
++    // Mocked failures (503, aborted request) are logged by the browser on purpose.
++    const expected = /Failed to load resource|net::ERR_FAILED|simulated server failure/.test(text);
++    if (msg.type() === 'error' && !expected && !/favicon/i.test(text)) problems.push(`console: ${text}`);
++  });
++  await page.route(/supabase\.co/, handleSupabase);
++
++  // ----- owner opens a shop -----
++  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}`);
++  await page.getByRole('link', { name: 'Licence', exact: true }).waitFor();
++  check('web build: the owner-only Android switch is off', (await page.evaluate(() => window.PRINTNEST_CONFIG?.ownerApp)) === false);
++  check('owner sees a Licence link on the shop page', (await page.getByRole('link', { name: 'Licence', exact: true }).count()) === 1);
++
++  await page.getByRole('link', { name: 'Licence', exact: true }).click();
++  await waitForText(page, 'Access until');
++  let text = await screenText(page);
++  check('active dated licence says it is active until a time', /Active/.test(text) && /Access until \d{1,2} \w{3} \d{4}, \d{2}:\d{2} IST/.test(text), text.split('\n').slice(0, 6).join(' | '));
++  const first = licenceCalls()[0];
++  check('licence check sends one owner RPC with the shop id and owner token',
++    licenceCalls().length === 1 && first.body?.p_shop_id === ALPHA.id && first.auth === 'Bearer owner-token',
++    JSON.stringify(first));
++  check('the licence page sends no call to the licence tables', !state.requests.some((r) => /licence_(coverages|config|denial|admin)|shop_licence_state/.test(r.path)));
++  check('no printing-permitted line is shown (removed until 7F enforcement exists)', !/Printing permitted/i.test(await screenText(page)));
++  check('the page offers only Refresh, not any licence change', JSON.stringify(await buttonLabels(page)) === '["Refresh"]', JSON.stringify(await buttonLabels(page)));
++
++  // ----- refresh: overlapping presses make one request -----
++  state.licence[ALPHA.id] = { body: ACTIVE_LIFETIME, delayMs: 700 };
++  const before = licenceCalls().length;
++  // Two presses in the same tick. The second lands on the button the first press replaced.
++  await page.evaluate(() => {
++    const button = document.querySelector('#app [data-action="licence-refresh"]');
++    button.click();
++    button.click();
++  });
++  await page.getByRole('button', { name: 'Checking…' }).waitFor();
++  const disabled = await page.getByRole('button', { name: 'Checking…' }).isDisabled();
++  await waitForText(page, 'Lifetime access');
++  check('refresh button is disabled while a check runs', disabled === true);
++  check('overlapping refresh presses make one request', licenceCalls().length - before === 1, `new=${licenceCalls().length - before}`);
++  text = await screenText(page);
++  check('lifetime coverage shows no expiry and no printing line', /Lifetime access\. No expiry\./.test(text) && !/Printing permitted/i.test(text));
++  state.licence[ALPHA.id] = { body: ACTIVE_DATED };
++
++  // ----- inactive, scheduled -----
++  state.licence[ALPHA.id] = { body: INACTIVE };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'No printing access is active');
++  check('inactive shows Not active, with no reason given and no printing line', /Not active/.test(await screenText(page)) && !/Printing permitted/i.test(await screenText(page)));
++
++  state.licence[ALPHA.id] = { body: SCHEDULED };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'next access starts');
++  text = await screenText(page);
++  const scheduledParas = await page.locator('.licence-status p').allInnerTexts();
++  check('scheduled coverage: one Not active badge, the next start on its own line, no printing line', /Not active/.test(text) && !/Not active now/.test(text) && /No access is active now\./.test(text) && scheduledParas.some((p) => /^The next access starts \d{1,2} \w{3} \d{4}, \d{2}:\d{2} IST\.$/.test(p)) && !/Printing permitted/i.test(text));
++
++  // ----- unavailable states: never shown as active -----
++  state.licence[ALPHA.id] = { body: ACTIVE_DATED };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'Access until');
++
++  state.licence[ALPHA.id] = { body: FORBIDDEN };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'cannot see the licence status');
++  text = await screenText(page);
++  check('forbidden reply is unavailable, and the old Access until line is gone', /Status unavailable/.test(text) && !/Access until/.test(text) && !/\bActive\b/.test(text));
++  check('forbidden reply shows no printing line', !/Printing permitted/i.test(await screenText(page)));
++
++  state.licence[ALPHA.id] = { body: { ok: true, active: true } };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'cannot read');
++  check('malformed reply is unavailable, never active', /Status unavailable/.test(await screenText(page)) && !/Access until/.test(await screenText(page)));
++
++  state.licence[ALPHA.id] = { abort: true };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'could not be reached');
++  text = await screenText(page);
++  check('network failure is unavailable, distinct from inactive', /Status unavailable/.test(text) && !/No printing access is active/.test(text) && !/Access until/.test(text));
++
++  state.licence[ALPHA.id] = { status: 503 };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'busy or unavailable');
++  check('server failure is unavailable, with a retry hint', /Status unavailable/.test(await screenText(page)));
++
++  // ----- offline: no request is sent -----
++  state.licence[ALPHA.id] = { body: ACTIVE_DATED };
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'Access until');
++  await context.setOffline(true);
++  const beforeOffline = licenceCalls().length;
++  await page.getByRole('button', { name: 'Refresh' }).click();
++  await waitForText(page, 'This device is offline');
++  check('offline shows its own message, not inactive', /Status unavailable/.test(await screenText(page)) && !/No printing access/.test(await screenText(page)));
++  check('offline sends no licence request', licenceCalls().length === beforeOffline);
++  await context.setOffline(false);
++
++  // ----- shop switching: a late reply for shop A must not reach shop B -----
++  state.licence[ALPHA.id] = { body: ACTIVE_DATED, delayMs: 900 };
++  state.licence[BETA.id] = { body: SCHEDULED };
++  // Start from the shop list, so each licence visit is a real navigation (same-hash goto does nothing).
++  await page.goto(`${BASE}#/owner`);
++  await page.getByRole('button', { name: 'Sign out' }).waitFor();
++  const beforeSwitch = licenceCalls().length;
++  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
++  await waitForCalls(beforeSwitch + 1);
++  await page.goto(`${BASE}#/owner/shop/${BETA.slug}/licence`);
++  await waitForText(page, 'next access starts');
++  await sleep(1300); // long enough for Alpha's late reply to arrive
++  text = await screenText(page);
++  check('shop switch: Beta shows its own status after Alpha replies late', /Beta Print/.test(text) && /next access starts/.test(text) && !/Access until/.test(text), text.split('\n').slice(0, 3).join(' | '));
++
++  // ----- sign-out during a check: nothing from the licence stays on screen -----
++  state.licence[BETA.id] = { body: ACTIVE_LIFETIME, delayMs: 900 };
++  await page.goto(`${BASE}#/owner`);
++  await page.getByRole('button', { name: 'Sign out' }).waitFor();
++  const beforeSignOutCheck = licenceCalls().length;
++  await page.goto(`${BASE}#/owner/shop/${BETA.slug}/licence`);
++  await waitForCalls(beforeSignOutCheck + 1);
++  await page.goto(`${BASE}#/owner`);
++  await page.getByRole('button', { name: 'Sign out' }).click();
++  await page.locator('#auth-form').waitFor();
++  await sleep(1300);
++  const afterSignOut = await page.evaluate(() => sessionStorage.getItem('qrquick.owner.session'));
++  text = await page.locator('#app').innerText();
++  check('sign-out clears the stored session', afterSignOut === null);
++  check('sign-out leaves no licence text on screen, even after a late reply', !/Lifetime access|Access until|Next access|Not active|Status unavailable/.test(text));
++
++  // ----- staff: no licence link, no request -----
++  // Sign-out cleared the session in memory too, so restore it and reload the app.
++  await page.evaluate((s) => sessionStorage.setItem('qrquick.owner.session', JSON.stringify(s)), SESSION);
++  await page.goto(`${BASE}#/owner`);
++  await page.reload();
++  state.role = 'staff';
++  const beforeStaff = licenceCalls().length;
++  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}`);
++  await page.getByRole('link', { name: 'Statistics', exact: true }).waitFor();
++  check('staff see no Licence link on the shop page', (await page.getByRole('link', { name: 'Licence', exact: true }).count()) === 0);
++  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
++  await waitForText(page, 'shown to the shop owner only');
++  check('staff who open the licence page directly are told it is for owners', /shown to the shop owner only/.test(await screenText(page)) && !/Access until|Lifetime access|Not active/.test(await screenText(page)));
++  check('staff open page sends no licence request', licenceCalls().length === beforeStaff);
++  state.role = 'owner';
++
++  // ----- layout and errors -----
++  await page.goto(`${BASE}#/owner`);
++  await page.getByRole('button', { name: 'Sign out' }).waitFor();
++  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
++  await waitForText(page, 'Access until');
++  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
++  check('no horizontal scroll at phone width (390px)', overflow <= 0, `overflow=${overflow}px`);
++  check('no JavaScript errors in the browser', problems.length === 0, problems.join(' | '));
++
++  // ----- Android owner bundle (config.ownerApp = true): the licence view is off -----
++  // A fresh context, so no copy of the normal config.js is cached. config.js is served
++  // with ownerApp switched on, the same change mobile/scripts/copy-web.mjs makes.
++  const androidContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
++  await androidContext.addInitScript((session) => {
++    if (!sessionStorage.getItem('__licence_smoke_seeded')) {
++      sessionStorage.setItem('qrquick.owner.session', JSON.stringify(session));
++      sessionStorage.setItem('__licence_smoke_seeded', '1');
++    }
++  }, SESSION);
++  const android = await androidContext.newPage();
++  android.setDefaultTimeout(8000);
++  const androidProblems = [];
++  android.on('pageerror', (err) => androidProblems.push(`pageerror: ${err.message}`));
++  android.on('console', (msg) => {
++    const text = msg.text();
++    const expected = /Failed to load resource|net::ERR_FAILED|simulated server failure/.test(text);
++    if (msg.type() === 'error' && !expected && !/favicon/i.test(text)) androidProblems.push(`console: ${text}`);
++  });
++  await android.route(/supabase\.co/, handleSupabase);
++  await android.route(/\/config\.js(\?.*)?$/, (route) =>
++    route.fulfill({
++      status: 200,
++      contentType: 'application/javascript',
++      body: readFileSync(CONFIG_PATH, 'utf8').replace(/ownerApp:\s*false/, 'ownerApp: true'),
++    })
++  );
++
++  const beforeAndroid = licenceCalls().length;
++  await android.goto(`${BASE}#/owner/shop/${ALPHA.slug}`);
++  await android.getByRole('link', { name: 'Statistics', exact: true }).waitFor();
++  check('Android bundle: the owner-only switch is on', (await android.evaluate(() => window.PRINTNEST_CONFIG?.ownerApp)) === true);
++  check('Android bundle: the shop page has no Licence link', (await android.getByRole('link', { name: 'Licence', exact: true }).count()) === 0);
++  check('Android bundle: the rest of the owner shop page still shows', (await android.getByRole('link', { name: 'Statistics', exact: true }).count()) === 1);
++  await android.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
++  await waitForText(android, 'Services and prices');
++  text = await screenText(android);
++  check('Android bundle: the licence address shows the shop page, not the licence screen',
++    !/Access until|Lifetime access|No printing access|Not active|Status unavailable|Checking/.test(text));
++  check('Android bundle: opening the licence address sends no licence request', licenceCalls().length === beforeAndroid, `new=${licenceCalls().length - beforeAndroid}`);
++  check('Android bundle: no JavaScript errors in the browser', androidProblems.length === 0, androidProblems.join(' | '));
++
++  await browser.close();
++  console.log(`\n${results.length - failures} of ${results.length} checks passed.`);
++  process.exit(failures ? 1 : 0);
++})().catch((err) => {
++  console.error('Smoke run failed:', err);
++  process.exit(2);
++});
+diff --git a/web/tests/fixtures/licence-status-rpc.json b/web/tests/fixtures/licence-status-rpc.json
+new file mode 100644
+index 0000000..a28cda5
+--- /dev/null
++++ b/web/tests/fixtures/licence-status-rpc.json
+@@ -0,0 +1,63 @@
++{
++  "_source": "Captured 2026-11-08 from the local throwaway PostgreSQL 16.15 cluster (stage7c_local), by running the migration 0012 shop_licence_status function text inside a transaction that ends in ROLLBACK. public.shop_licence_state was replaced with a stub that returns a fixed state, so only the owner RPC body and its JSON output were exercised. The coverage algorithm was not run. This is not a run against a Supabase project.",
++  "cases": {
++    "owner_active_dated": {
++      "ok": true,
++      "active": true,
++      "no_expiry": false,
++      "access_end": "2027-12-31T18:30:00+00:00",
++      "next_start": null
++    },
++    "owner_active_lifetime": {
++      "ok": true,
++      "active": true,
++      "no_expiry": true,
++      "access_end": null,
++      "next_start": null
++    },
++    "owner_scheduled": {
++      "ok": true,
++      "active": false,
++      "no_expiry": false,
++      "access_end": null,
++      "next_start": "2026-12-01T18:30:00+00:00"
++    },
++    "owner_expired": {
++      "ok": true,
++      "active": false,
++      "no_expiry": false,
++      "access_end": null,
++      "next_start": null
++    },
++    "owner_revoked": {
++      "ok": true,
++      "active": false,
++      "no_expiry": false,
++      "access_end": null,
++      "next_start": null
++    },
++    "owner_none": {
++      "ok": true,
++      "active": false,
++      "no_expiry": false,
++      "access_end": null,
++      "next_start": null
++    },
++    "staff_same_shop": {
++      "ok": false,
++      "code": "forbidden"
++    },
++    "stranger": {
++      "ok": false,
++      "code": "forbidden"
++    },
++    "anon_no_claims": {
++      "ok": false,
++      "code": "forbidden"
++    },
++    "null_shop_id": {
++      "ok": false,
++      "code": "forbidden"
++    }
++  }
++}
+diff --git a/web/tests/licence-status.test.js b/web/tests/licence-status.test.js
+new file mode 100644
+index 0000000..dbac9b5
+--- /dev/null
++++ b/web/tests/licence-status.test.js
+@@ -0,0 +1,593 @@
++// Stage 7E: the licence status screen. These are MOCKED tests: no network and no
++// database. The reply shapes in fixtures/licence-status-rpc.json were captured from the
++// migration 0012 function on a local throwaway PostgreSQL (see the fixture's _source).
++// They are not a run against Supabase.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import {
++  REASON,
++  STATE,
++  VIEW,
++  createLicenceStatusController,
++  describeView,
++  failureReason,
++  formatIst,
++  parseLicenceStatus,
++  timeHasPassed,
++} from '../src/licence-status.js';
++import { createLicencePages } from '../src/owner-licence.js';
++
++const fixtures = JSON.parse(readFileSync(new URL('./fixtures/licence-status-rpc.json', import.meta.url), 'utf8')).cases;
++const src = (name) => readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8');
++
++// 8 Nov 2026, 10:00 IST. The fixed clock for every time-based check.
++const NOW = Date.parse('2026-11-08T10:00:00+05:30');
++const SHOP_A = 'shop-a';
++const SHOP_B = 'shop-b';
++
++function deferred() {
++  let resolve;
++  let reject;
++  const promise = new Promise((res, rej) => {
++    resolve = res;
++    reject = rej;
++  });
++  return { promise, resolve, reject };
++}
++
++const ACTIVE_DATED = { ok: true, active: true, no_expiry: false, access_end: '2028-01-01T00:00:00+05:30', next_start: null };
++const ACTIVE_LIFETIME = { ok: true, active: true, no_expiry: true, access_end: null, next_start: null };
++const SCHEDULED = { ok: true, active: false, no_expiry: false, access_end: null, next_start: '2026-12-02T00:00:00+05:30' };
++const INACTIVE = { ok: true, active: false, no_expiry: false, access_end: null, next_start: null };
++
++// ---------- 1. the reply contract ----------
++
++test('fixture: lifetime coverage is active with no expiry', () => {
++  const parsed = parseLicenceStatus(fixtures.owner_active_lifetime);
++  assert.equal(parsed.ok, true);
++  assert.equal(parsed.state, STATE.ACTIVE);
++  assert.equal(parsed.lifetime, true);
++  assert.equal(parsed.accessEndMs, null);
++});
++
++test('fixture: dated coverage is active until its end, read as an instant', () => {
++  const parsed = parseLicenceStatus(fixtures.owner_active_dated);
++  assert.equal(parsed.state, STATE.ACTIVE);
++  assert.equal(parsed.lifetime, false);
++  // The database returns UTC with +00:00; 1 Jan 2028 00:00 IST is 31 Dec 2027 18:30 UTC.
++  assert.equal(parsed.accessEndMs, Date.parse('2027-12-31T18:30:00+00:00'));
++});
++
++test('fixture: a scheduled reply carries the next start and is not active', () => {
++  const parsed = parseLicenceStatus(fixtures.owner_scheduled);
++  assert.equal(parsed.state, STATE.SCHEDULED);
++  assert.equal(parsed.nextStartMs, Date.parse('2026-12-01T18:30:00+00:00'));
++});
++
++test('fixture: expired, revoked and no coverage give the same inactive result, which the RPC does not distinguish', () => {
++  const expired = parseLicenceStatus(fixtures.owner_expired);
++  const revoked = parseLicenceStatus(fixtures.owner_revoked);
++  const none = parseLicenceStatus(fixtures.owner_none);
++  assert.deepEqual(expired, revoked);
++  assert.deepEqual(expired, none);
++  assert.equal(expired.state, STATE.INACTIVE);
++});
++
++test('fixture: every denial reply is forbidden and none is read as a licence', () => {
++  for (const name of ['staff_same_shop', 'stranger', 'anon_no_claims', 'null_shop_id']) {
++    const parsed = parseLicenceStatus(fixtures[name]);
++    assert.equal(parsed.ok, false, name);
++    assert.equal(parsed.reason, REASON.FORBIDDEN, name);
++  }
++});
++
++test('a reply that is not an object is malformed', () => {
++  for (const raw of [null, undefined, 'OK', [], 42, true, '{"ok":true}']) {
++    assert.deepEqual(parseLicenceStatus(raw), { ok: false, reason: REASON.MALFORMED }, String(raw));
++  }
++});
++
++test('ok must be exactly true or a forbidden refusal', () => {
++  assert.equal(parseLicenceStatus({}).reason, REASON.MALFORMED);
++  assert.equal(parseLicenceStatus({ ...ACTIVE_LIFETIME, ok: 'true' }).reason, REASON.MALFORMED);
++  assert.equal(parseLicenceStatus({ ...ACTIVE_LIFETIME, ok: 1 }).reason, REASON.MALFORMED);
++  assert.equal(parseLicenceStatus({ ok: false, code: 'something_else' }).reason, REASON.MALFORMED);
++  assert.equal(parseLicenceStatus({ ok: false }).reason, REASON.MALFORMED);
++});
++
++test('a missing field is never read as active', () => {
++  assert.equal(parseLicenceStatus({ ok: true, active: true }).reason, REASON.MALFORMED);
++  for (const key of ['active', 'no_expiry', 'access_end', 'next_start']) {
++    const reply = { ...ACTIVE_LIFETIME };
++    delete reply[key];
++    assert.equal(parseLicenceStatus(reply).ok, false, `without ${key}`);
++  }
++});
++
++test('wrong field types are malformed', () => {
++  const bad = [
++    { active: 'true' },
++    { no_expiry: 'false' },
++    { access_end: 123 },
++    { next_start: {} },
++    { active: 1, no_expiry: 0 },
++  ];
++  for (const change of bad) {
++    assert.equal(parseLicenceStatus({ ...ACTIVE_DATED, ...change }).ok, false, JSON.stringify(change));
++  }
++});
++
++test('active replies must be internally consistent', () => {
++  // Active with a next start: an active coverage cannot also be the scheduled one.
++  assert.equal(parseLicenceStatus({ ...ACTIVE_DATED, next_start: '2026-12-02T00:00:00+05:30' }).reason, REASON.MALFORMED);
++  // Lifetime with an end time: a lifetime coverage has no end.
++  assert.equal(parseLicenceStatus({ ...ACTIVE_LIFETIME, access_end: '2028-01-01T00:00:00+05:30' }).reason, REASON.MALFORMED);
++  // Dated but with no end time.
++  assert.equal(parseLicenceStatus({ ...ACTIVE_DATED, access_end: null }).reason, REASON.MALFORMED);
++  // A dated end that is not a readable timestamp.
++  for (const bad of ['soon', '', '2028-01-01', '2028-01-01 00:00:00+05:30', '2028-13-45T99:00:00+05:30']) {
++    assert.equal(parseLicenceStatus({ ...ACTIVE_DATED, access_end: bad }).reason, REASON.MALFORMED, bad);
++  }
++});
++
++test('a timestamp without a stated zone is malformed, so the device time zone cannot change the result', () => {
++  assert.equal(parseLicenceStatus({ ...ACTIVE_DATED, access_end: '2028-01-01T00:00:00' }).reason, REASON.MALFORMED);
++  assert.equal(parseLicenceStatus({ ...SCHEDULED, next_start: '2026-12-02T00:00:00' }).reason, REASON.MALFORMED);
++});
++
++test('inactive and scheduled replies must be internally consistent', () => {
++  // Not active but still marked lifetime.
++  assert.equal(parseLicenceStatus({ ...INACTIVE, no_expiry: true }).reason, REASON.MALFORMED);
++  // Not active but carrying an end time.
++  assert.equal(parseLicenceStatus({ ...INACTIVE, access_end: '2028-01-01T00:00:00+05:30' }).reason, REASON.MALFORMED);
++  // Scheduled with an unreadable start.
++  assert.equal(parseLicenceStatus({ ...SCHEDULED, next_start: 'tomorrow' }).reason, REASON.MALFORMED);
++});
++
++test('no reply shape can produce an active state unless it says active', () => {
++  const replies = [
++    { ok: true },
++    { ok: true, access_end: '2028-01-01T00:00:00+05:30', no_expiry: false },
++    { ok: true, active: false, no_expiry: true, access_end: null, next_start: null },
++  ];
++  for (const reply of replies) {
++    const parsed = parseLicenceStatus(reply);
++    assert.notEqual(parsed.state, STATE.ACTIVE, JSON.stringify(reply));
++  }
++});
++
++// ---------- 2. why a request failed ----------
++
++test('failure reasons separate offline, network, auth, server and unknown', () => {
++  assert.equal(failureReason(new TypeError('Failed to fetch'), true), REASON.NETWORK);
++  assert.equal(failureReason(new TypeError('Failed to fetch'), false), REASON.OFFLINE);
++  assert.equal(failureReason(Object.assign(new Error('x'), { status: 500 }), false), REASON.OFFLINE, 'offline wins');
++  assert.equal(failureReason(Object.assign(new Error('x'), { status: 401 })), REASON.AUTH);
++  assert.equal(failureReason(Object.assign(new Error('x'), { status: 403 })), REASON.AUTH);
++  assert.equal(failureReason(Object.assign(new Error('x'), { status: 404 })), REASON.SERVICE_MISSING);
++  assert.equal(failureReason(Object.assign(new Error('x'), { code: 'PGRST202' })), REASON.SERVICE_MISSING);
++  for (const status of [408, 429, 500, 502, 503]) {
++    assert.equal(failureReason(Object.assign(new Error('x'), { status })), REASON.SERVER, String(status));
++  }
++  assert.equal(failureReason(Object.assign(new Error('x'), { status: 400 })), REASON.UNKNOWN);
++  assert.equal(failureReason(new Error('boom')), REASON.UNKNOWN);
++});
++
++// ---------- 3. what the screen says ----------
++
++test('IST formatting shows the exclusive end in Asia/Kolkata', () => {
++  assert.equal(formatIst(Date.parse('2027-12-31T18:30:00Z')), '1 Jan 2028, 00:00 IST');
++});
++
++test('display: lifetime, dated and scheduled coverage show the approved labels', () => {
++  const lifetime = describeView({ phase: VIEW.READY, status: parseLicenceStatus(fixtures.owner_active_lifetime), checkedAt: NOW }, NOW);
++  assert.equal(lifetime.badge, 'Active');
++  assert.equal(lifetime.summary, 'Lifetime access. No expiry.');
++  assert.equal(lifetime.nextStart, '');
++  assert.equal('printing' in lifetime, false);
++
++  const dated = describeView({ phase: VIEW.READY, status: parseLicenceStatus(fixtures.owner_active_dated), checkedAt: NOW }, NOW);
++  assert.equal(dated.badge, 'Active');
++  assert.equal('printing' in dated, false);
++  // The access line wording is approved by the owner (decision 2, 2026-11-09). Exact match, so any change shows up here.
++  assert.equal(dated.summary, 'Access until 1 Jan 2028, 00:00 IST.');
++
++  const scheduled = describeView({ phase: VIEW.READY, status: parseLicenceStatus(fixtures.owner_scheduled), checkedAt: NOW }, NOW);
++  // One inactive badge. The next start is kept on its own line (owner, 2026-11-09).
++  assert.equal(scheduled.badge, 'Not active');
++  assert.equal(scheduled.tone, 'muted');
++  assert.equal(scheduled.summary, 'No access is active now.');
++  assert.equal(scheduled.nextStart, 'The next access starts 2 Dec 2026, 00:00 IST.');
++  assert.equal('printing' in scheduled, false);
++});
++
++test('display: inactive shows no reason, because the RPC gives none', () => {
++  const inactive = describeView({ phase: VIEW.READY, status: parseLicenceStatus(fixtures.owner_expired), checkedAt: NOW }, NOW);
++  assert.equal(inactive.badge, 'Not active');
++  assert.equal(inactive.nextStart, '');
++  assert.equal('printing' in inactive, false);
++  assert.doesNotMatch(inactive.summary, /expired|revoked|cancel/i);
++});
++
++test('display: an end time that has already passed asks for a refresh and is never shown as Active', () => {
++  const status = parseLicenceStatus({ ...ACTIVE_DATED, access_end: '2026-11-08T09:00:00+05:30' });
++  const model = describeView({ phase: VIEW.READY, status, checkedAt: NOW - 60_000 }, NOW);
++  assert.equal(model.needsRefresh, true);
++  assert.equal(model.badge, 'Check again');
++  assert.notEqual(model.badge, 'Active');
++  assert.equal('printing' in model, false);
++});
++
++test('display: a scheduled start that has already passed asks for a refresh', () => {
++  const status = parseLicenceStatus({ ...SCHEDULED, next_start: '2026-11-08T09:00:00+05:30' });
++  const model = describeView({ phase: VIEW.READY, status, checkedAt: NOW - 60_000 }, NOW);
++  assert.equal(model.needsRefresh, true);
++  assert.equal(model.badge, 'Check again');
++});
++
++test('display: every unavailable reason is never shown as active or as inactive', () => {
++  for (const reason of Object.values(REASON)) {
++    if (reason === REASON.FORBIDDEN || reason === REASON.MALFORMED) continue; // covered below
++    const model = describeView({ phase: VIEW.UNAVAILABLE, reason, attemptedAt: NOW }, NOW);
++    assert.equal(model.badge, 'Status unavailable', reason);
++    assert.notEqual(model.badge, 'Active', reason);
++    assert.notEqual(model.badge, 'Not active', reason);
++    assert.match(model.checkedText, /No status from earlier checks is shown/, reason);
++  }
++});
++
++test('display: forbidden and malformed replies are unavailable, not active', () => {
++  for (const reason of [REASON.FORBIDDEN, REASON.MALFORMED]) {
++    const model = describeView({ phase: VIEW.UNAVAILABLE, reason, attemptedAt: NOW }, NOW);
++    assert.equal(model.badge, 'Status unavailable', reason);
++    assert.notEqual(model.badge, 'Active', reason);
++  }
++});
++
++test('display: offline and inactive are clearly different', () => {
++  const offline = describeView({ phase: VIEW.UNAVAILABLE, reason: REASON.OFFLINE, attemptedAt: NOW }, NOW);
++  const inactive = describeView({ phase: VIEW.READY, status: parseLicenceStatus(INACTIVE), checkedAt: NOW }, NOW);
++  assert.notEqual(offline.badge, inactive.badge);
++  assert.notEqual(offline.summary, inactive.summary);
++  assert.match(offline.summary, /offline/);
++  assert.doesNotMatch(inactive.summary, /offline|could not/i);
++});
++
++test('display: an auth failure offers a way back to sign in', () => {
++  assert.equal(describeView({ phase: VIEW.UNAVAILABLE, reason: REASON.AUTH, attemptedAt: NOW }, NOW).signIn, true);
++  assert.equal(describeView({ phase: VIEW.UNAVAILABLE, reason: REASON.NETWORK, attemptedAt: NOW }, NOW).signIn, false);
++});
++
++test('display: loading and idle show no licence facts', () => {
++  const loading = describeView({ phase: VIEW.LOADING }, NOW);
++  assert.equal(loading.busy, true);
++  assert.equal('printing' in loading, false);
++  assert.equal(loading.badge, 'Checking…');
++
++  const idle = describeView({ phase: VIEW.IDLE }, NOW);
++  assert.equal('printing' in idle, false);
++  assert.equal(idle.badge, '');
++  assert.equal('printing' in describeView(null, NOW), false);
++});
++
++test('display: the approved labels are exact in the screen code, and the removed printing line is gone', () => {
++  const screen = src('licence-status.js') + src('owner-licence.js');
++  for (const label of [
++    'Lifetime access. No expiry.',
++    'Access until ',
++    'No access is active now.',
++    'The next access starts ',
++    'No printing access is active for this shop.',
++    'Check again',
++    'Status unavailable',
++    'Checking…',
++    'Refresh',
++    'Last checked ',
++    'Last attempt ',
++    'The licence status is shown to the shop owner only.',
++  ]) {
++    assert.ok(screen.includes(label), label);
++  }
++  assert.match(screen, /badge: 'Not active'/);
++  assert.doesNotMatch(screen, /Not active now/);
++  assert.doesNotMatch(screen, /Printing permitted/);
++  assert.doesNotMatch(screen, /licence-facts|printingText/);
++});
++
++test('timeHasPassed only flags a time that is in the past', () => {
++  assert.equal(timeHasPassed(parseLicenceStatus(fixtures.owner_active_dated), NOW), false);
++  assert.equal(timeHasPassed(parseLicenceStatus(fixtures.owner_active_lifetime), Date.parse('2099-01-01T00:00:00Z')), false);
++  assert.equal(timeHasPassed(parseLicenceStatus(fixtures.owner_expired), Date.parse('2099-01-01T00:00:00Z')), false);
++  assert.equal(timeHasPassed(parseLicenceStatus({ ...ACTIVE_DATED, access_end: '2026-11-08T09:00:00+05:30' }), NOW), true);
++  assert.equal(timeHasPassed(parseLicenceStatus({ ...SCHEDULED, next_start: '2026-11-08T09:00:00+05:30' }), NOW), true);
++});
++
++// ---------- 4. the state controller ----------
++
++function harness({ online = true } = {}) {
++  const calls = [];
++  const views = [];
++  const pending = new Map(); // shopId -> the deferred for the newest call to it
++  let loader = null; // optional: (shopId) => promise; default is a deferred per call
++  const controller = createLicenceStatusController({
++    loadStatus: (shopId) => {
++      calls.push(shopId);
++      if (loader) return loader(shopId);
++      const d = deferred();
++      pending.set(shopId, d);
++      return d.promise;
++    },
++    now: () => NOW,
++    isOnline: () => online,
++    onChange: (view) => views.push(view),
++  });
++  return {
++    controller,
++    calls,
++    views,
++    pending,
++    setLoader(fn) {
++      loader = fn;
++    },
++    setOnline(value) {
++      online = value;
++    },
++  };
++}
++
++test('controller: open shows loading, then the ready status with the check time', async () => {
++  const h = harness();
++  const done = h.controller.open(SHOP_A);
++  assert.equal(h.controller.getView().phase, VIEW.LOADING);
++  assert.equal(h.controller.getView().status, null);
++
++  h.pending.get(SHOP_A).resolve(ACTIVE_DATED);
++  const view = await done;
++  assert.equal(view.phase, VIEW.READY);
++  assert.equal(view.status.state, STATE.ACTIVE);
++  assert.equal(view.checkedAt, NOW);
++  assert.deepEqual(h.calls, [SHOP_A]);
++});
++
++test('controller: a malformed reply is unavailable and never active', async () => {
++  const h = harness();
++  h.setLoader(async () => ({ ok: true, active: true }));
++  const view = await h.controller.open(SHOP_A);
++  assert.equal(view.phase, VIEW.UNAVAILABLE);
++  assert.equal(view.reason, REASON.MALFORMED);
++  assert.equal(view.status, null);
++});
++
++test('controller: a forbidden reply is unavailable, with the forbidden reason', async () => {
++  const h = harness();
++  h.setLoader(async () => fixtures.staff_same_shop);
++  const view = await h.controller.open(SHOP_A);
++  assert.equal(view.phase, VIEW.UNAVAILABLE);
++  assert.equal(view.reason, REASON.FORBIDDEN);
++  assert.equal(view.status, null);
++});
++
++test('controller: request failures map to auth, network and server reasons, never to active', async () => {
++  const cases = [
++    [Object.assign(new Error('Please sign in again.'), { status: 401 }), REASON.AUTH],
++    [new TypeError('Failed to fetch'), REASON.NETWORK],
++    [Object.assign(new Error('busy'), { status: 503 }), REASON.SERVER],
++  ];
++  for (const [err, reason] of cases) {
++    const h = harness();
++    h.setLoader(async () => {
++      throw err;
++    });
++    const view = await h.controller.open(SHOP_A);
++    assert.equal(view.phase, VIEW.UNAVAILABLE, reason);
++    assert.equal(view.reason, reason);
++    assert.equal(view.status, null);
++  }
++});
++
++test('controller: offline sends no request and says offline', async () => {
++  const h = harness({ online: false });
++  const view = await h.controller.open(SHOP_A);
++  assert.deepEqual(h.calls, []);
++  assert.equal(view.reason, REASON.OFFLINE);
++  assert.equal(view.status, null);
++});
++
++test('controller: a shop switch drops the earlier shop\'s late reply', async () => {
++  const h = harness();
++  const first = h.controller.open(SHOP_A);
++  const second = h.controller.open(SHOP_B);
++  h.pending.get(SHOP_B).resolve(SCHEDULED);
++  await second;
++  // Shop A answers last, with an active licence. It must not appear.
++  h.pending.get(SHOP_A).resolve(ACTIVE_LIFETIME);
++  const after = await first;
++
++  assert.equal(after.shopId, SHOP_B);
++  assert.equal(after.status.state, STATE.SCHEDULED);
++  const leaked = h.views.filter((v) => v.shopId === SHOP_A && v.status);
++  assert.equal(leaked.length, 0, 'no view of shop A carries its status once B is open');
++});
++
++test('controller: a late failure for an earlier shop does not overwrite the current shop', async () => {
++  const h = harness();
++  const first = h.controller.open(SHOP_A);
++  const second = h.controller.open(SHOP_B);
++  h.pending.get(SHOP_B).resolve(INACTIVE);
++  await second;
++  h.pending.get(SHOP_A).reject(new TypeError('Failed to fetch'));
++  const after = await first;
++  assert.equal(after.shopId, SHOP_B);
++  assert.equal(after.phase, VIEW.READY);
++  assert.equal(after.reason, null);
++});
++
++test('controller: sign-out during a check drops the reply and keeps no licence data', async () => {
++  const h = harness();
++  const pendingOpen = h.controller.open(SHOP_A);
++  h.controller.close();
++  h.pending.get(SHOP_A).resolve(ACTIVE_LIFETIME);
++  const after = await pendingOpen;
++
++  assert.equal(after.phase, VIEW.IDLE);
++  assert.equal(after.status, null);
++  assert.equal(after.shopId, null);
++  assert.equal(h.views.at(-1).phase, VIEW.IDLE, 'the last published view is the cleared one');
++  assert.equal(h.views.filter((v) => v.status).length, 0);
++});
++
++test('controller: after close, refresh does nothing and sends no request', async () => {
++  const h = harness();
++  h.controller.close();
++  await h.controller.refresh();
++  assert.deepEqual(h.calls, []);
++});
++
++test('controller: overlapping refresh presses share one request', async () => {
++  const h = harness();
++  const first = h.controller.open(SHOP_A);
++  const again = [h.controller.refresh(), h.controller.refresh(), h.controller.refresh()];
++  assert.deepEqual(h.calls, [SHOP_A], 'one request while the first is running');
++
++  h.pending.get(SHOP_A).resolve(ACTIVE_DATED);
++  const results = await Promise.all([first, ...again]);
++  assert.equal(h.calls.length, 1);
++  for (const view of results) assert.equal(view.phase, VIEW.READY);
++});
++
++test('controller: a refresh after a finished check sends a new request', async () => {
++  const h = harness();
++  const first = h.controller.open(SHOP_A);
++  h.pending.get(SHOP_A).resolve(ACTIVE_DATED);
++  await first;
++
++  const second = h.controller.refresh();
++  assert.equal(h.calls.length, 2);
++  h.pending.get(SHOP_A).resolve(SCHEDULED);
++  const view = await second;
++  assert.equal(view.status.state, STATE.SCHEDULED);
++});
++
++test('controller: a refresh clears the earlier status, so old data is not shown as freshly checked', async () => {
++  const h = harness();
++  const first = h.controller.open(SHOP_A);
++  h.pending.get(SHOP_A).resolve(ACTIVE_LIFETIME);
++  await first;
++
++  h.controller.refresh();
++  const during = h.controller.getView();
++  assert.equal(during.phase, VIEW.LOADING);
++  assert.equal(during.status, null);
++  assert.equal(during.checkedAt, null);
++});
++
++test('controller: a failed refresh after a success shows no status', async () => {
++  const h = harness();
++  const first = h.controller.open(SHOP_A);
++  h.pending.get(SHOP_A).resolve(ACTIVE_LIFETIME);
++  await first;
++
++  const second = h.controller.refresh();
++  h.pending.get(SHOP_A).reject(Object.assign(new Error('busy'), { status: 503 }));
++  const view = await second;
++  assert.equal(view.phase, VIEW.UNAVAILABLE);
++  assert.equal(view.reason, REASON.SERVER);
++  assert.equal(view.status, null);
++});
++
++test('controller: the view is a copy, so a caller cannot change the state by editing it', async () => {
++  const h = harness();
++  const first = h.controller.open(SHOP_A);
++  h.pending.get(SHOP_A).resolve(ACTIVE_LIFETIME);
++  const view = await first;
++  view.phase = VIEW.IDLE;
++  view.status.state = STATE.INACTIVE;
++  assert.equal(h.controller.getView().phase, VIEW.READY);
++  assert.equal(h.controller.getView().status.state, STATE.ACTIVE);
++});
++
++// ---------- 5. static guards: what the browser code may and may not reach ----------
++
++test('the browser reads licence status through one owner RPC and never the licence tables', () => {
++  const api = src('owner-api.js');
++  const page = src('owner-licence.js');
++  const logic = src('licence-status.js');
++  const forbidden = /licence_(coverages|config|denial|admin|audit|lock|replay|canon)|shop_licence_state|licence_admin|\/licence_/;
++  for (const [name, text] of [['owner-api.js', api], ['owner-licence.js', page], ['licence-status.js', logic]]) {
++    assert.doesNotMatch(text, forbidden, `${name} must not name a licence table, helper or admin RPC`);
++  }
++  const licenceRpcs = api.match(/rpc\/[a-z_]*licence[a-z_]*/g) ?? [];
++  assert.deepEqual(licenceRpcs, ['rpc/shop_licence_status'], 'the only licence call is the owner read');
++});
++
++test('the licence screen has one action, Refresh, and no grant, extend, revoke or replace control', () => {
++  const page = src('owner-licence.js');
++  const actions = [...page.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]);
++  assert.deepEqual([...new Set(actions)], ['licence-refresh']);
++  // Only the code is checked: the header comment names these words to say they are absent.
++  assert.doesNotMatch(page.replace(/\/\/.*$/gm, ''), /grant|extend|revoke|replace/i);
++});
++
++test('the shop page links to the licence screen only for owners, and sign-out and navigation clear it', () => {
++  const owner = src('owner.js');
++  assert.match(owner, /shop\.role === 'owner' && licenceEnabled \? `<a class="button" href="#\/owner\/shop\/\$\{encodeURIComponent\(shop\.slug\)\}\/licence">Licence<\/a>` : ''/);
++  assert.match(owner, /if \(section === 'licence' && licenceEnabled\) return licencePages\.open\(shop\);/);
++  assert.match(owner, /licencePages\.close\(\); \/\/ leaving the licence page/);
++  assert.match(owner, /async function signOut\(\) \{\s*licencePages\.close\(\);/);
++});
++
++test('the licence view is switched off in the Android owner bundle (config.ownerApp), and only there', () => {
++  const owner = src('owner.js');
++  assert.match(owner, /const licenceEnabled = config\.ownerApp !== true;/);
++  assert.match(owner, /createLicencePages\(\{ app, ownerApi, enabled: licenceEnabled \}\)/);
++  // The copy script is what sets ownerApp for the Android bundle; the web default stays false.
++  const copyScript = readFileSync(new URL('../../mobile/scripts/copy-web.mjs', import.meta.url), 'utf8');
++  assert.match(copyScript, /ownerApp:\s*true/);
++  const config = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
++  assert.match(config, /ownerApp: false,/);
++});
++
++// ---------- 6. the Android owner bundle: the licence view is off ----------
++
++test('with the view switched off, opening it for an owner sends no request and draws nothing', async () => {
++  const calls = [];
++  const app = { innerHTML: 'unchanged' };
++  const pages = createLicencePages({
++    app,
++    ownerApi: {
++      shopLicenceStatus: async (shopId) => {
++        calls.push(shopId);
++        return ACTIVE_DATED;
++      },
++    },
++    enabled: false,
++    now: () => NOW,
++    isOnline: () => true,
++  });
++  await pages.open({ id: SHOP_A, slug: 'alpha', name: 'Alpha', role: 'owner' });
++  assert.deepEqual(calls, []);
++  assert.equal(app.innerHTML, 'unchanged');
++});
++
++test('with the view on, the owner gets one check and staff get none (control for the test above)', async () => {
++  const calls = [];
++  const app = { innerHTML: '', querySelector: () => null };
++  const pages = createLicencePages({
++    app,
++    ownerApi: {
++      shopLicenceStatus: async (shopId) => {
++        calls.push(shopId);
++        return ACTIVE_DATED;
++      },
++    },
++    now: () => NOW,
++    isOnline: () => true,
++  });
++  await pages.open({ id: SHOP_A, slug: 'alpha', name: 'Alpha', role: 'owner' });
++  assert.deepEqual(calls, [SHOP_A]);
++  assert.match(app.innerHTML, /Access until 1 Jan 2028, 00:00 IST\./);
++  await pages.open({ id: SHOP_B, slug: 'beta', name: 'Beta', role: 'staff' });
++  assert.deepEqual(calls, [SHOP_A], 'staff send no request');
++  assert.match(app.innerHTML, /shown to the shop owner only/);
++});
+diff --git a/docs/STAGE7E_LICENCE_STATUS.md b/docs/STAGE7E_LICENCE_STATUS.md
+new file mode 100644
+index 0000000..2191fda
+--- /dev/null
++++ b/docs/STAGE7E_LICENCE_STATUS.md
+@@ -0,0 +1,147 @@
++# Stage 7E: owner licence status (read only)
++
++**Status: implemented, labels applied 2026-11-09, not committed.** Branch `stage7e-owner-licence-status`, worktree
++`/home/claude/joyyxh/ps-qr-stage7e`, based on `stage7-payments` at `5c82d37`. Nothing is pushed,
++merged, deployed, or applied to any database. The RPC this screen calls (migration `0012`) is
++still untracked on `stage7-payments` and is not applied anywhere.
++
++## Scope (resolved by owner decision 1, 2026-11-09)
++
++The brief asked for the licence view in the **owner Android app**. The decision records say the
++owner **web** view is 7E, and the Android view is **DEFERRED** (`STAGE7_DECISIONS.md` §12B.2 D,
++§14.2 item 13, line ~591).
++
++This branch follows the records. The screen is in the shared owner web app (`web/`). `mobile/`
++packages that same `web/` folder with Capacitor, so the screen is in the Android source bundle
++too. **The Android build switches it off.** `mobile/scripts/copy-web.mjs` sets `ownerApp: true`.
++Then `web/src/owner.js` (`licenceEnabled`) removes the Licence button and the
++`#/owner/shop/<slug>/licence` route, and `owner-licence.js` sends no request. The Android app
++therefore does not show the licence screen. Item 13 stays deferred. No native Android code was
++written.
++
++**Owner decision 1 (2026-11-09):** keep the Android view disabled, following item 13. Native
++Android scope is not reopened. Showing the view in Android would need a new owner decision.
++
++## What the owner sees
++
++Route: `#/owner/shop/<slug>/licence`. Reached from a **Licence** button on the shop page. The
++button appears only when the signed-in user's membership role is `owner`.
++
++| What is shown | When | Notes |
++|---|---|---|
++| **Active**, "Lifetime access. No expiry." | `active` and `no_expiry` | Approved by the owner, 2026-11-09 (item 13 / decision 19; proposal P4) |
++| **Active**, "Access until 1 Jan 2028, 00:00 IST." | `active`, `access_end` set | The end is exclusive (decision 9). Approved by the owner (decision 2, 2026-11-09) |
++| **Not active**, "No access is active now." and, on its own line, "The next access starts …" | `next_start` set and not active | One inactive badge for scheduled and ordinary inactive states (approved P2, 2026-11-09). The next start is kept on its own line |
++| **Not active**, "No printing access is active for this shop." | not active, no `next_start`. This is also the empty state | Same badge. Approved by the owner, 2026-11-09 (confirmation W1) |
++| **Check again**, "The end time … has passed since the last check. Refresh to see the current status." | the stored time is already past on this device's clock | Kept (approved P3). Refresh is needed |
++| **Status unavailable** (with a reason) | offline, network, server, service missing, sign-in, forbidden, malformed, unknown | Kept with its eight reason texts (approved P5). Nothing from earlier checks is shown |
++| Checking… | a check is running | Kept (approved P6). Refresh is disabled. Earlier results are cleared |
++
++No printing-permitted line is shown. It was removed on 2026-11-09 (approved P1) and returns only with
++Stage 7F enforcement.
++
++Approved labels (owner, 2026-11-09): "Access until 1 Jan 2028, 00:00 IST."; "Lifetime access. No expiry."; the inactive badge "Not active", with "No access is active now." and "The next access starts …" on its own line, or "No printing access is active for this shop."; "Check again"; "Status unavailable" with its eight reasons; "Checking…", "Refresh", "Last checked" and "Last attempt"; and the staff-only message. Any other change needs a new approval.
++
++The only action is **Refresh**. There are no controls to grant, extend, revoke or replace a licence.
++The page shows the time of the last successful check, or of the last attempt when that failed.
++
++Staff: no link. Opening the page directly shows "The licence status is shown to the shop owner
++only." and sends **no** request.
++
++## The RPC contract
++
++Called through `web/src/owner-api.js` → `shopLicenceStatus(shopId)`:
++
++```
++POST /rest/v1/rpc/shop_licence_status
++Authorization: Bearer <owner access token>
++body: {"p_shop_id": "<uuid>"}
++```
++
++Defined in `supabase/migrations/0012_licence_admin_rpcs.sql` (`security definer`, `stable`,
++`search_path = pg_catalog, public`). Execute is granted to `authenticated` only. It returns:
++
++- Owner: `{"ok": true, "active": bool, "no_expiry": bool, "access_end": timestamptz|null, "next_start": timestamptz|null}`
++- Anyone else, anonymous, or a null shop id: `{"ok": false, "code": "forbidden"}`
++
++The RPC writes no denial row and changes no counter (decision H4; an explicit exception to A4).
++`ACTIVE` gives `active = true`. `SCHEDULED` gives `next_start`. `REVOKED`, `EXPIRED` and `NONE`
++all give the same inactive reply, so the screen cannot name the reason (see below).
++
++**How this was checked.** The 0012 function text was run inside a transaction that ends in
++`ROLLBACK`, on the local throwaway PostgreSQL 16.15 cluster (`stage7c_local`). Only the state
++helper `public.shop_licence_state` was replaced by a stub that returns a fixed state. The ten
++replies are saved in `web/tests/fixtures/licence-status-rpc.json`. This is **not** a Supabase run.
++
++## Client rules
++
++- The client never queries a licence table, never calls another licence RPC, and never calls
++  `shop_licence_state`. A guard test checks this in the source.
++- A reply is accepted only if it matches the contract exactly (`web/src/licence-status.js`,
++  `parseLicenceStatus`). All five keys must be present. `active` cannot coexist with `next_start`,
++  `no_expiry` cannot coexist with `access_end`, and every time must carry an explicit zone.
++  Anything else is **malformed**, which is shown as unavailable.
++- A missing session, an HTTP error, a network error, or offline all count as **unavailable**.
++  Offline is decided by the device before any request is sent, so it is never shown as inactive.
++- A **stale reply is dropped**. Every open and close starts a new generation. A reply for an
++  earlier shop, or one that arrives after sign-out or navigation away, is ignored.
++- **Overlapping Refresh presses share one request.** The button is disabled while a check runs.
++- **Sign-out and leaving the page clear the data**, including any check still in flight.
++- The client never shows a previous status as current. A refresh clears it first, and a failed
++  refresh shows no status.
++- No grace period and no expiry extension is invented. A time that is already past only triggers
++  "Check again". It never changes the state to active or inactive.
++
++## Not shown, and why
++
++| Item | Reason |
++|---|---|
++| Coverage start | The RPC does not return it |
++| Expired vs revoked vs never licensed | The RPC gives one inactive state for all three |
++| Scheduled end, or the reason for a scheduled start | The RPC returns only `next_start` |
++| Admin notes, actor IDs, audit rows, denial counts, payment references, coverage IDs, revocation reasons | Decision D excludes them; the RPC does not return them |
++| Whether an admin grant may show a label | Still open (decision 19). Not shown |
++| Printing status line | Removed on 2026-11-09 (approved P1) until Stage 7F enforcement exists. The screen says nothing about printing |
++| Printing enforcement | Stage 7F. Not implemented. Nothing on this screen blocks or allows printing |
++
++## Limitations
++
++- **Manual refresh only.** The status is checked when the page opens and when Refresh is pressed.
++  It does not poll.
++- **The device clock** decides only whether to show "Check again". The server decides the status.
++- **Wording.** The labels are owner-approved (2026-11-09, item 13 / decision 19; P1–P9, and confirmations W1–W3
++  for the inactive sentence, the muted badge and the scheduled wording). Any other change needs a new approval.
++- **The Android switch is checked in a browser only.** The browser check serves `config.js` with
++  `ownerApp: true`, the setting the Android bundle uses. The APK was not built or run.
++- **The contract is not applied anywhere.** On a real project, the screen will show "Status
++  unavailable" (service missing) until the migration is applied. That depends on the migration plan
++  (owner decision 6). Nothing has been renumbered or applied.
++- **Android is not built or run** (`mobile/` is built only in GitHub Actions; the APK has never been built).
++
++## Verification level
++
++| Level | What ran | Result |
++|---|---|---|
++| Unit, mocked (`node --test`) | `tests/licence-status.test.js`: contract (incl. the 10 captured replies), failure reasons, display rules, controller (shop switch, sign-out, refresh de-duplication, offline, stale replies), static guards (including the approved-label guard), Android switch-off (3 of these are new) | **46 of 46** |
++| Unit, mocked | `tests/owner-api.test.js`: the RPC call, signed-out, missing function | **14 of 14** (3 new) |
++| Full `web/` suite | `npm test` (includes the two files above) | **212 of 212** |
++| Browser, mocked network, 390 px | `tests/browser/licence-smoke.cjs` (Supabase replaced by `page.route`). Runs the web build, then a fresh context with `config.js` served as the Android bundle (`ownerApp: true`) | **33 of 33** |
++| Database shape check | Local throwaway PostgreSQL, rolled back, stubbed state helper (see above) | 10 replies captured; the fixture matches |
++| Supabase integration (hosted or staging) | **Not run.** There is no staging database and the migrations are not applied | **Gate** (below) |
++| Regression, existing browser smokes | `owner-smoke.cjs`, `stats-smoke.cjs`, `features-smoke.cjs` run against this branch and against baseline `5c82d37` | **Identical outcomes on both.** Pre-existing failures: owner 3 (run stops after 34 checks), stats 1, features 3. Not caused by 7E and not fixed here |
++
++The mocked tests and the mocked browser run use fake replies. Only the database shape check ran
++against a real Postgres, and it uses a stubbed state function. The coverage rules were not run.
++
++## Remaining gates
++
++1. **Migration plan (decision 6).** No renumbering and no application until the owner approves the
++   integration plan. The RPC's file name and number are set by that plan. This doc calls it `0012`
++   until then.
++2. **Real Supabase integration test,** after decision 6 and a separate staging approval: an owner
++   sees their shop's status; staff and another owner are refused; a call with an expired session
++   is refused. The owner-membership check is exercised by a real signed-in owner.
++3. **Commit, push, PR, merge, deployment:** each needs its own approval. None has been given.
++4. **7F is separate.** Printing enforcement needs C-1 (lawyer review) and C-3 (owner policy), plus
++   M1 and an approved held-file release policy (decisions 3–5). 7E does not depend on these and
++   enforces nothing.

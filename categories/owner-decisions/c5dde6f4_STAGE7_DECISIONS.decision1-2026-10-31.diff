@@ -1,0 +1,93 @@
+--- /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/STAGE7_DECISIONS.before-decision1-2026-10-31.md	2026-10-31 12:15:08.521908133 +0000
++++ STAGE7_DECISIONS.md	2026-10-31 12:15:58.191579838 +0000
+@@ -341,7 +341,7 @@
+ 
+ Each item is a proposal, not a decision. Decisions 13–20 (manual licence management and admin grants) are in §12A. They are PENDING OWNER APPROVAL, except where §12B.3 records a partial status.
+ 
+-1. **Licence unit.** Proposal: per shop. Options: per owner; per printer computer. **PENDING OWNER APPROVAL.**
++1. **Licence unit. DECIDED (decision 1, owner decision 2026-10-31).** QRquick licences are issued per shop. Each individual shop requires its own licence. A single owner account may manage multiple shops, but licensing one shop does not automatically license the others. Changing the printer computer does not change the licence. Options not chosen: per owner; per printer computer.
+ 2. **Term.** The 12-month paid term is approved as policy (M4). The paid path stays blocked (M5). Renewal: the owner pays again each year, with no automatic renewal (RECOMMENDED; owner confirmation pending). Options: yearly manual renewal; one-time (not recommended, since recurring costs need recurring income). Stacking of an early payment: C-4 (§12B.9). See §14, items 3 and 16.
+ 3. **Price.** Proposal: Option B, ₹1,499 incl. GST, as the starting point. Options: A (₹499 pilot); C (₹2,999); other. **PENDING OWNER APPROVAL.**
+ 4. **GST route.** No option chosen. Options: (a) stay unregistered and charge no GST, only if a CA confirms the exemption applies; (b) register and charge GST on an inclusive price. Input credit: whether a registered shop can claim input credit on the licence depends on QRquick issuing valid GST invoices. This claim is **unsourced** in this draft. Whether QRquick can claim input credit on its own costs, and the reverse-charge treatment of foreign services, are **not modelled**. **PENDING OWNER APPROVAL. CA review required.**
+@@ -825,6 +825,15 @@
+ 
+ ## 13. Revision log
+ 
++### Owner decision 1: licence unit (2026-10-31)
++
++| Item | Change | Where applied |
++|---|---|---|
++| Decision 1 approved | Owner decision recorded: "QRquick licences are issued per shop. Each individual shop requires its own licence. A single owner account may manage multiple shops, but licensing one shop does not automatically license the others. Changing the printer computer does not change the licence." Status DECIDED (no open condition). The §14.0 DECIDED rule now also cites §13 | §9 item 1; §14.0; §14.6 decision 1 |
++| Item 16 | Stays RECOMMENDED, because the renewal rule (decision 2) is still open. The unit no longer blocks 7B | §14.2 item 16; §15.1 owner row; §15.3 7B row and owner-inputs list; §16 Q6 |
++| Counts | Unchanged for items 1–35: 9 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 5 DEFERRED, 0 DECIDED | §14.2 |
++| Not changed | No code, migration, test, production setting or gate approved. Historical log entries are not edited | — |
++
+ ### Owner decisions and correction pass (2026-10-31)
+ 
+ Five owner instructions from 2026-10-31, and the corrections that follow from them. They change statuses and wording only. No gate, setup, migration, test, deployment, production action or commit is approved.
+@@ -1016,7 +1025,7 @@
+ 
+ ### 14.0 Status key and rules
+ 
+-- **DECIDED:** approved by the owner in this file (§12B.2 or §12B.3) with no open condition. Any implementation still needs its own gate. A conditional approval (APPROVED, CONDITIONAL in §14.1) is not DECIDED while its condition is open. Its register status follows the open condition.
++- **DECIDED:** approved by the owner in this file (§12B.2, §12B.3 or §13) with no open condition. Any implementation still needs its own gate. A conditional approval (APPROVED, CONDITIONAL in §14.1) is not DECIDED while its condition is open. Its register status follows the open condition.
+ - **RECOMMENDED:** a proposed default that the owner can confirm or change by written answer.
+ - **DEFERRED:** postponed on purpose. The trigger for reopening is given.
+ - **EXTERNAL BLOCKER:** the next step needs an outside party: a CA, a lawyer, a processor, the production owner, or evidence from a live system.
+@@ -1074,7 +1083,7 @@
+ | 13 | Expiry, grace and the shop-facing view (decisions 7, 18, 19) | RECOMMENDED | A, D | Approved: printing-only enforcement, held queued jobs and no retries while inactive (A, B, C). The "no new customer orders" wording is superseded (C-9). Approved (§12B.2 D): owner-only status with the fields listed there. Open: staff visibility (§12B.2 D); the owner confirms no grace period (decision 18); and the labels, Active or Inactive, with no admin-grant label (decision 19). The Android view is DEFERRED. Reopening trigger for it: a new owner decision to show the licence view in the Android app. The deletion-schedule question under decision 7 sits in item 1. | 7E wording. |
+ | 14 | Manual payments, verification and audit (decision 20; §12A.7; §12B.8) | EXTERNAL BLOCKER | A, C, D | The payment-method list is recommended (UPI direct, bank transfer, cash, cheque, other), but it is DEFERRED with the paid path (M5). A CA advises on GST invoices for manual receipts. A lawyer advises on personal data in audit rows and their retention. | Paid path (M5); any audit-retention job (none approved). |
+ | 15 | Denial and replay retention; denial growth (M3, M8; C-12; decision 20) | EXTERNAL BLOCKER | A, B, E | Approved: detailed denial records capped at 20 per user per hour, with count-only records above the cap (M3, design only). A lawyer reviews the retention periods (90 days for denial records; replay records kept until a safe mechanism exists; M8). Staging measures row growth. The owner accepts the global ceiling (no value is proposed here) and the count-only limitation (C-12). | 7C denial logging; retention in 7C. |
+-| 16 | Licence unit and term (decisions 1, 2; §9 items 1–2) | RECOMMENDED | A | Recommended unit: per shop. It matches the `shop_id` model (§12A.5). A per-owner or per-computer unit would change the 7B data model, so the unit must be confirmed before 7B design. Term: 12 months, approved as policy (M4). Renewal: manual, with no automatic renewal, recommended. §9 item 2 is updated to match M4. | 7B data model (the unit only; the term does not change the schema); paid path (term and renewal). |
++| 16 | Licence unit and term (decisions 1, 2; §9 items 1–2) | RECOMMENDED | A | Unit: DECIDED, per shop (decision 1, owner decision 2026-10-31; §13). Term: 12 months, approved as policy (M4). Renewal (decision 2): manual, with no automatic renewal, RECOMMENDED and still open. The item stays RECOMMENDED until decision 2 is answered. | Paid path (renewal rule). The unit no longer blocks 7B. |
+ | 17 | Processor and gateway (decision 9; §3; §4) | DEFERRED | C, D | The gateway is deferred. §12A.1 records that the owner collects licence payments manually for now. Stripe is invite-only for new Indian businesses (§3, verified). Razorpay India signup is unverified. When the gateway is reopened, processor eligibility evidence and CA advice are needed first. If a named processor is chosen for pricing (item 4), its eligibility evidence and fee basis are needed before pricing; that does not reopen integration. | Gateway work (later stage; §12A.12); the fee basis for pricing if a named processor is chosen (item 4). Reopening trigger: a new owner decision to reopen decision 9. |
+ | 18 | GST route, exemption, input credit, reverse charge, TDS and invoices (decision 4; §10 item 3) | EXTERNAL BLOCKER | C | The CA decides the registration route, the current status of Notification 10/2017-IT, input credit, reverse charge on foreign services, TDS and invoicing. | Pricing tax treatment (I); invoices; paid path. |
+ | 19 | Advisers (decision 11) | RECOMMENDED | A | The owner engages an Indian CA and a lawyer before any paid collection. No engagement is evidenced. The advice itself is an EXTERNAL BLOCKER (items 10, 11, 14, 15, 18, 28, 29, 30). | Paid collection; published terms. |
+@@ -1162,7 +1171,7 @@
+ 
+ | Decision | Topic | Status | Item | Note |
+ |---|---|---|---|---|
+-| 1 | Licence unit (per shop) | RECOMMENDED | 16 | Owner confirms. |
++| 1 | Licence unit (per shop) | DECIDED | 16 | Owner decision 2026-10-31 (§13): QRquick licences are issued per shop. Each individual shop requires its own licence. A single owner account may manage multiple shops, but licensing one shop does not automatically license the others. Changing the printer computer does not change the licence. |
+ | 2 | Term and renewal | RECOMMENDED | 16 | The 12-month term is approved as policy (M4). The renewal rule is recommended. |
+ | 3 | Price (Option B proposal) | EXTERNAL BLOCKER | 4 | No price is approved. First, the CA's tax answer (item 18) and the owner's collection-channel answer (item 4). Then the owner chooses the price and minimum. |
+ | 4 | GST route | EXTERNAL BLOCKER | 18 | CA. |
+@@ -1202,7 +1211,7 @@
+ 
+ | Category | Items and IDs (§14) | Who acts | Can start now? |
+ |---|---|---|---|
+-| Owner confirmation (RECOMMENDED) | Items 3, 6, 7, 8, 12, 13, 16, 19, 20; C-3, C-4, C-5, C-7, C-8, C-12; S-4; decisions 1, 2, 7, 10, 11, 13, 15, 16, 18, 19 | Owner, by written answer | Yes. An answer records a decision and approves no gate |
++| Owner confirmation (RECOMMENDED) | Items 3, 6, 7, 8, 12, 13, 16, 19, 20; C-3, C-4, C-5, C-7, C-8, C-12; S-4; decisions 2, 7, 10, 11, 13, 15, 16, 18, 19 | Owner, by written answer | Yes. An answer records a decision and approves no gate |
+ | Professional advice (EXTERNAL BLOCKER) | Items 1, 4, 10, 14, 15, 18, 28, 29, 30, and the M8 and S-6 parts of 35; C-1, C-11, C-13; decisions 3, 4, 6, 20; the engagement in item 19 | CA or lawyer | No. No engagement is evidenced |
+ | Production-owner verification (read-only unless stated) | Items 5, 25, 27, 31, 34 (closure checks); item 11 (before enforcement activation); item 26 (before a production migration); the item 6 visibility check; C-6, C-14, C-15; decisions 8, 14 | Production owner | Only on the owner's separate request. Read-only. Any change is the owner's decision |
+ | Local or staging setup (separate approval each) | Gate 1 (local setup, Docker, CLI, containers, `supabase init`); staging tests for items 15 (growth), 25 and 33; the R and S tests in §14.4 and §14.7; the item 23 targeted local tests (only after diff review) and staging tests (separate explicit approval); the item 24 tests (after diff review); the M1 tests | Owner approves; engineering runs | No |
+@@ -1232,17 +1241,17 @@
+ | Gate | Scope | Prerequisites | Approval needed | Tests (§12A.11, §12B.11) | Rollback |
+ |---|---|---|---|---|---|
+ | 7A Owner inputs | Decisions 13 to 16 and 18 to 19; owner confirmations for items 6, 7, 8, 13, 16; the production-owner UUID and MFA answers (item 5) | Owner's written answers; production-owner checks | The owner's written answers | None. No code | None needed |
+-| 7B Schema, migration 0011 (staging only) | Licence tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, `shop_licence_meta`. Paid tables excluded if C-5 is confirmed | Gate 1 or staging setup, with 0010 applied to the staging copy under its own approval; the owner inputs listed below the gate table (C-5, item 8, item 16, and the basis ranking in item 7). For tests only: the R15 fixture approach (decision L) and the R17 default-privilege check. Item 26's live list is needed before any production migration, not for staging | Separate approval to create the migration, and a separate approval for each staging run | State, trigger, privilege and regression tests | Drop the 0011 objects on staging. No production rollback plan exists (item 32) |
++| 7B Schema, migration 0011 (staging only) | Licence tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, `shop_licence_meta`. Paid tables excluded if C-5 is confirmed | Gate 1 or staging setup, with 0010 applied to the staging copy under its own approval; the owner inputs listed below the gate table (C-5, item 8, and the basis ranking in item 7; the licence unit in item 16 is decided). For tests only: the R15 fixture approach (decision L) and the R17 default-privilege check. Item 26's live list is needed before any production migration, not for staging | Separate approval to create the migration, and a separate approval for each staging run | State, trigger, privilege and regression tests | Drop the 0011 objects on staging. No production rollback plan exists (item 32) |
+ | 7C Admin RPCs and owner read RPC | Grant, extend, revoke (M2), replace; denial logging (M3); idempotency (R5); owner read (decision D) | 7B on staging; the lock map confirmed by a two-session test (item 33); the global denial ceiling accepted (item 15); the count-only limitation accepted (C-12); item 5; the decision 16 validation inputs (duration, backdating, lifetime owner-only, and maximum custom length, which may be "none", item 7) | Separate approval | Admin, privilege, concurrency and denial-cap tests | Revoke `EXECUTE` on the admin RPCs (needs a migration). This rollback changes no coverage row (§15.5) |
+ | 7D Admin UI, separate private deployment | Login, shop search, grant, extend, revoke, replace with confirmation, audit view; MFA enrolment if decision 14 requires it | 7C on staging; the hosting decision (item 6); the visibility check (item 6); item 5 | Separate approval | Browser smoke test on staging; static scan that no service key is in the bundle | Take the deployment down. No database change, and no coverage row changes (§15.5) |
+ | 7E Owner read-only status, web | Fields as in decision D; labels (item 13); display rule (item 8) | 7C; the label decision (item 13); the display rule (item 8) | Separate approval | Enforcement off returns no fields; enforcement on returns only the D fields; staff denied | Remove the owner status UI. Revoke `EXECUTE` on `shop_licence_status` only if the read RPC must be withdrawn (needs a migration). The rollback changes no coverage row and grants or revokes no licence (§15.5) |
+ | 7F Enforcement, printing only | Gates on approve, retry, claim and `mark_printing` (decisions A, B, C) | 7C and 7E; S-4 accepted (item 35); item 33 lock tests; item 25 tests of both signatures; item 32 kill switch approved; item 1 for the build (C-1 answered, C-3 decided). Before enabling only: item 11 (existing-shop policy); M1 and item 2 (reopened), if C-3 holds enforcement back. Ordering of items 23 and 24 against this build is an owner decision; neither is a prerequisite by default | Separate approval to build, and a separate approval to enable | Printing and checkout tests (§12B.11) | A designed kill switch is needed (item 32). None exists yet |
+ 
+-**Owner inputs needed before the 7B schema can be designed.** Four inputs, and no others:
++**Owner inputs needed before the 7B schema can be designed.** Four inputs, and no others (input 3 is decided):
+ 
+ 1. C-5: exclude `paid_verified` and `licence_payments` from 0011 (owner confirmation, RECOMMENDED). `trial` is also excluded (C-10, deferred).
+ 2. Item 8: C-8 (revoking current coverage does not cancel future coverage), the same-instant tie-break (fix 5) and the exclusive-end display (fix 9). The state function and the revocation trigger depend on them.
+-3. Item 16: the licence unit (per shop, recommended). It sets the `shop_id` model. The term does not change the schema.
++3. Item 16: the licence unit, DECIDED as per shop (decision 1, 2026-10-31). It sets the `shop_id` model. The term does not change the schema.
+ 4. Item 7: the basis ranking of a lifetime grant over an admin grant (§12A.6). M6 covers paid coverage only.
+ 
+ **Not needed for the 7B design:** the maximum custom length, backdating, the durations and lifetime owner-only (7C validation, decision 16); C-7 and the other paid-path items (paid path only); items 1 and 2 (M1 only); item 5 (the admin UUID is inserted by a one-time owner-run row, and the migration must not contain it); decision 13 (the table holds any number of admin rows) and decision 14 (`aal2` is checked in the 7C RPCs); item 26 (its live list is needed before any production migration, not for staging). The R15 fixture approach and the R17 privilege check are needed for 7B tests, not for the design.
+@@ -1291,7 +1300,7 @@
+ | 3 | Is every open ID given one status? | YES | Items 1 to 35, groups A to E, decisions A to L and 1 to 20, M1 to M8, C-1 to C-15, S-1 to S-8 and R1 to R19 are each in §14. |
+ | 4 | Are external blockers identified with their outside party? | YES | The 17 EXTERNAL BLOCKER items in §14.2 name the party. The answers are not in the repository. |
+ | 5 | Are factual claims supported by repository evidence? | PARTLY | Repository facts are re-checked with line numbers (§2, §4, §5C, §12A.2, §12B.4 to §12B.9). Live state, README statements and external sources are labelled and not verified. |
+-| 6 | Is the implementation scope frozen? | NO | 7B waits on C-5, items 8 and 16, the basis-ranking confirmation under item 7, and a staging copy with 0010 applied. Item 26 is needed only before a production migration. 7F build waits on 7C and 7E, on item 1 (C-1 answered, C-3 decided), and on items 25, 32, 33 and S-4. Before enabling only: item 11, and M1 and item 2 if C-3 holds enforcement back. |
++| 6 | Is the implementation scope frozen? | NO | 7B waits on C-5, item 8, the basis-ranking confirmation under item 7, and a staging copy with 0010 applied. The licence unit (item 16) is decided. Item 26 is needed only before a production migration. 7F build waits on 7C and 7E, on item 1 (C-1 answered, C-3 decided), and on items 25, 32, 33 and S-4. Before enabling only: item 11, and M1 and item 2 if C-3 holds enforcement back. |
+ | 7 | Are setup, staging, production and deployment permissions still separate? | YES | §15.2, §15.3 and §15.5. No approval exists for any of them. The main checkout and `stash@{0}` are untouched. |
+ | 8 | Are the Stage 7 closure criteria met? | NO | See §16.1. |
+ 

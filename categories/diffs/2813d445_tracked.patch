@@ -1,0 +1,202 @@
+diff --git a/README.md b/README.md
+index a0ee51b..067248d 100644
+--- a/README.md
++++ b/README.md
+@@ -18,7 +18,7 @@ Android app. Each shop is isolated from every other shop.
+ | 5b. Statistics and payment records | Earnings and revenue (day, week, month, year), order statistics, cancellations, payments (cash or online), popular services, recent activity, CSV export | Built. Migration `0006` is applied to the live project and its 54 database checks pass. The browser check with a mocked backend passes at phone width |
+ | 5c. Shop features and payment QR | Yes/no features (colour printing, double-sided, and six more), payment QR upload, features and payment QR shown to customers | Built. Migrations `0004` and `0005` are in the repo. Browser check with a mocked backend passes. Not re-checked on the live project in this session |
+ | 5d. Android app and installable web app | Capacitor app built in GitHub Actions, and an install-to-home-screen web app | Built, **not yet built or run**. See "What is not verified" |
+-| 6. Local print agent | Simulated printer first, then Windows | Not started |
++| 6. Local print agent | Simulated printer first, then Windows | Simulated printer built and tested locally (`run --simulated-printer`, localhost only, 18 tests). Not run on a real printer, so not hardware-validated. Windows and CUPS adapters unchanged |
+ | 7. Payments and licences | One-time licence checkout, Stripe | Not started (Stripe is installed but not connected) |
+ | 8. Privacy and hardening | Automatic file deletion, rate limits, audit log | Not started. Until this stage, uploaded files are kept until someone removes them by hand |
+ 
+diff --git a/agent/README.md b/agent/README.md
+index 674329d..adc84a5 100644
+--- a/agent/README.md
++++ b/agent/README.md
+@@ -92,6 +92,28 @@ the agent stops with a message to pair again.
+ - `outbox.json` — the agent's own notes about the job it is printing, and results not yet sent.
+   Do not delete it while the agent is running.
+ 
++## Simulated printer (testing only)
++
++`run --simulated-printer` tests the order-to-print path with no printer at all. The agent takes
++jobs and follows the usual rules: the server's approval and payment checks, the lease, the
++"printing" record before anything is sent, and the duplicate-print safeguards. The only
++difference is the adapter. It checks that the file is a PDF, keeps a record in memory and reports
++the job as sent. It never runs CUPS, PowerShell, SumatraPDF or any printer command, and its
++messages say **SIMULATED** and "no paper came out".
++
++- Only `run` has this mode. `printers`, `doctor`, `set-printer` and `test-print` always use the
++  real printing system.
++- It starts only when the server address is `localhost` or `127.0.0.1`. Any other address,
++  including the live server, is refused before any request is made.
++- Its results are written to that test server's database as `sent`, the same as a real job. Use a
++  test database only.
++- The simulated printer takes the name of the fallback printer set on this computer, if there is
++  one. Its log lines still say SIMULATED.
++
++```
++qrquick-print-agent run --simulated-printer
++```
++
+ ## Tests (for developers)
+ 
+ ```
+@@ -99,8 +121,10 @@ cd agent
+ npm test
+ ```
+ 
+-61 unit tests cover: the duplicate-print rules, the printer option parsing for CUPS and
+-PowerShell, the picture-to-PDF wrapper, the CLI and the API client. They do not print anything.
++79 unit tests cover: the duplicate-print rules, the printer option parsing for CUPS and
++PowerShell, the picture-to-PDF wrapper, the CLI, the API client and the simulated printer mode.
++They do not print anything. The simulated-mode tests also check that the simulated printer never
++calls the command runner, and that the live server is refused.
+ 
+ ## Hardware checklist (do this before going live)
+ 
+@@ -132,3 +156,5 @@ Until items 3 to 5 pass, do not describe automatic printing as working.
+ - Paper size is A4 only. Orientation, page ranges, fit-to-page and cropping are not implemented.
+ - No printing confirmation: the agent knows the job was accepted by the printing system, not
+   that paper came out.
++- Simulated mode (`run --simulated-printer`) proves the order path and the agent's bookkeeping
++  only. It says nothing about printer drivers, paper, colour, or double-sided output.
+diff --git a/agent/src/cli.mjs b/agent/src/cli.mjs
+index e2d5464..c1bd996 100644
+--- a/agent/src/cli.mjs
++++ b/agent/src/cli.mjs
+@@ -8,6 +8,7 @@ import { createAgentApi } from './api.mjs';
+ import { configPaths, defaultConfigDir, loadConfig, normaliseServerUrl, saveConfig } from './config.mjs';
+ import { createJournal } from './journal.mjs';
+ import { createPrinterAdapter } from './printers/index.mjs';
++import { createSimulatedAdapter, isLocalTestServer, SIMULATED_PRINTER_NAME } from './printers/simulated.mjs';
+ import { findSumatra } from './printers/windows.mjs';
+ import { runCommand } from './runner.mjs';
+ import { buildSamplePdf } from './sample-page.mjs';
+@@ -24,17 +25,23 @@ Commands:
+   doctor                                 Check the setup and the connection to QRquick
+   test-print                             Print one test page on the chosen printer (uses paper)
+   run                                    Start printing approved orders (keep this running)
++  run --simulated-printer                Testing only: process jobs without a printer. Works
++                                         only against a test server on this computer.
+ 
+ Setup order: pair, printers, set-printer, doctor, test-print, run.
+ `;
+ 
++const SIMULATED_FLAG = '--simulated-printer';
++
+ function platformName(platform) {
+   if (platform === 'win32') return 'windows';
+   if (platform === 'linux') return 'linux';
+   return null;
+ }
+ 
+-function makeAdapter(deps, platform) {
++function makeAdapter(deps, platform, { simulated = false, printerName } = {}) {
++  // Simulated mode never reaches a real adapter, even when one is injected.
++  if (simulated) return createSimulatedAdapter({ printerName: printerName || SIMULATED_PRINTER_NAME });
+   if (deps.adapter) return deps.adapter;
+   const sumatraPath = platform === 'win32' ? findSumatra() : null;
+   return createPrinterAdapter({ platform, run: deps.run ?? runCommand, sumatraPath });
+@@ -184,18 +191,32 @@ async function testPrint(_args, deps, { dir, out, platform }) {
+   return 0;
+ }
+ 
+-async function run(_args, deps, { dir, out, platform }) {
++async function run(args, deps, { dir, out, platform }) {
++  // Any other option is refused, so a typo can never start real printing by accident.
++  const unknown = args.find((arg) => arg !== SIMULATED_FLAG);
++  if (unknown) throw new Error(`Unknown option "${unknown}". Usage: qrquick-print-agent run [${SIMULATED_FLAG}]`);
++  const simulated = args.includes(SIMULATED_FLAG);
++
+   const config = await requireConfig(dir);
++  if (simulated && !isLocalTestServer(config.serverUrl)) {
++    throw new Error(
++      'Simulated printing only works with a test server on this computer (127.0.0.1 or localhost). Nothing was started.',
++    );
++  }
++
+   const api = createAgentApi({ serverUrl: config.serverUrl, token: config.token, fetchImpl: deps.fetchImpl });
+   const worker = createWorker({
+     api,
+-    adapter: makeAdapter(deps, platform),
++    adapter: makeAdapter(deps, platform, { simulated, printerName: config.printer || undefined }),
+     journal: createJournal(configPaths(dir).outbox),
+     download: deps.download,
+     config: { printer: config.printer },
+     log: (line) => out(`${new Date().toISOString()} ${line}`),
+     version: VERSION,
+   });
++  if (simulated) {
++    out('SIMULATED PRINTING: nothing is sent to a printer and no paper comes out. For testing only.');
++  }
+   out(`QRquick print agent ${VERSION} is running for ${config.shopName}. Keep this window open. Press Ctrl+C to stop.`);
+   try {
+     await worker.run();
+diff --git a/agent/src/worker.mjs b/agent/src/worker.mjs
+index b6899ed..7311cb0 100644
+--- a/agent/src/worker.mjs
++++ b/agent/src/worker.mjs
+@@ -287,7 +287,11 @@ export function createWorker({
+       await journal.setActive({ ...jobRef, state: 'submitted', at: now(), spoolerId: result?.spoolerId ?? null });
+       await report(jobRef, 'sent');
+       await journal.clearActive();
+-      log(`${label}: sent to ${printer.name}.`);
++      log(
++        adapter.simulated
++          ? `${label}: SIMULATED on "${printer.name}". No printer was used and no paper came out.`
++          : `${label}: sent to ${printer.name}.`,
++      );
+     } finally {
+       await rm(dir, { recursive: true, force: true });
+     }
+diff --git a/docs/PRINTING_STATUS.md b/docs/PRINTING_STATUS.md
+index 3364b55..a53373f 100644
+--- a/docs/PRINTING_STATUS.md
++++ b/docs/PRINTING_STATUS.md
+@@ -18,6 +18,7 @@ real printer, with the live Supabase project, or in the Android app.** Those ste
+ | Windows agent | Written, **not run on Windows** | SumatraPDF plus PowerShell. Setting names are unverified on a real install. |
+ | Linux agent (CUPS) | Written, **not run on CUPS** | Uses `lpstat`, `lpoptions`, `lp`. |
+ | Sending jobs without duplicates | Built, tested locally | Claim lease, "printing" recorded before the printer gets the file, `needs_check` for uncertain jobs, no automatic reprint. |
++| Simulated printer (testing only) | Built, tested locally | `run --simulated-printer` runs the whole order path with no printer. It works only against `localhost` or `127.0.0.1`, never calls CUPS, PowerShell, SumatraPDF or a printer, and never says paper came out. It does not prove anything about real printers. |
+ | Failure handling | Built, tested locally | Offline printer, unsupported option, spooler error, lost connection, revoked computer, repeated claims. |
+ | Owner retry | Built, tested locally | Failed jobs can be printed again. Jobs that may have printed need confirmation. |
+ | Print options | Partial | Copies, colour, double-sided and A4 are applied and refused when the printer cannot do them. Orientation, page range, fit-to-page, cropping and the customer's paper choice are **not** built. |
+@@ -40,7 +41,11 @@ real printer, with the live Supabase project, or in the Android app.** Those ste
+ - `supabase/tests/print_agent_api_checks.test.js`: 7 of 7 static checks on the print-agent function
+   (code normalisation, hashing, token handling, no database text in responses, rate limits).
+   These read the source; the function itself was **not executed**.
+-- **Desktop agent (`agent/`)**: 61 of 61 unit tests, using fake printers and a fake server.
++- **Desktop agent (`agent/`)**: 79 of 79 unit tests, using fake printers and a fake server. That is
++  61 from before, plus 18 for the simulated printer mode.
++- **Simulated mode, guard check**: the localhost guard and the simulated-adapter choice were each
++  broken on purpose, one at a time. Each break made a test fail, and the code was restored and
++  compared byte for byte after each one.
+ - **Web app (`web/`)**: `npm test`, 124 of 124 pass, including 10 new tests for the printing helpers
+   and API calls.
+ 
+@@ -78,6 +83,9 @@ browser, and the Android APK build (the build runs only in GitHub Actions).
+ - A real paper-size check on Windows.
+ - Repeat the review of the file-link and retention code with a timestamp simulation.
+ - Browser test of the owner screens (the Playwright smoke suite needs its own install).
++- Simulated results are stored on the test server as `sent`, the same as a real job. The database
++  cannot tell them apart. A server-side simulated flag would fix this, but it needs a migration and
++  an explicit decision, so it is not built.
+ 
+ ## Files added or changed in this round
+ 
+@@ -94,3 +102,12 @@ browser, and the Android APK build (the build runs only in GitHub Actions).
+ - `web/tests/print-logic.test.js` (new); `web/tests/orders.test.js` (select string updated);
+   `web/package.json` (test list)
+ - `docs/PRINTING_STATUS.md` (this file)
++
++## Stage 6 round: simulated printer (branch `stage6-simulated-printer`)
++
++- `agent/src/printers/simulated.mjs` (new): the simulated adapter and the localhost-only check
++- `agent/src/cli.mjs`: `run --simulated-printer` flag, refused for any other server address
++- `agent/src/worker.mjs`: one log line says SIMULATED when the adapter is simulated
++- `agent/test/simulated.test.mjs` (new): 18 tests
++- `agent/README.md`, `docs/PRINTING_STATUS.md`: this section and the simulated-mode notes
++- No database migration, no Supabase change, no change to the live server, the APK or GitHub Pages

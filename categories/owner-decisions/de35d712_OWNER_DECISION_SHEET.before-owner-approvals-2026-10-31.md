@@ -1,0 +1,125 @@
+# Stage 7 owner decision sheet
+
+**Status: documentation only.** Prepared 2026-10-31 from `STAGE7_DECISIONS.md` (four-issue resolution). This sheet approves nothing. It is not an approval of any decision, gate, setup, migration, test, price or external action. It proposes no price and sets no default. Nothing here has been checked against production.
+
+**How to answer:** for each row, reply Accept, Change, Reject or Defer, in your own words. "Claude suggests" is a suggestion, not a decision.
+
+**IDs:** D = decision (§14.6); item = numbered item (§14.2); C = conflict (§14.3); S = security finding (§14.4); M = milestone (§14.5). Section numbers refer to `STAGE7_DECISIONS.md`.
+
+## 1. Decide now (owner only)
+
+| ID | Decision | File status | Claude suggests | Consequence |
+|---|---|---|---|---|
+| D2 | Term and renewal | RECOMMENDED | Manual renewal each year, with no automatic renewal | The owner pays each year. Nothing is charged automatically. The paid path stays blocked (M5). |
+| D13 | Admin accounts | RECOMMENDED | One owner admin. Each extra admin needs an owner-run SQL row | The admin UUID is needed (section 3). |
+| D15 | Admin UI hosting | RECOMMENDED | A separate private deployment, not linked from the shop app and not on the public GitHub Pages site | 7D needs the hosting decision and a visibility check (item 6). |
+| D16 | Grant limits | RECOMMENDED (7C validation) | Backdating only with explicit confirmation. Lifetime owner-only. Maximum custom length: the owner sets it, or chooses "none". No value is proposed here | These are 7C validation inputs. They do not change the 7B schema. |
+| D18 | Grace period | RECOMMENDED | No grace period (the file's proposal) | Access ends at the stated end date. |
+| D19 | Shop-facing licence view | RECOMMENDED | Active or Inactive, with the expiry date. No admin-grant label. Never show reasons, actor IDs or payment references | Sets the 7E wording. Needed before 7E. |
+| D12 | Premium features | DEFERRED | None for now. Option C has no defined value (item 21) | No tier logic is built. |
+| D11 | Advisers | RECOMMENDED | Engage an Indian CA and a lawyer before any paid collection | Their advice is needed for the external blockers in section 5. |
+| D10 | Stage 6 merge order | RECOMMENDED | No view given here. Decide whether `stage6-simulated-printer` (885d28b) is merged before Stage 7 is rebased | Affects rebase order only. This sheet does not merge anything. |
+| S-4 | Residual 180-second file-link window | RECOMMENDED | Accept it, or reduce it before the 7F build | S-4 is a 7F build prerequisite. |
+| Item 2 | Deferral from Stage 7 closure | Proposed in §16.1(e) | Accept the deferral | Closure no longer waits on the hold-start choice. Item 2 is needed for enabling only if C-3 holds enforcement back. |
+| Closure reading | Enabling is not a closure requirement | Proposed in §16.1(e) | Accept | Enabling stays a separate 7F approval. Without this, closure would wait on enabling. |
+
+## 2. Decide before 7B design
+
+| ID | Decision | File status | Claude suggests | Consequence |
+|---|---|---|---|---|
+| C-5 | Keep `paid_verified`, `licence_payments` and `trial` out of 0011 | RECOMMENDED (trial: C-10, DEFERRED) | Accept | 0011 has no paid tables. Paid tables come later, under their own gate. |
+| Item 8 (C-8, fixes 5 and 9) | Revoking current coverage does not cancel future coverage. A same-instant tie gives REVOKED. The exclusive end is displayed | RECOMMENDED | Accept all three | The 7B state function and revocation trigger depend on them. |
+| Item 16 | Licence unit | RECOMMENDED: per shop | Per shop | A per-owner or per-computer unit would change the 7B data model. |
+| Item 7 | Basis ranking: lifetime grant over admin grant (§12A.6) | RECOMMENDED; not separately confirmed | Confirm the ranking | Sets the order in the 7B state function. M6 covers paid coverage only. |
+
+Not needed before 7B design (§15.3): item 5 and decisions 13 to 15; C-6; C-1; C-3; maximum custom length, backdating and durations (7C); C-7 and the other paid-path items; items 1 and 2 (M1 only); item 26 (needed only before a production migration).
+
+## 3. Decide before or during 7C to 7F
+
+| ID | Decision | Needed before | Claude suggests | Consequence |
+|---|---|---|---|---|
+| Item 5 and D14 | Production-owner evidence: the admin Auth user UUID (never inferred) and the MFA status. Whether `aal2` is required for admin RPCs | 7A, 7C, 7D | Require `aal2` for admin RPCs. The production owner supplies the UUID | 7A cannot finish without the UUID and the MFA status. |
+| Item 15, C-12 | Global denial ceiling value. Accept count-only records above the cap | 7C | Choose the ceiling after staging measures row growth. No value is proposed here | Sets the denial-log growth and the retention load. |
+| C-3 (item 1) | Held files accepted as an interim, or enforcement held back. Decided after the lawyer's C-1 answer | 7F build | Hold enforcement back until the C-1 answer and an M1 limit, or an equivalent, are decided. M1 (the 7-day held-job rule) is a proposal, not approved | Accept interim: held files are not purged while held (0010 lines 795–798), so this needs the owner's written acceptance. Hold back: enabling waits for M1 and item 2. |
+| Item 11 (C-14) | Existing-shop count N and free-period policy | Enabling enforcement | No free-year promise and no term extension until N is known (the file's position) | Enabling waits for N, which the production owner counts (excluding test rows), and for a lawyer's review of the 30-day notice. |
+
+## 4. Paid path and gateway (blocked or deferred)
+
+| ID | Status | Claude suggests | Consequence |
+|---|---|---|---|
+| D3 price | EXTERNAL BLOCKER (blocked) | No price is recommended here. The options in §9 item 3 are the file's proposals, not approved | No price is shown or charged. Items 18 and 4 come first. |
+| Item 4 collection channel | EXTERNAL BLOCKER | Decide after the CA's tax answer. Manual collection or a named processor: no view until the fee basis is known | Needed before pricing. |
+| D9 gateway | DEFERRED | Keep deferred | No gateway work. Reopening needs a new owner decision, processor eligibility evidence and CA advice. |
+| Item 3 (C-4) stacking | RECOMMENDED | Confirm that paid terms do not overlap | Paid path only. |
+| Item 7 (C-7) | RECOMMENDED | Confirm that a valid paid period stays in force after a lifetime revocation (M6) | Paid path only. |
+| Item 10 refunds (C-11) | EXTERNAL BLOCKER | The lawyer reviews first, then the owner decides | Refund tests and the paid path wait. |
+| D17 standalone revocation | DEFERRED | Keep deferred with the paid path | Reversal (H) and refusal after the natural end (M2) stay approved. |
+| Item 14 payment methods (D20) | DEFERRED with M5 | The file's proposed list: UPI direct, bank transfer, cash, cheque, other | Paid path only. |
+| M5 paid-path block | DECIDED (blocking condition) | Keep the block. A separate M5 approval names the scope later | No paid coverage can be recorded until then. |
+
+## 5. External blockers (evidence needed, by party)
+
+| Party | Evidence needed | Unblocks |
+|---|---|---|
+| CA | Tax route (D4, item 18): registration, status of Notification 10/2017-IT, input credit, reverse charge on foreign services, TDS and invoicing. GST invoices for manual receipts (item 14) | Pricing tax treatment (I), invoices, the paid path |
+| Lawyer | Release rule and held-file retention (C-1, item 1). Customer-document sensitivity and DPDP applicability (item 30) | M1; C-3; enabling; retention rules |
+| Lawyer | Refund policy (item 10) | Refund tests; the paid path |
+| Lawyer | Retention periods: 90 days for denial records and replay records (item 15, M8). User IDs in ledgers (S-6). Personal data in audit rows (item 14) | 7C logging; audit rules |
+| Lawyer | Privacy policy, terms, consent and takedown text (item 29). Google Play policy (item 28). The 30-day notice (item 11) | Published terms; any Android licence payment; existing-shop terms |
+| Production owner | Admin Auth user UUID (never inferred) and MFA status (item 5) | 7A; the bootstrap row; 7C and 7D |
+| Production owner | Shop count N, excluding test rows (item 11; README lines 395–405) | Enabling; existing-shop terms |
+| Production owner | Live function signatures and grants, read-only (item 25) | The checkout-unaffected test; 7F |
+| Production owner | Applied migrations, read-only (item 26) | Any production application of 0010 or 0011 |
+| Production owner | Whether `cleanup-files` is deployed, whether its secrets are set (not their values), and its recent runs (item 27) | Any claim that the purge runs (§5C, §8) |
+| Production owner | Live leaked-password protection, Site URL, SMTP and MFA settings (item 31). Whether `demo_seed` ever ran on live (item 34). Repository visibility and plan (item 6) | MFA decision; configuration; shop count; 7D hosting |
+| Processor (only if one is named) | Eligibility evidence. Stripe is invite-only for new Indian businesses (§3). Razorpay India signup is unverified (§4) | Fee basis for pricing only |
+
+## 6. Printing defects 23 and 24: separate technical approvals
+
+Neither fix is approved. Neither is a 7A to 7F gate prerequisite (§15.3). Stage 7 closure does require both to be closed (§16.1(e)). The investigation under K is approved. Each fix needs diff review under M7.
+
+**Item 23, duplicate print.** Confirmed from code, not reproduced (§14.2 item 23, §12B.4). Scope: the body of `retry_print_job` only (§15.3). Proposed rule: refuse if a sibling job is `sent`; keep the latest-attempt rule; failed and confirmed `needs_check` jobs stay retryable.
+- Steps: (1) staging tests, which need their own approval (§15.5); (2) diff review (M7); (3) a separate implementation approval.
+- Claude suggests: approve the staging tests now. Do not approve the implementation until the diff has been reviewed.
+
+**Item 24, refund and claim.** Confirmed from code, not reproduced (§14.2 item 24, §12B.4). The defect (S-8): a refunded order's queued jobs can still be claimed for printing. Options:
+- R-a: mark the order's queued jobs `failed` with a reason on refund or on the ready or completed transition. Changes the bodies of `set_order_payment` (0006) and the order status path, and touches the customer payment ledger. The file recommends R-a, subject to the diff.
+- R-b: add a `cancelled` job status. A schema change, plus the same body changes.
+- R-c: claim-side eligibility only. Ineligible jobs stay `queued` and pin their files (0010 lines 795–798). Not acceptable without a retention decision (C-1).
+- Steps: (1) diff review; (2) the owner chooses R-a, R-b or R-c; (3) a separate approval.
+- Claude suggests: review the R-a diff, and a test that a refunded order's files are not claimed, before any choice.
+
+## 7. Gate summary (matches §15.3)
+
+| Gate | Owner input | External evidence | Approval |
+|---|---|---|---|
+| 7A owner inputs | Decisions 13 to 16 and 18 to 19. Confirmations for items 6, 7, 8, 13 and 16 | Production owner: UUID and MFA status (item 5) | Owner's written answers |
+| 7B schema, staging only | C-5; item 8; item 16; item 7 basis ranking | None for staging. A production migration needs item 26 | Separate approval to create 0011, and one per staging run |
+| 7C admin RPCs | 7B on staging; the item 15 ceiling; C-12; decision 16 inputs | Item 5; item 33 lock-map tests | Separate approval |
+| 7D admin UI | 7C on staging; hosting (D15) | Item 6 visibility check; item 5 | Separate approval |
+| 7E owner status | 7C; labels (D19, item 13); display rule (item 8) | None | Separate approval |
+| 7F build | 7C and 7E; S-4; C-1 answered and C-3 decided (item 1) | Items 25, 32 and 33 | Separate approval |
+| 7F enabling | Item 11; M1 and item 2, if C-3 holds enforcement back | Item 11 count (production owner); lawyer's review of the notice | Separate approval |
+
+## 8. Deferred (no action until reopened)
+
+- Trial (D5, item 9): reopen only by a new owner decision.
+- Gateway (D9, item 17).
+- Standalone paid revocation (D17, item 8).
+- Premium features (D12, item 21).
+- Maximum custom length (item 7): until the owner sets it.
+- Custom SMTP (item 22): before production sign-up volume.
+- Purge capacity change (item 27): when growth needs it, beyond about 3,000 shops. Separate approval.
+- Configuration versioning (item 31): until local setup is approved.
+- Android view (item 13).
+- Deleting the test rows (item 34): needs an explicit owner go-ahead.
+
+## 9. Already decided (reference only)
+
+These are recorded in the file. Nothing here is new.
+- A (printing-only enforcement), C (retries blocked while inactive), D (minimal owner status), F, H and J (approved; paid parts blocked with M5), G (SCHEDULED state), E (approved for design; enabling blocked, under item 11).
+- M2 (refusal after the natural end), M3 (denial design, cap of 20 per user per hour; the build is gate 7C), M4 (custom-grant convention and the 12-month term; paid term blocked by M5), M5 (paid-path block), M6 (lifetime over paid, as policy), M7 (review required for both printing fixes), M8 (policy approved; legal review needed before periods are fixed).
+- B is APPROVED, CONDITIONAL on C-1 and C-3. Its register status is EXTERNAL BLOCKER, not DECIDED.
+- M1 is a proposal, not approved.
+
+**Known mismatch, not changed:** §9 item 5 (trial) says PENDING OWNER APPROVAL, while decision 5 is DEFERRED. The owner should choose the wording.

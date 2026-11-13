@@ -1,0 +1,1349 @@
+diff --git a/README.md b/README.md
+index a0ee51b..59b588d 100644
+--- a/README.md
++++ b/README.md
+@@ -18,7 +18,7 @@ Android app. Each shop is isolated from every other shop.
+ | 5b. Statistics and payment records | Earnings and revenue (day, week, month, year), order statistics, cancellations, payments (cash or online), popular services, recent activity, CSV export | Built. Migration `0006` is applied to the live project and its 54 database checks pass. The browser check with a mocked backend passes at phone width |
+ | 5c. Shop features and payment QR | Yes/no features (colour printing, double-sided, and six more), payment QR upload, features and payment QR shown to customers | Built. Migrations `0004` and `0005` are in the repo. Browser check with a mocked backend passes. Not re-checked on the live project in this session |
+ | 5d. Android app and installable web app | Capacitor app built in GitHub Actions, and an install-to-home-screen web app | Built, **not yet built or run**. See "What is not verified" |
+-| 6. Local print agent | Simulated printer first, then Windows | Not started |
++| 6. Local print agent | Simulated printer first, then Windows | Offline simulation built and tested locally (`simulate` command: no network, no printer, 35 tests). Not run on a real printer, so not hardware-validated. Windows and CUPS adapters unchanged |
+ | 7. Payments and licences | One-time licence checkout, Stripe | Not started (Stripe is installed but not connected) |
+ | 8. Privacy and hardening | Automatic file deletion, rate limits, audit log | Not started. Until this stage, uploaded files are kept until someone removes them by hand |
+ 
+diff --git a/agent/README.md b/agent/README.md
+index 674329d..4f12c47 100644
+--- a/agent/README.md
++++ b/agent/README.md
+@@ -92,6 +92,54 @@ the agent stops with a message to pair again.
+ - `outbox.json` — the agent's own notes about the job it is printing, and results not yet sent.
+   Do not delete it while the agent is running.
+ 
++## Simulated printing (testing only)
++
++`qrquick-print-agent simulate` runs the order-to-print steps with no server and no printer. It
++works fully offline:
++
++- It reads no saved server address or token, and it makes no network request. A test can block
++  the network and the command still works.
++- Jobs come from a local JSON file, or from a built-in scenario when no file is given. Files are
++  read only from the folder that holds the JSON file.
++- The steps are the agent's own: the lease, "printing" recorded before anything is sent, and the
++  duplicate-print safeguards. The in-memory server follows the same job rules as the QRquick
++  database (migration `0010`). A test checks that those rules still match the migration.
++- Only approved and paid orders can be simulated, as on the real server. One unpaid or
++  unapproved job stops the whole file before anything runs.
++- Jobs already printing or needing a check are never claimed or printed again.
++- The printer is the simulated one. It never runs CUPS, PowerShell, SumatraPDF or any printer
++  command. Its messages say **SIMULATED** and "no paper came out".
++
++```
++qrquick-print-agent simulate
++qrquick-print-agent simulate my-test-jobs.json
++```
++
++A fixture file looks like this. `file` is a name inside the same folder:
++
++```json
++{
++  "jobs": [
++    {
++      "job_id": "sim-0001",
++      "attempt": 1,
++      "state": "queued",
++      "approved": true,
++      "paid": true,
++      "file": "menu.pdf",
++      "settings": { "copies": 1, "colour": false, "duplex": false, "paper": "A4" },
++      "printer": null
++    }
++  ]
++}
++```
++
++`state` can be `queued` (the job is printed), `printing` or `needs_check` (the job is left alone).
++
++`run --simulated-printer` is refused. It used to run against a server, and a server connected to
++the production database would have recorded simulated jobs as sent, or taken real orders. It
++now stops before reading any saved setting, so no simulated run can reach a server.
++
+ ## Tests (for developers)
+ 
+ ```
+@@ -99,8 +147,11 @@ cd agent
+ npm test
+ ```
+ 
+-61 unit tests cover: the duplicate-print rules, the printer option parsing for CUPS and
+-PowerShell, the picture-to-PDF wrapper, the CLI and the API client. They do not print anything.
++96 unit tests cover: the duplicate-print rules, the printer option parsing for CUPS and
++PowerShell, the picture-to-PDF wrapper, the CLI, the API client, the simulated printer, and the
++offline simulation. They do not print anything. The simulation tests block the network, check that
++the real printer adapter is never called, and check that a run that never ends stops at its safety
++limit.
+ 
+ ## Hardware checklist (do this before going live)
+ 
+@@ -132,3 +183,6 @@ Until items 3 to 5 pass, do not describe automatic printing as working.
+ - Paper size is A4 only. Orientation, page ranges, fit-to-page and cropping are not implemented.
+ - No printing confirmation: the agent knows the job was accepted by the printing system, not
+   that paper came out.
++- Simulated printing (`simulate`) checks the agent's steps and the job rules only. It says nothing
++  about printer drivers, paper, colour, or double-sided output. It never contacts QRquick, so it
++  does not test the live server or database.
+diff --git a/agent/src/cli.mjs b/agent/src/cli.mjs
+index e2d5464..c295c08 100644
+--- a/agent/src/cli.mjs
++++ b/agent/src/cli.mjs
+@@ -1,13 +1,14 @@
+ // Command-line front end for the agent. Each command returns an exit code and never
+ // prints the agent's token.
+ 
+-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
++import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+ import os from 'node:os';
+ import path from 'node:path';
+ import { createAgentApi } from './api.mjs';
+ import { configPaths, defaultConfigDir, loadConfig, normaliseServerUrl, saveConfig } from './config.mjs';
+ import { createJournal } from './journal.mjs';
+ import { createPrinterAdapter } from './printers/index.mjs';
++import { builtInFixture, readFixtureJobs, runSimulation, SAMPLE_FILE_NAME, SIMULATION_BANNER } from './simulation.mjs';
+ import { findSumatra } from './printers/windows.mjs';
+ import { runCommand } from './runner.mjs';
+ import { buildSamplePdf } from './sample-page.mjs';
+@@ -24,10 +25,14 @@ Commands:
+   doctor                                 Check the setup and the connection to QRquick
+   test-print                             Print one test page on the chosen printer (uses paper)
+   run                                    Start printing approved orders (keep this running)
++  simulate [fixture.json]                Testing only: run the print steps offline. Contacts no
++                                         server and uses no printer. Nothing is printed.
+ 
+ Setup order: pair, printers, set-printer, doctor, test-print, run.
+ `;
+ 
++const SIMULATED_FLAG = '--simulated-printer';
++
+ function platformName(platform) {
+   if (platform === 'win32') return 'windows';
+   if (platform === 'linux') return 'linux';
+@@ -184,7 +189,17 @@ async function testPrint(_args, deps, { dir, out, platform }) {
+   return 0;
+ }
+ 
+-async function run(_args, deps, { dir, out, platform }) {
++async function run(args, deps, { dir, out, platform }) {
++  // Simulated printing is the offline "simulate" command. This refusal happens before any saved
++  // setting is read, so a simulated run can never reach a server.
++  if (args.includes(SIMULATED_FLAG)) {
++    throw new Error(
++      'Simulated printing is now the "simulate" command. It works offline and never contacts QRquick. Nothing was started.',
++    );
++  }
++  // Any other option is refused, so a typo can never start real printing by accident.
++  if (args.length > 0) throw new Error(`Unknown option "${args[0]}". Usage: qrquick-print-agent run`);
++
+   const config = await requireConfig(dir);
+   const api = createAgentApi({ serverUrl: config.serverUrl, token: config.token, fetchImpl: deps.fetchImpl });
+   const worker = createWorker({
+@@ -209,7 +224,52 @@ async function run(_args, deps, { dir, out, platform }) {
+   return 0;
+ }
+ 
+-const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run };
++const MAX_FIXTURE_BYTES = 1024 * 1024;
++
++// Offline testing. It reads no saved server address or token and contacts no server. With no
++// file, it runs a built-in scenario that writes a sample PDF into a temporary folder.
++async function simulate(args, _deps, { out }) {
++  if (args.length > 1) throw new Error('Usage: qrquick-print-agent simulate [fixture.json]');
++  let fixtureDir;
++  let data;
++  let tempDir = null;
++  try {
++    if (args.length === 0) {
++      tempDir = await mkdtemp(path.join(os.tmpdir(), 'qrquick-simulate-'));
++      fixtureDir = tempDir;
++      await writeFile(path.join(fixtureDir, SAMPLE_FILE_NAME), buildSamplePdf(['QRquick simulation', 'Nothing is printed.']));
++      data = builtInFixture();
++    } else {
++      const file = path.resolve(args[0]);
++      const info = await stat(file).catch(() => null);
++      if (!info) throw new Error(`Could not open "${args[0]}".`);
++      if (info.size > MAX_FIXTURE_BYTES) throw new Error('The fixture file is larger than 1 MB. Nothing was simulated.');
++      try {
++        data = JSON.parse(await readFile(file, 'utf8'));
++      } catch {
++        throw new Error(`"${args[0]}" is not a valid JSON file. Nothing was simulated.`);
++      }
++      fixtureDir = path.dirname(file);
++    }
++
++    // Any problem in the file stops everything here, before the simulation starts.
++    const jobs = readFixtureJobs(data, fixtureDir);
++    out(SIMULATION_BANNER);
++    const { records } = await runSimulation({ jobs, fixtureDir, out, version: VERSION });
++    const simulated = records.filter((r) => r.state === 'sent').length;
++    const refused = records.filter((r) => r.state === 'failed').length;
++    const leftAlone = records.length - simulated - refused;
++    out(
++      `Simulation finished. Simulated: ${simulated}. Refused: ${refused}. ` +
++        `Left alone (already printing or needing a check): ${leftAlone}. Nothing was printed and nothing was sent to QRquick.`,
++    );
++    return 0;
++  } finally {
++    if (tempDir) await rm(tempDir, { recursive: true, force: true });
++  }
++}
++
++const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run, simulate };
+ 
+ // Entry point. deps are for tests: dir, platform, out, fail, fetchImpl, run, adapter, download, computerName.
+ export async function main(argv, deps = {}) {
+diff --git a/agent/src/worker.mjs b/agent/src/worker.mjs
+index b6899ed..1d87863 100644
+--- a/agent/src/worker.mjs
++++ b/agent/src/worker.mjs
+@@ -257,8 +257,15 @@ export function createWorker({
+       try {
+         await api.markPrinting(jobRef);
+       } catch (err) {
+-        // Nothing has been sent to the printer. The server requeues the job when the lease ends,
+-        // or it has already moved on. Do not report a failure: that would invite a reprint.
++        // The printer has not been given the file. Do not report a failure: if the server did record
++        // "printing", a failure report would invite a reprint. The agent cannot tell which of these
++        // happened, so it leaves the job to the server:
++        //   - The "printing" request never reached the server. The job stays "claimed". Once the claim
++        //     lease ends, the server requeues it the next time any computer in this shop sends a
++        //     heartbeat or asks for work (or fails it after repeated claims).
++        //   - The server recorded "printing", but its reply was lost. If no "sent" or "failed" report
++        //     arrives before the printing lease ends, the server moves the job to "needs_check" for the
++        //     owner to decide. It is never requeued automatically.
+         await journal.clearActive();
+         log(`${label}: not printed. The server did not confirm the start (${err.code ?? 'error'}).`);
+         return;
+@@ -287,7 +294,11 @@ export function createWorker({
+       await journal.setActive({ ...jobRef, state: 'submitted', at: now(), spoolerId: result?.spoolerId ?? null });
+       await report(jobRef, 'sent');
+       await journal.clearActive();
+-      log(`${label}: sent to ${printer.name}.`);
++      log(
++        adapter.simulated
++          ? `${label}: SIMULATED on "${printer.name}". No printer was used and no paper came out.`
++          : `${label}: sent to ${printer.name}.`,
++      );
+     } finally {
+       await rm(dir, { recursive: true, force: true });
+     }
+diff --git a/docs/PRINTING_STATUS.md b/docs/PRINTING_STATUS.md
+index 3364b55..b5102a8 100644
+--- a/docs/PRINTING_STATUS.md
++++ b/docs/PRINTING_STATUS.md
+@@ -18,6 +18,7 @@ real printer, with the live Supabase project, or in the Android app.** Those ste
+ | Windows agent | Written, **not run on Windows** | SumatraPDF plus PowerShell. Setting names are unverified on a real install. |
+ | Linux agent (CUPS) | Written, **not run on CUPS** | Uses `lpstat`, `lpoptions`, `lp`. |
+ | Sending jobs without duplicates | Built, tested locally | Claim lease, "printing" recorded before the printer gets the file, `needs_check` for uncertain jobs, no automatic reprint. |
++| Simulated printing (testing only) | Built, tested locally | `qrquick-print-agent simulate` runs the order steps offline, from a local file. It makes no network request, never calls CUPS, PowerShell, SumatraPDF or a printer, and never says paper came out. It does not test the live server or database, or real printers. |
+ | Failure handling | Built, tested locally | Offline printer, unsupported option, spooler error, lost connection, revoked computer, repeated claims. |
+ | Owner retry | Built, tested locally | Failed jobs can be printed again. Jobs that may have printed need confirmation. |
+ | Print options | Partial | Copies, colour, double-sided and A4 are applied and refused when the printer cannot do them. Orientation, page range, fit-to-page, cropping and the customer's paper choice are **not** built. |
+@@ -40,7 +41,11 @@ real printer, with the live Supabase project, or in the Android app.** Those ste
+ - `supabase/tests/print_agent_api_checks.test.js`: 7 of 7 static checks on the print-agent function
+   (code normalisation, hashing, token handling, no database text in responses, rate limits).
+   These read the source; the function itself was **not executed**.
+-- **Desktop agent (`agent/`)**: 61 of 61 unit tests, using fake printers and a fake server.
++- **Desktop agent (`agent/`)**: 96 of 96 unit tests, using fake printers and a fake server. That is
++  61 from before, plus 14 for the simulated printer and 21 for the offline simulation.
++- **Simulation guard check**: five safety guards were each disabled on purpose, one at a time. Each
++  one made specific tests fail within seconds, and none hung. The file was restored and compared
++  byte for byte after each run.
+ - **Web app (`web/`)**: `npm test`, 124 of 124 pass, including 10 new tests for the printing helpers
+   and API calls.
+ 
+@@ -78,6 +83,12 @@ browser, and the Android APK build (the build runs only in GitHub Actions).
+ - A real paper-size check on Windows.
+ - Repeat the review of the file-link and retention code with a timestamp simulation.
+ - Browser test of the owner screens (the Playwright smoke suite needs its own install).
++- Simulation never contacts a server, so it cannot write to the database. A server-side simulated
++  flag was considered and not built. It would not stop a localhost server connected to production
++  from writing rows, so it does not address this risk. It would need a migration and an explicit
++  decision in any case.
++- The live server and database rules (migration 0010) have not been run here. The offline
++  simulation follows the same rules, and a test checks that the migration still states them.
+ 
+ ## Files added or changed in this round
+ 
+@@ -94,3 +105,16 @@ browser, and the Android APK build (the build runs only in GitHub Actions).
+ - `web/tests/print-logic.test.js` (new); `web/tests/orders.test.js` (select string updated);
+   `web/package.json` (test list)
+ - `docs/PRINTING_STATUS.md` (this file)
++
++## Stage 6 round: simulated printer (branch `stage6-simulated-printer`)
++
++- `agent/src/simulation.mjs` (new): the offline `simulate` steps, fixture checks and the in-memory
++  server that follows migration 0010's job rules
++- `agent/src/printers/simulated.mjs` (new): the simulated adapter (the localhost check was removed)
++- `agent/src/cli.mjs`: the `simulate` command; `run --simulated-printer` is now refused before any
++  setting is read; `makeAdapter` is back to its original form
++- `agent/src/worker.mjs`: one log line says SIMULATED when the adapter is simulated
++- `agent/test/simulated.test.mjs` (new, 14 tests): the simulated printer and worker steps
++- `agent/test/simulation.test.mjs` (new, 21 tests): offline simulation, fixture checks, safety limit, CLI
++- `agent/README.md`, `docs/PRINTING_STATUS.md`, `README.md`: simulation notes
++- No database migration, no Supabase change, no change to the live server, the APK or GitHub Pages
+diff --git a/agent/src/printers/simulated.mjs b/agent/src/printers/simulated.mjs
+new file mode 100644
+index 0000000..3b226ae
+--- /dev/null
++++ b/agent/src/printers/simulated.mjs
+@@ -0,0 +1,65 @@
++// A simulated printer, for testing the order-to-print steps without hardware.
++//
++// It never runs a program and never talks to a printer or to the printing system, so it does
++// not import the command runner. It is used only by the offline "simulate" command (see
++// ../simulation.mjs), which never contacts a server. Its results say "simulated" in every
++// message and id, so they cannot be mistaken for paper that came out.
++
++import { readFile } from 'node:fs/promises';
++
++export const SIMULATED_PRINTER_NAME = 'SIMULATED printer (no paper)';
++export const SIMULATED_SPOOLER_PREFIX = 'simulated-';
++
++// Same shape as the real adapters: platform, acceptsImages, listPrinters(), print({...}).
++// Each print gets the next id in sequence, so results are deterministic within one run.
++export function createSimulatedAdapter({
++  printerName = SIMULATED_PRINTER_NAME,
++  enabled = true,
++  colour = true,
++  duplex = true,
++  papers = ['A4'],
++} = {}) {
++  let sequence = 0;
++  const prints = []; // one record per accepted job; tests and the simulation read it
++
++  return {
++    platform: 'simulated',
++    simulated: true,
++    // Pictures are turned into PDF first, as on Windows, so that path is exercised too.
++    acceptsImages: false,
++    prints,
++
++    async listPrinters() {
++      return [
++        {
++          name: printerName,
++          isDefault: true,
++          enabled,
++          capabilitiesKnown: true,
++          colour,
++          duplex,
++          papers: [...papers],
++        },
++      ];
++    },
++
++    async print({ printer, file, copies, colour: wantColour, duplex: wantDuplex, paper, title }) {
++      if (printer !== printerName) {
++        const err = new Error(`The simulated printer is "${printerName}", not "${printer}".`);
++        err.code = 'printer_not_found';
++        throw err;
++      }
++      // A real spooler needs a PDF. Refuse anything else the same way.
++      const head = (await readFile(file)).subarray(0, 5).toString('latin1');
++      if (head !== '%PDF-') {
++        const err = new Error('The simulated spooler only accepts PDF files.');
++        err.code = 'spooler_error';
++        throw err;
++      }
++      sequence += 1;
++      const spoolerId = `${SIMULATED_SPOOLER_PREFIX}${sequence}`;
++      prints.push({ spoolerId, printer, copies, colour: wantColour, duplex: wantDuplex, paper, title });
++      return { spoolerId, simulated: true };
++    },
++  };
++}
+diff --git a/agent/src/simulation.mjs b/agent/src/simulation.mjs
+new file mode 100644
+index 0000000..2b52613
+--- /dev/null
++++ b/agent/src/simulation.mjs
+@@ -0,0 +1,259 @@
++// Offline simulation for testing the order-to-print steps without a printer.
++//
++// This module never contacts QRquick. Jobs come from a local fixture file, the "server" is an
++// in-memory copy of the server's job rules, files are read from the fixture folder, and the
++// printer is the simulated adapter. Nothing here can reach a database, so a simulated job can
++// never be recorded as a real "sent" on any server.
++//
++// The in-memory server follows the same rules as migration 0010 (agent_claim_next_job,
++// agent_mark_printing and agent_finish_job). A test reads the migration to check that these
++// rules still match it.
++
++import { mkdtemp, readFile, rm } from 'node:fs/promises';
++import os from 'node:os';
++import path from 'node:path';
++import { AgentApiError } from './api.mjs';
++import { createJournal } from './journal.mjs';
++import { createSimulatedAdapter } from './printers/simulated.mjs';
++import { createWorker } from './worker.mjs';
++
++export const SIMULATION_BANNER =
++  'SIMULATION ONLY. Nothing is sent to QRquick or to any printer, and no paper comes out. Jobs come from a local file.';
++export const SAMPLE_FILE_NAME = 'sample.pdf';
++
++const MAX_JOBS = 50;
++const JOB_STATES = ['queued', 'printing', 'needs_check'];
++const DEFAULT_MAX_STEPS = 200;
++
++// Raised when a simulation would not stop on its own. It is a safety net, not a normal result.
++export class SimulationStopped extends Error {
++  constructor(message) {
++    super(message);
++    this.name = 'SimulationStopped';
++  }
++}
++
++// Checks a fixture file before anything runs. One problem refuses the whole file, so a
++// partly valid file is never half simulated. Only approved and paid orders are accepted,
++// which mirrors the server's rule that a print job exists only for an approved, paid order.
++export function readFixtureJobs(data, fixtureDir) {
++  if (!data || typeof data !== 'object' || !Array.isArray(data.jobs)) {
++    throw new Error('The fixture file needs a "jobs" list.');
++  }
++  if (data.jobs.length < 1 || data.jobs.length > MAX_JOBS) {
++    throw new Error(`The fixture file must have from 1 to ${MAX_JOBS} jobs.`);
++  }
++  const root = path.resolve(fixtureDir);
++  const seen = new Set();
++  return data.jobs.map((raw, index) => {
++    const label = `Job ${index + 1}`;
++    if (!raw || typeof raw !== 'object') throw new Error(`${label} is not an object.`);
++
++    const jobId = raw.job_id;
++    if (typeof jobId !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(jobId)) {
++      throw new Error(`${label} needs a job_id made of letters, digits and dashes.`);
++    }
++    if (seen.has(jobId)) throw new Error(`The job_id "${jobId}" appears more than once.`);
++    seen.add(jobId);
++
++    if (raw.approved !== true || raw.paid !== true) {
++      throw new Error(
++        `"${jobId}" is not approved and paid. Only approved, paid orders can be simulated, as on the real server. Nothing was simulated.`,
++      );
++    }
++
++    const attempt = raw.attempt ?? 1;
++    if (!Number.isInteger(attempt) || attempt < 1 || attempt > 100) {
++      throw new Error(`"${jobId}" has an invalid attempt number.`);
++    }
++    const state = raw.state ?? 'queued';
++    if (!JOB_STATES.includes(state)) throw new Error(`"${jobId}" has an unknown state "${state}".`);
++
++    if (typeof raw.file !== 'string' || raw.file === '' || path.isAbsolute(raw.file) || raw.file.includes('\0')) {
++      throw new Error(`"${jobId}" needs a file name inside the fixture folder.`);
++    }
++    const filePath = path.resolve(root, raw.file);
++    if (!filePath.startsWith(root + path.sep)) {
++      throw new Error(`"${jobId}" points outside the fixture folder. Nothing was simulated.`);
++    }
++    if (raw.size_bytes !== undefined && (!Number.isInteger(raw.size_bytes) || raw.size_bytes < 0)) {
++      throw new Error(`"${jobId}" has an invalid size_bytes.`);
++    }
++    if (raw.printer !== undefined && raw.printer !== null && typeof raw.printer !== 'string') {
++      throw new Error(`"${jobId}" has an invalid printer name.`);
++    }
++
++    return {
++      jobId,
++      attempt,
++      state,
++      filePath,
++      settings: raw.settings && typeof raw.settings === 'object' ? raw.settings : {},
++      printer: raw.printer ?? null,
++      sizeBytes: raw.size_bytes,
++    };
++  });
++}
++
++// The in-memory stand-in for the server. It has no network code. It is the only "server"
++// a simulation has, and it follows the same rules as migration 0010:
++//   - a job is claimed only from 'queued' (so 'printing' and 'needs_check' are never printed again);
++//   - 'printing' is recorded only for a claimed job with the same attempt;
++//   - 'sent' is accepted only from 'printing' or 'needs_check';
++//   - 'failed' is accepted only from 'claimed' or 'printing'.
++export function createSimulatedServer(jobs, { abort = () => {} } = {}) {
++  const records = jobs.map((job) => ({
++    jobId: job.jobId,
++    attempt: job.attempt,
++    state: job.state,
++    filePath: job.filePath,
++    settings: job.settings,
++    printer: job.printer,
++    sizeBytes: job.sizeBytes,
++    simulated: false,
++    errorCode: null,
++  }));
++  const calls = [];
++  let claims = 0;
++
++  function find(jobRef) {
++    return records.find((r) => r.jobId === jobRef.jobId && r.attempt === jobRef.attempt) ?? null;
++  }
++  const lost = () => new AgentApiError(409, 'lease_lost', 'The job was taken back.');
++
++  const api = {
++    async heartbeat() {
++      calls.push('heartbeat');
++      return { ok: true };
++    },
++
++    async claim() {
++      calls.push('claim');
++      claims += 1;
++      // Each job can be claimed once. Anything beyond that is a bug, so the simulation ends.
++      if (claims > jobs.length + 1) {
++        abort();
++        return { job: null };
++      }
++      const next = records.find((r) => r.state === 'queued');
++      if (!next) {
++        abort();
++        return { job: null };
++      }
++      next.state = 'claimed';
++      return {
++        job: {
++          job_id: next.jobId,
++          attempt: next.attempt,
++          settings: next.settings,
++          printer: next.printer,
++          file_url: next.filePath,
++          size_bytes: next.sizeBytes,
++        },
++      };
++    },
++
++    async markPrinting(jobRef) {
++      calls.push('printing');
++      const r = find(jobRef);
++      if (!r || r.state !== 'claimed') throw lost();
++      r.state = 'printing';
++      return { ok: true };
++    },
++
++    async finish(jobRef, { outcome, errorCode = null }) {
++      calls.push(`finish:${outcome}`);
++      const r = find(jobRef);
++      if (!r) throw lost();
++      if (r.state === outcome) return { ok: true, already_recorded: true };
++      if (outcome === 'sent' && (r.state === 'printing' || r.state === 'needs_check')) {
++        r.state = 'sent';
++        r.simulated = true;
++        return { ok: true };
++      }
++      if (outcome === 'failed' && (r.state === 'claimed' || r.state === 'printing')) {
++        r.state = 'failed';
++        r.errorCode = errorCode;
++        return { ok: true };
++      }
++      throw lost();
++    },
++  };
++
++  return { api, records, calls };
++}
++
++// Reads a file from the fixture folder only. Nothing is downloaded from anywhere.
++async function readFixtureFile(filePath, { root, maxBytes }) {
++  if (!filePath.startsWith(root + path.sep)) {
++    const err = new Error('The file is outside the fixture folder.');
++    err.code = 'download_failed';
++    throw err;
++  }
++  const bytes = await readFile(filePath);
++  if (bytes.length > maxBytes) {
++    const err = new Error('The file is larger than the 10 MB limit.');
++    err.code = 'file_too_large';
++    throw err;
++  }
++  return bytes;
++}
++
++// Runs the real worker over the jobs, with the simulated server and the simulated printer.
++// Returns the final state of each job. A loop that would never end stops with SimulationStopped.
++export async function runSimulation({
++  jobs,
++  fixtureDir,
++  out = () => {},
++  version = '0.1.0',
++  maxSteps = DEFAULT_MAX_STEPS,
++  server,
++}) {
++  const work = await mkdtemp(path.join(os.tmpdir(), 'qrquick-simulation-'));
++  try {
++    const controller = new AbortController();
++    const fake = server ?? createSimulatedServer(jobs, { abort: () => controller.abort() });
++    const adapter = createSimulatedAdapter();
++    const root = path.resolve(fixtureDir);
++    let steps = 0;
++    const worker = createWorker({
++      api: fake.api,
++      adapter,
++      journal: createJournal(path.join(work, 'outbox.json')),
++      download: (filePath, { maxBytes }) => readFixtureFile(filePath, { root, maxBytes }),
++      config: {},
++      workDir: path.join(work, 'job-files'),
++      log: (line) => out(line),
++      // Every pause counts as a step. A loop that never ends hits the limit and stops.
++      sleep: async () => {
++        steps += 1;
++        if (steps > maxSteps) {
++          throw new SimulationStopped('The simulation stopped at its safety limit. Nothing more was simulated.');
++        }
++        await new Promise((resolve) => setImmediate(resolve));
++      },
++      pollMs: 0,
++      version,
++    });
++    await worker.run({ signal: controller.signal });
++    return { records: fake.records, prints: adapter.prints, calls: fake.calls ?? [] };
++  } finally {
++    await rm(work, { recursive: true, force: true });
++  }
++}
++
++// The scenario used when "simulate" is run with no file. The caller writes SAMPLE_FILE_NAME
++// into the fixture folder first. It covers a normal job, a job the printer cannot do, a job
++// already printing, and a job that needs a check.
++export function builtInFixture() {
++  const settings = { copies: 1, colour: false, duplex: false, paper: 'A4' };
++  const base = { approved: true, paid: true, file: SAMPLE_FILE_NAME, printer: null };
++  return {
++    jobs: [
++      { ...base, job_id: 'sim-0001', attempt: 1, state: 'queued', settings },
++      { ...base, job_id: 'sim-0002', attempt: 1, state: 'queued', settings: { ...settings, paper: 'A3' } },
++      { ...base, job_id: 'sim-0003', attempt: 1, state: 'printing', settings },
++      { ...base, job_id: 'sim-0004', attempt: 1, state: 'needs_check', settings },
++    ],
++  };
++}
+diff --git a/agent/test/simulated.test.mjs b/agent/test/simulated.test.mjs
+new file mode 100644
+index 0000000..c0edb94
+--- /dev/null
++++ b/agent/test/simulated.test.mjs
+@@ -0,0 +1,231 @@
++// The simulated printer and the worker steps it drives. The server is a fake at the worker's
++// edge. No real printer, program or server is used by these tests.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import { mkdtemp, rm, writeFile } from 'node:fs/promises';
++import os from 'node:os';
++import path from 'node:path';
++import { AgentApiError } from '../src/api.mjs';
++import { createJournal } from '../src/journal.mjs';
++import { createSimulatedAdapter, SIMULATED_PRINTER_NAME } from '../src/printers/simulated.mjs';
++import { createWorker } from '../src/worker.mjs';
++
++const JOB_ID = '11111111-2222-4333-8444-555555555555';
++const PDF = Buffer.from('%PDF-1.4\n% test file\n%%EOF\n');
++const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00, 0xff, 0xd9]);
++
++async function tempDir(t) {
++  const dir = await mkdtemp(path.join(os.tmpdir(), 'qrq-sim-'));
++  t.after(() => rm(dir, { recursive: true, force: true }));
++  return dir;
++}
++
++function job(bytes = PDF, extra = {}) {
++  return {
++    job_id: JOB_ID,
++    attempt: 1,
++    settings: { copies: 1, colour: false, duplex: false, paper: 'A4' },
++    printer: null,
++    file_url: 'https://files.example/signed-link',
++    size_bytes: bytes.length,
++    file_name: 'menu.pdf',
++    ...extra,
++  };
++}
++
++// A worker with the real simulated adapter. "events" records the server calls and the
++// simulated prints in order, so tests can check that "printing" comes before the print.
++async function harness(t, { adapterOptions = {}, bytes = PDF, download, api: apiOverrides = {}, config = {} } = {}) {
++  const dir = await tempDir(t);
++  const adapter = createSimulatedAdapter(adapterOptions);
++  const events = [];
++  const reports = [];
++  const logs = [];
++  const realPrint = adapter.print;
++  adapter.print = async (opts) => {
++    events.push('print');
++    return realPrint(opts);
++  };
++  const api = {
++    heartbeat: async () => ({ ok: true }),
++    claim: async () => ({ job: null }),
++    markPrinting: async () => {
++      events.push('printing');
++      return { ok: true };
++    },
++    finish: async (ref, result) => {
++      events.push(result.outcome);
++      reports.push({ ref, ...result });
++      return { ok: true };
++    },
++    ...apiOverrides,
++  };
++  const worker = createWorker({
++    api,
++    adapter,
++    journal: createJournal(path.join(dir, 'outbox.json')),
++    download: download ?? (async () => bytes),
++    config,
++    workDir: path.join(dir, 'work'),
++    log: (line) => logs.push(line),
++    sleep: async () => {},
++    heartbeatMs: 1e9,
++  });
++  return { worker, adapter, events, reports, logs, dir };
++}
++
++test('the simulated printer is clearly named, marked simulated, and is the default', async () => {
++  const adapter = createSimulatedAdapter();
++  const [printer] = await adapter.listPrinters();
++  assert.equal(printer.name, SIMULATED_PRINTER_NAME);
++  assert.match(printer.name, /SIMULATED/);
++  assert.equal(printer.isDefault, true);
++  assert.equal(printer.enabled, true);
++  assert.equal(adapter.simulated, true);
++});
++
++test('simulated results are deterministic: each accepted job gets the next simulated id', async (t) => {
++  const dir = await tempDir(t);
++  const file = path.join(dir, 'job.pdf');
++  await writeFile(file, PDF);
++  const adapter = createSimulatedAdapter();
++  const options = { printer: SIMULATED_PRINTER_NAME, file, copies: 1, colour: false, duplex: false, paper: 'A4', title: 'QRquick' };
++  const first = await adapter.print(options);
++  const second = await adapter.print(options);
++  assert.equal(first.spoolerId, 'simulated-1');
++  assert.equal(second.spoolerId, 'simulated-2');
++  assert.equal(adapter.prints.length, 2);
++});
++
++test('the simulated spooler refuses a non-PDF file or a printer it does not have', async (t) => {
++  const dir = await tempDir(t);
++  const file = path.join(dir, 'job.gif');
++  await writeFile(file, Buffer.from('GIF89a................', 'latin1'));
++  const adapter = createSimulatedAdapter();
++  await assert.rejects(
++    adapter.print({ printer: SIMULATED_PRINTER_NAME, file, copies: 1, colour: false, duplex: false, paper: 'A4', title: 'x' }),
++    (err) => err.code === 'spooler_error',
++  );
++  await assert.rejects(
++    adapter.print({ printer: 'Office', file, copies: 1, colour: false, duplex: false, paper: 'A4', title: 'x' }),
++    (err) => err.code === 'printer_not_found',
++  );
++  assert.equal(adapter.prints.length, 0, 'nothing is recorded as printed');
++});
++
++test('a simulated run records "printing" before the print, then reports sent and says SIMULATED', async (t) => {
++  const h = await harness(t);
++  await h.worker.processJob(job());
++  assert.deepEqual(h.events, ['printing', 'print', 'sent']);
++  assert.equal(h.reports[0].outcome, 'sent');
++  assert.equal(h.adapter.prints[0].spoolerId, 'simulated-1');
++  assert.ok(h.logs.some((l) => l.includes('SIMULATED on')), h.logs.join('\n'));
++  assert.ok(h.logs.every((l) => !l.includes(': sent to ')), 'a simulated job is never logged as sent to a printer');
++});
++
++test('a picture is wrapped in a PDF first, so the simulated spooler receives a PDF', async (t) => {
++  const h = await harness(t, { bytes: JPEG });
++  await h.worker.processJob(job(JPEG));
++  assert.deepEqual(h.events, ['printing', 'print', 'sent']);
++  assert.equal(h.adapter.prints.length, 1);
++});
++
++test('an unknown file type is refused and nothing is simulated', async (t) => {
++  const bytes = Buffer.from('hello, this is not a document');
++  const h = await harness(t, { bytes });
++  await h.worker.processJob(job(bytes));
++  assert.equal(h.reports[0].outcome, 'failed');
++  assert.equal(h.reports[0].errorCode, 'file_type_unknown');
++  assert.deepEqual(h.events, ['failed']);
++  assert.equal(h.adapter.prints.length, 0);
++});
++
++test('a file the server cannot give us is reported once as failed and nothing is simulated', async (t) => {
++  const h = await harness(t, {
++    download: async () => {
++      throw new AgentApiError(404, 'download_failed', 'The file could not be downloaded.');
++    },
++  });
++  await h.worker.processJob(job());
++  assert.equal(h.reports.length, 1);
++  assert.equal(h.reports[0].errorCode, 'download_failed');
++  assert.equal(h.adapter.prints.length, 0);
++});
++
++test('a job the server has already moved on from is not simulated again', async (t) => {
++  let markCalls = 0;
++  const h = await harness(t, {
++    api: {
++      markPrinting: async () => {
++        markCalls += 1;
++        if (markCalls > 1) throw new AgentApiError(409, 'lease_lost', 'The job was taken back.');
++        return { ok: true };
++      },
++    },
++  });
++  await h.worker.processJob(job());
++  await h.worker.processJob(job());
++  assert.equal(h.adapter.prints.length, 1, 'one simulated print for one job');
++  assert.equal(markCalls, 2);
++  assert.ok(h.logs.some((l) => l.includes('not printed')));
++});
++
++test('no answer to "printing" means nothing is simulated and nothing is reported as failed', async (t) => {
++  const h = await harness(t, {
++    api: {
++      markPrinting: async () => {
++        throw new AgentApiError(0, 'network', 'Could not reach QRquick.');
++      },
++    },
++  });
++  await h.worker.processJob(job());
++  assert.equal(h.adapter.prints.length, 0);
++  assert.deepEqual(h.reports, [], 'no failure is reported, so nobody is invited to print again');
++});
++
++test('a result that could not be sent is kept and sent later, without a second simulated print', async (t) => {
++  const finishCalls = [];
++  const h = await harness(t, {
++    api: {
++      finish: async (ref, result) => {
++        finishCalls.push(result.outcome);
++        if (finishCalls.length === 1) throw new AgentApiError(0, 'network', 'Could not reach QRquick.');
++        return { ok: true };
++      },
++    },
++  });
++  await h.worker.processJob(job());
++  assert.equal(h.adapter.prints.length, 1);
++  await h.worker.flushReports();
++  await h.worker.flushReports();
++  assert.deepEqual(finishCalls, ['sent', 'sent'], 'the result is sent once after the first failure, then nothing more');
++  assert.equal(h.adapter.prints.length, 1, 'still one simulated print');
++});
++
++test('a simulated printer that is turned off fails the job before anything is simulated', async (t) => {
++  const h = await harness(t, { adapterOptions: { enabled: false } });
++  await h.worker.processJob(job());
++  assert.equal(h.reports[0].outcome, 'failed');
++  assert.equal(h.reports[0].errorCode, 'printer_offline');
++  assert.deepEqual(h.events, ['failed']);
++});
++
++test('a black-and-white simulated printer refuses a colour order before anything is simulated', async (t) => {
++  const h = await harness(t, { adapterOptions: { colour: false } });
++  await h.worker.processJob(job(PDF, { settings: { copies: 1, colour: true, duplex: false, paper: 'A4' } }));
++  assert.equal(h.reports[0].errorCode, 'unsupported_setting');
++  assert.equal(h.adapter.prints.length, 0);
++});
++
++test('an order for a printer this computer does not have fails as printer_not_found', async (t) => {
++  const h = await harness(t);
++  await h.worker.processJob(job(PDF, { printer: 'Office Laser' }));
++  assert.equal(h.reports[0].errorCode, 'printer_not_found');
++  assert.equal(h.adapter.prints.length, 0);
++});
++
++test('the simulated module never imports the command runner or a real printer adapter', () => {
++  const source = readFileSync(new URL('../src/printers/simulated.mjs', import.meta.url), 'utf8');
++  assert.doesNotMatch(source, /child_process|runner\.mjs|printers\/linux|printers\/windows|powershell|sumatra|execFile|https?:|fetch\(/i);
++});
+diff --git a/agent/test/simulation.test.mjs b/agent/test/simulation.test.mjs
+new file mode 100644
+index 0000000..a466856
+--- /dev/null
++++ b/agent/test/simulation.test.mjs
+@@ -0,0 +1,356 @@
++// The offline "simulate" command. Nothing here contacts a server or uses a printer: the network
++// is blocked for every test, and the real printer adapter throws if it is ever called.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import { mkdtemp, rm, writeFile } from 'node:fs/promises';
++import os from 'node:os';
++import path from 'node:path';
++import { AgentApiError } from '../src/api.mjs';
++import { main } from '../src/cli.mjs';
++import { saveConfig } from '../src/config.mjs';
++import {
++  createSimulatedServer,
++  readFixtureJobs,
++  runSimulation,
++  SIMULATION_BANNER,
++} from '../src/simulation.mjs';
++
++const PDF = Buffer.from('%PDF-1.4\n% test file\n%%EOF\n');
++const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00, 0xff, 0xd9]);
++const SETTINGS = { copies: 1, colour: false, duplex: false, paper: 'A4' };
++// A hung test fails after this long instead of stopping the whole run.
++const LIMIT = { timeout: 10000 };
++
++async function tempDir(t) {
++  const dir = await mkdtemp(path.join(os.tmpdir(), 'qrq-simtest-'));
++  t.after(() => rm(dir, { recursive: true, force: true }));
++  return dir;
++}
++
++async function folderWith(t, files = {}) {
++  const dir = await tempDir(t);
++  for (const [name, bytes] of Object.entries(files)) await writeFile(path.join(dir, name), bytes);
++  return dir;
++}
++
++function fixtureJob(overrides = {}) {
++  return {
++    job_id: 'sim-1',
++    attempt: 1,
++    state: 'queued',
++    approved: true,
++    paid: true,
++    file: 'job.pdf',
++    settings: SETTINGS,
++    printer: null,
++    ...overrides,
++  };
++}
++
++// Any network call is recorded and fails. Restored when the test ends.
++function blockNetwork(t) {
++  const original = globalThis.fetch;
++  const calls = [];
++  globalThis.fetch = async (url) => {
++    calls.push(String(url));
++    throw new Error('the network is blocked in simulation tests');
++  };
++  t.after(() => {
++    globalThis.fetch = original;
++  });
++  return calls;
++}
++
++// Checks the jobs, then runs the simulation over them.
++async function simulateJobs(t, jobs, files = { 'job.pdf': PDF }) {
++  const dir = await folderWith(t, files);
++  const lines = [];
++  const result = await runSimulation({
++    jobs: readFixtureJobs({ jobs }, dir),
++    fixtureDir: dir,
++    out: (line) => lines.push(line),
++  });
++  return { ...result, lines };
++}
++
++// ----- checking the fixture file -----
++
++test('a fixture with one unpaid job refuses the whole file, so nothing is simulated', LIMIT, async (t) => {
++  const dir = await folderWith(t, { 'job.pdf': PDF });
++  assert.throws(
++    () => readFixtureJobs({ jobs: [fixtureJob(), fixtureJob({ job_id: 'sim-2', paid: false })] }, dir),
++    /"sim-2" is not approved and paid/,
++  );
++});
++
++test('only a literal approved and paid order can be simulated', LIMIT, async (t) => {
++  const dir = await folderWith(t, { 'job.pdf': PDF });
++  assert.throws(() => readFixtureJobs({ jobs: [fixtureJob({ approved: 'yes' })] }, dir), /not approved and paid/);
++  assert.throws(() => readFixtureJobs({ jobs: [fixtureJob({ paid: 1 })] }, dir), /not approved and paid/);
++});
++
++test('a file outside the fixture folder is refused', LIMIT, async (t) => {
++  const dir = await folderWith(t, { 'job.pdf': PDF });
++  for (const bad of ['../secret.pdf', '/etc/passwd', 'sub/../../secret.pdf']) {
++    assert.throws(
++      () => readFixtureJobs({ jobs: [fixtureJob({ file: bad })] }, dir),
++      /inside the fixture folder|outside the fixture folder/,
++      `refused: ${bad}`,
++    );
++  }
++});
++
++test('job ids, states and attempt numbers are checked, and a repeated job id is refused', LIMIT, async (t) => {
++  const dir = await folderWith(t, { 'job.pdf': PDF });
++  assert.throws(() => readFixtureJobs({ jobs: [fixtureJob(), fixtureJob()] }, dir), /appears more than once/);
++  assert.throws(() => readFixtureJobs({ jobs: [fixtureJob({ job_id: 'bad id!' })] }, dir), /job_id made of/);
++  assert.throws(() => readFixtureJobs({ jobs: [fixtureJob({ state: 'paused' })] }, dir), /unknown state "paused"/);
++  assert.throws(() => readFixtureJobs({ jobs: [fixtureJob({ attempt: 0 })] }, dir), /invalid attempt/);
++});
++
++// ----- the offline run -----
++
++test('a simulated job is never sent to QRquick: no network call is made and the job ends as simulated', LIMIT, async (t) => {
++  const calls = blockNetwork(t);
++  const r = await simulateJobs(t, [fixtureJob()]);
++  assert.deepEqual(calls, [], 'no request leaves this computer');
++  assert.equal(r.records[0].state, 'sent');
++  assert.equal(r.records[0].simulated, true);
++  assert.equal(r.prints.length, 1);
++});
++
++test('the steps run in order: claim, printing, then the finish, and every line says SIMULATED', LIMIT, async (t) => {
++  const r = await simulateJobs(t, [fixtureJob()]);
++  const steps = r.calls.filter((c) => c !== 'heartbeat');
++  assert.deepEqual(steps.slice(0, 3), ['claim', 'printing', 'finish:sent']);
++  assert.ok(r.lines.some((l) => l.includes('SIMULATED on')), r.lines.join('\n'));
++  assert.ok(r.lines.every((l) => !l.includes(': sent to ')), 'nothing is logged as sent to a printer');
++});
++
++test('printing and needs-check jobs are never claimed or printed again', LIMIT, async (t) => {
++  const r = await simulateJobs(t, [
++    fixtureJob({ job_id: 'sim-1', state: 'printing' }),
++    fixtureJob({ job_id: 'sim-2', state: 'needs_check' }),
++    fixtureJob({ job_id: 'sim-3' }),
++  ]);
++  assert.deepEqual(
++    r.records.map((x) => [x.jobId, x.state]),
++    [
++      ['sim-1', 'printing'],
++      ['sim-2', 'needs_check'],
++      ['sim-3', 'sent'],
++    ],
++  );
++  assert.equal(r.prints.length, 1, 'only the queued job is printed');
++  assert.equal(r.calls.filter((c) => c === 'claim').length, 2, 'one claim for the queued job, one to find nothing left');
++});
++
++test('settings the simulated printer cannot do are refused before anything is simulated', LIMIT, async (t) => {
++  const r = await simulateJobs(t, [fixtureJob({ settings: { ...SETTINGS, paper: 'A3' } })]);
++  assert.equal(r.records[0].state, 'failed');
++  assert.equal(r.records[0].errorCode, 'unsupported_setting');
++  assert.equal(r.prints.length, 0);
++});
++
++test('an unknown file type is refused and nothing is simulated', LIMIT, async (t) => {
++  const r = await simulateJobs(t, [fixtureJob()], { 'job.pdf': Buffer.from('hello, not a document') });
++  assert.equal(r.records[0].state, 'failed');
++  assert.equal(r.records[0].errorCode, 'file_type_unknown');
++  assert.equal(r.prints.length, 0);
++});
++
++test('a picture is wrapped in a PDF and then simulated', LIMIT, async (t) => {
++  const r = await simulateJobs(t, [fixtureJob({ file: 'photo.jpg', size_bytes: JPEG.length })], { 'photo.jpg': JPEG });
++  assert.equal(r.records[0].state, 'sent');
++  assert.equal(r.prints.length, 1);
++});
++
++test('a file whose size does not match what was ordered is refused', LIMIT, async (t) => {
++  const r = await simulateJobs(t, [fixtureJob({ size_bytes: 999 })]);
++  assert.equal(r.records[0].state, 'failed');
++  assert.equal(r.records[0].errorCode, 'file_changed');
++  assert.equal(r.prints.length, 0);
++});
++
++test('a missing file is reported as a failed download, and nothing is simulated', LIMIT, async (t) => {
++  const r = await simulateJobs(t, [fixtureJob({ file: 'missing.pdf' })], {});
++  assert.equal(r.records[0].state, 'failed');
++  assert.equal(r.records[0].errorCode, 'download_failed');
++  assert.equal(r.prints.length, 0);
++});
++
++// ----- the in-memory server -----
++
++test('the in-memory server refuses a result that would skip the printing step', LIMIT, async () => {
++  const server = createSimulatedServer([
++    { jobId: 'sim-1', attempt: 1, state: 'queued', filePath: '/fixtures/job.pdf', settings: SETTINGS, printer: null, sizeBytes: undefined },
++  ]);
++  const { job } = await server.api.claim();
++  const ref = { jobId: job.job_id, attempt: job.attempt };
++  await assert.rejects(server.api.finish(ref, { outcome: 'sent' }), (e) => e.code === 'lease_lost', 'sent before printing is refused');
++  await assert.rejects(server.api.markPrinting({ jobId: 'sim-1', attempt: 2 }), (e) => e.code === 'lease_lost', 'a different attempt cannot start');
++  await server.api.markPrinting(ref);
++  await assert.rejects(server.api.markPrinting(ref), (e) => e.code === 'lease_lost', 'a job cannot start printing twice');
++  await server.api.finish(ref, { outcome: 'sent' });
++  await assert.rejects(server.api.finish(ref, { outcome: 'failed' }), (e) => e.code === 'lease_lost', 'sent can never become failed');
++  assert.equal(server.records[0].state, 'sent');
++  assert.equal(server.records[0].simulated, true);
++});
++
++test('the in-memory server keeps the job rules that migration 0010 states', () => {
++  const sql = readFileSync(new URL('../../supabase/migrations/0010_print_agents.sql', import.meta.url), 'utf8');
++  // A partial drift check: if the server changes these rules, the simulation must change too.
++  for (const rule of [
++    "and j.status = 'queued'",
++    "v_job.status <> 'claimed' or v_job.lease_until <= now()",
++    "if p_outcome = 'sent' and v_job.status in ('printing', 'needs_check') then",
++    "elsif p_outcome = 'failed' and v_job.status in ('claimed', 'printing') then",
++  ]) {
++    assert.ok(sql.includes(rule), `migration 0010 no longer has: ${rule}`);
++  }
++});
++
++// ----- the safety limit -----
++
++test('a server that never runs out of jobs stops at the safety limit instead of hanging', LIMIT, async (t) => {
++  const dir = await folderWith(t, {});
++  // If the safety limit were disabled, this stand-in still ends the run (after 1000 claims, as a
++  // revoked computer), so the test fails quickly rather than running forever.
++  let claims = 0;
++  const neverEnds = {
++    records: [],
++    calls: [],
++    api: {
++      heartbeat: async () => ({ ok: true }),
++      claim: async () => {
++        claims += 1;
++        if (claims > 1000) throw new AgentApiError(401, 'revoked', 'This computer was removed from QRquick.');
++        return { job: null };
++      },
++      markPrinting: async () => ({ ok: true }),
++      finish: async () => ({ ok: true }),
++    },
++  };
++  await assert.rejects(
++    runSimulation({ jobs: [], fixtureDir: dir, server: neverEnds, maxSteps: 5 }),
++    (err) => err.name === 'SimulationStopped',
++  );
++});
++
++// ----- the command line -----
++
++async function pairedDir(t, serverUrl) {
++  const dir = await tempDir(t);
++  await saveConfig(dir, {
++    serverUrl,
++    token: 'qpa_' + 'K'.repeat(43),
++    agentId: 'agent-1',
++    shopName: 'Test Print Shop',
++    computerName: 'TEST-PC',
++    platform: 'linux',
++    printer: null,
++    pairedAt: '2026-10-28T00:00:00.000Z',
++  });
++  return dir;
++}
++
++// Any real printer call is recorded and fails, so a test shows whether one was attempted.
++// Any request to a server is recorded and answered with "revoked" (401). A run that reaches
++// the server therefore ends at its first request, so no test can keep retrying in the background.
++function cliDeps(dir, extra = {}) {
++  const out = [];
++  const fail = [];
++  const realPrinterCalls = [];
++  const requests = [];
++  const forbidden = (name) => async (...args) => {
++    realPrinterCalls.push([name, ...args]);
++    throw new Error(`${name} must not run in simulation`);
++  };
++  const deps = {
++    dir,
++    platform: 'linux',
++    out: (line) => out.push(line),
++    fail: (line) => fail.push(line),
++    run: forbidden('run'),
++    adapter: { listPrinters: forbidden('listPrinters'), print: forbidden('print') },
++    fetchImpl: async (url) => {
++      requests.push(String(url));
++      return new Response('{"code":"revoked","message":"This computer was removed from QRquick."}', {
++        status: 401,
++        headers: { 'content-type': 'application/json' },
++      });
++    },
++    ...extra,
++  };
++  return { deps, out, fail, realPrinterCalls, requests };
++}
++
++test('run --simulated-printer is refused before any request, even against a localhost server', LIMIT, async (t) => {
++  const dir = await pairedDir(t, 'http://127.0.0.1:8787/print-agent');
++  const { deps, fail, realPrinterCalls, requests } = cliDeps(dir);
++  assert.equal(await main(['run', '--simulated-printer'], deps), 1);
++  assert.match(fail.join('\n'), /"simulate" command/);
++  assert.equal(requests.length, 0, 'no request is made');
++  assert.equal(realPrinterCalls.length, 0);
++});
++
++test('run refuses an unknown option before any request', LIMIT, async (t) => {
++  const dir = await pairedDir(t, 'http://127.0.0.1:8787/print-agent');
++  const { deps, fail, realPrinterCalls, requests } = cliDeps(dir);
++  assert.equal(await main(['run', '--simulate'], deps), 1);
++  assert.match(fail.join('\n'), /Unknown option "--simulate"/);
++  assert.equal(requests.length, 0);
++  assert.equal(realPrinterCalls.length, 0);
++});
++
++test('simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing', LIMIT, async (t) => {
++  const dir = await tempDir(t); // no saved config at all
++  const calls = blockNetwork(t);
++  const { deps, out, fail, realPrinterCalls } = cliDeps(dir);
++  assert.equal(await main(['simulate'], deps), 0);
++  assert.equal(out[0], SIMULATION_BANNER);
++  assert.ok(out.some((l) => l.includes('SIMULATED on')), out.join('\n'));
++  assert.ok(
++    out.some((l) => l.includes('Simulated: 1. Refused: 1. Left alone (already printing or needing a check): 2.')),
++    out.join('\n'),
++  );
++  assert.deepEqual(fail, []);
++  assert.deepEqual(calls, [], 'no request is made');
++  assert.equal(realPrinterCalls.length, 0, 'no printer is used');
++});
++
++test('simulate with a fixture file runs it offline and prints a summary', LIMIT, async (t) => {
++  const dir = await folderWith(t, {
++    'job.pdf': PDF,
++    'jobs.json': JSON.stringify({ jobs: [fixtureJob()] }),
++  });
++  const calls = blockNetwork(t);
++  const { deps, out, realPrinterCalls } = cliDeps(await tempDir(t));
++  assert.equal(await main(['simulate', path.join(dir, 'jobs.json')], deps), 0);
++  assert.ok(out.some((l) => l.includes('Simulated: 1. Refused: 0.')), out.join('\n'));
++  assert.deepEqual(calls, []);
++  assert.equal(realPrinterCalls.length, 0);
++});
++
++test('simulate with an unpaid job in the file stops before anything starts', LIMIT, async (t) => {
++  const dir = await folderWith(t, {
++    'job.pdf': PDF,
++    'jobs.json': JSON.stringify({ jobs: [fixtureJob({ paid: false })] }),
++  });
++  const calls = blockNetwork(t);
++  const { deps, out, fail } = cliDeps(await tempDir(t));
++  assert.equal(await main(['simulate', path.join(dir, 'jobs.json')], deps), 1);
++  assert.match(fail.join('\n'), /is not approved and paid/);
++  assert.deepEqual(out, [], 'the banner is not shown, because nothing starts');
++  assert.deepEqual(calls, []);
++});
++
++test('simulate refuses extra arguments and a file that does not exist', LIMIT, async (t) => {
++  const dir = await tempDir(t);
++  const { deps, fail } = cliDeps(dir);
++  assert.equal(await main(['simulate', 'a.json', 'b.json'], deps), 1);
++  assert.match(fail.join('\n'), /Usage: qrquick-print-agent simulate/);
++  assert.equal(await main(['simulate', path.join(dir, 'missing.json')], deps), 1);
++  assert.match(fail.join('\n'), /Could not open/);
++});
+diff --git a/agent/test/run-wiring.test.mjs b/agent/test/run-wiring.test.mjs
+new file mode 100644
+index 0000000..7bb4875
+--- /dev/null
++++ b/agent/test/run-wiring.test.mjs
+@@ -0,0 +1,117 @@
++// Wiring test for the real "run" command. A paired computer (a saved config) talks to a local
++// stub of the print-agent function. The stub answers 401 at once, as it does for a removed
++// computer, so the agent must stop there. The only printer is a fake that must never be used.
++// Nothing here reaches QRquick, Supabase, the internet or a printer.
++
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { createServer } from 'node:http';
++import { mkdtemp, rm } from 'node:fs/promises';
++import os from 'node:os';
++import path from 'node:path';
++import { saveConfig } from '../src/config.mjs';
++import { main, VERSION } from '../src/cli.mjs';
++
++const TOKEN = 'qpa_' + 'R'.repeat(43);
++const SHOP = 'Wiring Test Shop';
++const PRINTER = 'Front Desk';
++const REVOKED = 'This computer was removed from QRquick. Pair it again to print.';
++const LIMIT = { timeout: 10000 };
++
++function parseOrText(text) {
++  try {
++    return JSON.parse(text);
++  } catch {
++    return text;
++  }
++}
++
++// A local stub of the print-agent function. It records every request and answers 401.
++async function startStub(t) {
++  const requests = [];
++  const server = createServer((req, res) => {
++    let text = '';
++    req.setEncoding('utf8');
++    req.on('data', (chunk) => {
++      text += chunk;
++    });
++    req.on('end', () => {
++      requests.push({
++        method: req.method,
++        path: req.url,
++        auth: req.headers.authorization ?? null,
++        body: parseOrText(text),
++      });
++      res.writeHead(401, { 'content-type': 'application/json' });
++      res.end(JSON.stringify({ code: 'agent_unauthorized', message: REVOKED }));
++    });
++  });
++  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
++  t.after(() => {
++    server.closeAllConnections();
++    return new Promise((resolve) => server.close(resolve));
++  });
++  return { url: `http://127.0.0.1:${server.address().port}/print-agent`, requests };
++}
++
++// The only printer the run may see. It records any print, and a print here would be a bug.
++function fakePrinter() {
++  const prints = [];
++  return {
++    prints,
++    platform: 'linux',
++    acceptsImages: true,
++    listPrinters: async () => [
++      { name: PRINTER, isDefault: true, enabled: true, capabilitiesKnown: true, colour: true, duplex: true, papers: ['A4'] },
++    ],
++    print: async (job) => {
++      prints.push(job);
++      throw new Error('print must not run in this test');
++    },
++  };
++}
++
++test('run sends the saved token and printer list to the saved address, stops at once on 401, and prints nothing', LIMIT, async (t) => {
++  const dir = await mkdtemp(path.join(os.tmpdir(), 'qrq-run-'));
++  t.after(() => rm(dir, { recursive: true, force: true }));
++  const stub = await startStub(t);
++  await saveConfig(dir, {
++    serverUrl: stub.url,
++    token: TOKEN,
++    agentId: 'agent-1',
++    shopName: SHOP,
++    computerName: 'TEST-PC',
++    platform: 'linux',
++    printer: PRINTER,
++    pairedAt: new Date().toISOString(),
++  });
++  const printer = fakePrinter();
++  const out = [];
++  const fail = [];
++  const code = await main(['run'], {
++    dir,
++    platform: 'linux',
++    out: (line) => out.push(line),
++    fail: (line) => fail.push(line),
++    adapter: printer,
++  });
++
++  // Configuration: the shop name from the saved config is shown when the run starts.
++  assert.ok(out.some((line) => line.includes(`running for ${SHOP}`)), out.join('\n'));
++  // Error handling: a 401 ends the run with exit code 2 and the plain message. Nothing is thrown.
++  assert.equal(code, 2, fail.join('\n'));
++  assert.deepEqual(fail, []);
++  assert.ok(out.includes(REVOKED), out.join('\n'));
++  // API client and worker: the first call is the status report, sent to the saved address with
++  // the token and the printer list from the adapter.
++  assert.equal(stub.requests.length, 1, 'the worker stops on the first 401: no retry and no claim');
++  const [first] = stub.requests;
++  assert.equal(first.method, 'POST');
++  assert.equal(first.path, '/print-agent/heartbeat');
++  assert.equal(first.auth, `Bearer ${TOKEN}`);
++  assert.equal(first.body.version, VERSION);
++  assert.deepEqual(first.body.printers.map((p) => p.name), [PRINTER]);
++  // Safety: nothing is printed, and the token is never shown.
++  assert.equal(printer.prints.length, 0, 'nothing is printed');
++  assert.ok(!out.join('\n').includes(TOKEN), 'the token is never printed');
++});

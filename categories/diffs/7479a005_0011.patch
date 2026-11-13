@@ -1,0 +1,274 @@
+--- a/supabase/migrations/0011_licence_foundation.sql
++++ b/supabase/migrations/0011_licence_foundation.sql
+@@ -1,6 +1,7 @@
+--- 0011: licence foundation (Stage 7, steps 7B-1 and 7B-2). FILE ONLY.
++-- 0011: licence foundation (Stage 7, steps 7B-1 and 7B-2, plus the 7C replay ledger and denial tables). FILE ONLY.
+ --
+ -- Status: NOT APPLIED. NOT EXECUTED. NOT TESTED.
++-- Edited 2026-11-05 under the owner-approved Stage 7C bundles 1 to 3. Pre-staging review (O2) is still required.
+ -- Written on the origin/main line (migrations 0001-0010). Number 0011 confirmed free on
+ -- origin/main on 2026-11-01 (owner decision 1). Local main has a different, unmerged
+ -- 0011_service_options.sql. It is not part of this file (owner decision 2).
+@@ -13,6 +14,9 @@
+ --   shop_licence_state() a shop's licence state at a given instant
+ --   shop_licence_meta   one row per shop holding state_version (7B-2)
+ --   licence_lock_shop() internal lock helper: exclusive or shared (7B-2)
++--   licence_requests        replay ledger, committed successful admin operations only (D3)
++--   licence_denials         detailed denial records, append-only (M3)
++--   licence_denial_windows  per-actor and global denial counters per UTC hour (O1)
+ --
+ -- Rules enforced here (no browser or RPC can skip them)
+ --   * A period is half-open: [starts_at, end) where end = least(ends_at, revoked_at).
+@@ -30,16 +34,32 @@
+ --   * Coverage periods are contiguous when they touch: [a, b) followed by [b, c).
+ --   * Every coverage row needs its shop_licence_meta row (foreign key). Meta rows are created
+ --     only by licence_lock_shop(). A meta row cannot be deleted or truncated, its shop cannot
+---     change. state_version is set by the admin RPC, once per request (R2), not by this file.
++--     change. state_version is incremented once per committed successful admin operation (D5).
++--     The guard below requires each update to add exactly 1. Denials, rejected requests,
++--     replays and reads do not increment it. This file does not increment it.
+ --   * Lock order (R18, design approved 2026-11-01): shop meta row, then order, then agent, then
+ --     jobs. licence_lock_shop() takes the first lock and takes no order, agent or job lock.
+ --
++-- Rules the 7C RPCs must follow. This file supplies the tables, constraints and guards only.
++--   * Every admin and denial RPC checks that transaction_isolation is 'read committed' before
++--     any other statement, and raises an internal error otherwise (bundle 1).
++--   * Replay ledger: a row is written only for a committed successful operation (D3). Rejections,
++--     denials and replays write none. The ledger row is inserted after the business checks and
++--     before the operation writes. If the insert conflicts and a re-read then finds no row, the
++--     RPC fails with an error and writes nothing (bundle 1).
++--   * Denial counters: lock the actor row, then the global row, both before any shop meta lock.
++--     The denial path takes no meta, ledger, order, agent or job lock. Write a detail row only
++--     while the counters allow it. Omitted details are denial_count minus detail_count (bundle 3).
++--     The global detail ceiling (G) is OPEN and is not set in this file.
++--
+ -- Not in this file (each needs its own approval)
+---   * Admin write RPCs for grant, extend, revoke and replace (7C). Each calls
+---     licence_lock_shop(shop, 'exclusive') first, then writes its coverage and audit rows.
++--   * Admin write RPCs for grant, extend, revoke and replace (7C). Order (bundle 1): isolation
++--     check, authorisation, shape and hash validation, shop existence, licence_lock_shop(shop,
++--     'exclusive'), replay lookup, business checks, licence_requests insert, operation writes
++--     (coverage and audit), state_version increment, commit.
+ --   * Print gates in claim and mark (7F). Each calls licence_lock_shop(shop, 'shared') first,
+ --     before any agent or job lock.
+---   * Licence denials and their cap (7C). Printing enforcement (7F).
++--   * Denial RPC logic and detail-cap enforcement (7C). Printing enforcement (7F).
+ --   * Paid verification, licence payments and trials (C-5).
+ --   * Changes to orders, payments or existing functions, triggers, policies and grants.
+ --   * The bootstrap admin row. No seed data is inserted.
+@@ -117,6 +137,78 @@
+ 
+ create index licence_audit_log_shop_created_idx on public.licence_audit_log (shop_id, created_at);
+ 
++-- ---------- replay ledger and denial records (Stage 7C bundles 1 and 3) ----------
++
++-- One row per committed successful admin operation (D3). The primary key is the arbiter for
++-- request_id, globally unique across shops (bundle 1). Rejections, denials and replays write no
++-- row. There is no coverage_id: the created coverage is found through
++-- licence_coverages.request_id. target_coverage_id is set only for revoke and replace.
++-- There is no actor column. The caller's UID is part of payload_hash only (bundle 1).
++create table public.licence_requests (
++  request_id           uuid primary key,
++  action               text not null,
++  shop_id              uuid not null references public.shops (id) on delete restrict,
++  payload_hash         bytea not null,
++  target_coverage_id   uuid references public.licence_coverages (id) on delete restrict,
++  state_version_after  bigint not null,
++  created_at           timestamptz not null default now(),
++  constraint licence_requests_action check (action in ('grant', 'extend', 'revoke', 'replace')),
++  constraint licence_requests_payload_hash_length check (octet_length(payload_hash) = 32),
++  constraint licence_requests_state_version_after check (state_version_after >= 1),
++  constraint licence_requests_target_by_action check (
++    (action in ('revoke', 'replace')) = (target_coverage_id is not null)
++  )
++);
++
++-- Detailed denial records (M3). actor_user_id is a plain uuid with no foreign key, so an account
++-- can be removed (bundle 3). Retention is not decided, and no delete path is approved.
++create table public.licence_denials (
++  id             uuid primary key default gen_random_uuid(),
++  actor_user_id  uuid not null,
++  function_name  text not null,
++  denial_reason  text not null,
++  request_id     uuid,
++  occurred_at    timestamptz not null default now(),
++  constraint licence_denials_function_name_length check (char_length(function_name) between 1 and 64),
++  constraint licence_denials_denial_reason_length check (char_length(denial_reason) between 1 and 40)
++);
++
++create index licence_denials_actor_time on public.licence_denials (actor_user_id, occurred_at desc);
++
++-- Denial counters (O1). A scope 'actor' row counts one actor's authorisation denials in one UTC
++-- hour. A scope 'global' row counts all authorisation denials in one UTC hour. denial_count counts
++-- every denial. detail_count counts the licence_denials rows written for that window. Omitted
++-- details are denial_count minus detail_count and are not stored (bundle 3). window_start is the
++-- start of a UTC hour, computed by the RPC as date_trunc('hour', now() at time zone 'UTC') at time
++-- zone 'UTC'. The lock order is actor row, then global row (see the rules above).
++create table public.licence_denial_windows (
++  id             bigint generated always as identity primary key,
++  scope          text not null,
++  actor_user_id  uuid,
++  window_start   timestamptz not null,
++  denial_count   integer not null default 0,
++  detail_count   integer not null default 0,
++  constraint licence_denial_windows_scope check (scope in ('actor', 'global')),
++  constraint licence_denial_windows_scope_actor check (
++    (scope = 'global' and actor_user_id is null)
++    or (scope = 'actor' and actor_user_id is not null)
++  ),
++  constraint licence_denial_windows_denial_count_nonnegative check (denial_count >= 0),
++  constraint licence_denial_windows_detail_count_range check (
++    detail_count >= 0 and detail_count <= denial_count
++  )
++);
++
++-- Partial unique indexes, used as ON CONFLICT targets. NULLS NOT DISTINCT is not used, because
++-- it needs PostgreSQL 15 and the server version is unverified.
++create unique index licence_denial_windows_actor_hour
++  on public.licence_denial_windows (actor_user_id, window_start)
++  where scope = 'actor';
++
++create unique index licence_denial_windows_global_hour
++  on public.licence_denial_windows (window_start)
++  where scope = 'global';
++
+ -- ---------- append-only guards ----------
+ 
+ create or replace function public.licence_coverages_guard()
+@@ -201,7 +293,9 @@
+     raise exception 'shop_licence_meta is not deletable: % is not allowed', tg_op;
+   end if;
+ 
+-  -- UPDATE. The shop and created_at cannot change. state_version is set by the RPC (R2), not here.
++  -- UPDATE. The shop and created_at cannot change. Each update adds exactly 1 to state_version (D5).
++  -- The RPC performs one update per committed operation. This guard checks each update, not the
++  -- number of updates in a transaction.
+   if new.shop_id is distinct from old.shop_id then
+     raise exception 'shop_licence_meta.shop_id cannot change';
+   end if;
+@@ -210,6 +304,10 @@
+     raise exception 'shop_licence_meta.created_at cannot change';
+   end if;
+ 
++  if new.state_version is distinct from old.state_version + 1 then
++    raise exception 'shop_licence_meta.state_version must increase by exactly 1 per update';
++  end if;
++
+   return new;
+ end;
+ $$;
+@@ -222,6 +320,77 @@
+   before truncate on public.shop_licence_meta
+   for each statement execute function public.shop_licence_meta_guard();
+ 
++-- ---------- guards for the replay ledger and denial records (7C bundles 1 and 3) ----------
++
++create or replace function public.licence_requests_guard()
++returns trigger
++language plpgsql
++set search_path = public
++as $$
++begin
++  raise exception 'licence_requests is append-only: % is not allowed', tg_op;
++end;
++$$;
++
++create or replace function public.licence_denials_guard()
++returns trigger
++language plpgsql
++set search_path = public
++as $$
++begin
++  raise exception 'licence_denials is append-only: % is not allowed', tg_op;
++end;
++$$;
++
++create or replace function public.licence_denial_windows_guard()
++returns trigger
++language plpgsql
++set search_path = public
++as $$
++begin
++  if tg_op in ('DELETE', 'TRUNCATE') then
++    raise exception 'licence_denial_windows is not deletable: % is not allowed', tg_op;
++  end if;
++
++  -- UPDATE. Identity columns cannot change. Both counts can only rise.
++  if new.scope is distinct from old.scope
++     or new.actor_user_id is distinct from old.actor_user_id
++     or new.window_start is distinct from old.window_start then
++    raise exception 'licence_denial_windows identity columns cannot change';
++  end if;
++
++  if new.denial_count < old.denial_count or new.detail_count < old.detail_count then
++    raise exception 'licence_denial_windows counts cannot decrease';
++  end if;
++
++  return new;
++end;
++$$;
++
++create trigger licence_requests_guard_rows
++  before update or delete on public.licence_requests
++  for each row execute function public.licence_requests_guard();
++
++create trigger licence_requests_guard_truncate
++  before truncate on public.licence_requests
++  for each statement execute function public.licence_requests_guard();
++
++create trigger licence_denials_guard_rows
++  before update or delete on public.licence_denials
++  for each row execute function public.licence_denials_guard();
++
++create trigger licence_denials_guard_truncate
++  before truncate on public.licence_denials
++  for each statement execute function public.licence_denials_guard();
++
++create trigger licence_denial_windows_guard_rows
++  before update or delete on public.licence_denial_windows
++  for each row execute function public.licence_denial_windows_guard();
++
++create trigger licence_denial_windows_guard_truncate
++  before truncate on public.licence_denial_windows
++  for each statement execute function public.licence_denial_windows_guard();
++
+ -- ---------- helpers ----------
+ 
+ create or replace function public.is_platform_admin()
+@@ -372,7 +541,8 @@
+ -- writing a coverage row. Returns the current state_version.
+ -- Assumes READ COMMITTED (the default). Under REPEATABLE READ or stricter, the lock select can
+ -- miss a row that a concurrent transaction committed, and the helper then raises an error.
+--- Do not raise the isolation level for callers of this helper.
++-- Do not raise the isolation level for callers of this helper. The 7C RPCs enforce READ COMMITTED
++-- on entry (bundle 1).
+ create or replace function public.licence_lock_shop(
+   p_shop_id uuid,
+   p_mode    text
+@@ -424,11 +594,15 @@
+ alter table public.licence_coverages enable row level security;
+ alter table public.licence_audit_log enable row level security;
+ alter table public.shop_licence_meta enable row level security;
++alter table public.licence_requests  enable row level security;
++alter table public.licence_denials   enable row level security;
++alter table public.licence_denial_windows enable row level security;
+ -- No policies on purpose. Browsers, anon and authenticated read and write nothing here.
+ -- Service role is revoked as well, so only functions owned by the migration role touch
+ -- these tables. This differs from 0010, which leaves service_role alone.
+ revoke all on public.platform_admins, public.licence_coverages, public.licence_audit_log,
+-  public.shop_licence_meta
++  public.shop_licence_meta, public.licence_requests, public.licence_denials,
++  public.licence_denial_windows
+   from public, anon, authenticated, service_role;
+ 
+ revoke execute on function public.is_platform_admin()
+@@ -444,5 +618,8 @@
+   from public, anon, authenticated, service_role;
+ revoke execute on function public.shop_licence_meta_guard()
+   from public, anon, authenticated, service_role;
++revoke execute on function public.licence_requests_guard(),
++  public.licence_denials_guard(), public.licence_denial_windows_guard()
++  from public, anon, authenticated, service_role;
+ 
+--- End of 0011 (7B-1 and 7B-2). Not applied.
++-- End of 0011 (7B-1, 7B-2 and the 7C ledger and denial tables). Not applied.

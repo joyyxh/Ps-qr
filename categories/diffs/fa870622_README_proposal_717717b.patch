@@ -1,0 +1,137 @@
+diff --git a/README.md b/README.md
+index a0ee51b..9a7ee96 100644
+--- a/README.md
++++ b/README.md
+@@ -6,7 +6,7 @@ server-calculated price, and get a tracking code. Shop owners manage their shop,
+ prices, features, payment QR, orders and statistics, from the web or from the
+ Android app. Each shop is isolated from every other shop.
+ 
+-## Status (18 Oct 2026)
++## Status (repository checked 11 Nov 2026)
+ 
+ | Stage | What it covers | State |
+ |---|---|---|
+@@ -18,9 +18,9 @@ Android app. Each shop is isolated from every other shop.
+ | 5b. Statistics and payment records | Earnings and revenue (day, week, month, year), order statistics, cancellations, payments (cash or online), popular services, recent activity, CSV export | Built. Migration `0006` is applied to the live project and its 54 database checks pass. The browser check with a mocked backend passes at phone width |
+ | 5c. Shop features and payment QR | Yes/no features (colour printing, double-sided, and six more), payment QR upload, features and payment QR shown to customers | Built. Migrations `0004` and `0005` are in the repo. Browser check with a mocked backend passes. Not re-checked on the live project in this session |
+ | 5d. Android app and installable web app | Capacitor app built in GitHub Actions, and an install-to-home-screen web app | Built, **not yet built or run**. See "What is not verified" |
+-| 6. Local print agent | Simulated printer first, then Windows | Not started |
+-| 7. Payments and licences | One-time licence checkout, Stripe | Not started (Stripe is installed but not connected) |
+-| 8. Privacy and hardening | Automatic file deletion, rate limits, audit log | Not started. Until this stage, uploaded files are kept until someone removes them by hand |
++| 6. Local print agent | Node agent in `agent/` for Linux (CUPS) and Windows (SumatraPDF), migration `0010`, and the `print-agent` function | Built on `main` and tested with fake printers only (61 agent tests pass). **Not tested on a real printer.** The simulated printer is on branch `stage6-simulated-printer` (not merged, no pull request) |
++| 7. Payments and licences | One-time licence checkout | Not built on `main`. Decision records are on branch `stage7-payments`. Licence migrations and the admin panel exist only as uncommitted local work, applied nowhere. No payment provider is in the repository |
++| 8. Privacy and hardening | Automatic file deletion, rate limits, audit log | Partly on `main`: rate limits on uploads and the print agent (`consume_rate_limit`), and file expiry in migration `0010` with the `cleanup-files` function. The scheduled cleanup workflow has not run successfully: its two repository secrets are not set. Audit log not built |
+ 
+ Phase 1 research (competitor pages, cost model, licence terms) is **not done yet**.
+ I did not visit the competitor sites in this session, so the comparison in the
+@@ -32,7 +32,7 @@ brief is still open.
+   functions. The project is `printnest` (ref `qvnwqrevgyootaaunrto`) in `ap-south-1`
+   (Mumbai) on the free plan. Chosen because the database enforces tenant isolation,
+   so the rule is not left to frontend code.
+-- **Stripe (installed, not connected):** needed for licence payments in Stage 7.
++- **Payment provider for licences (Stage 7):** not chosen. The repository has no Stripe package, code or setting. An earlier note said Stripe is installed; that could not be confirmed.
+ - **Lovable, Replit, Base44 (available, not used):** AI app builders. I wrote the
+   code in this repo so you own every line and can host it anywhere.
+ - **Google Drive, Bird, Zapier, Etherscan:** not relevant to this build.
+@@ -55,10 +55,16 @@ printnest/
+ │   ├── migrations/0004_shop_features_payment_qr.sql   feature catalogue, yes/no features, payment QR
+ │   ├── migrations/0005_shop_assets_policy_fix.sql     owner-folder policies for the payment QR bucket
+ │   ├── migrations/0006_payments_and_statistics.sql    payment fields, order history, statistics functions
++│   ├── migrations/0007_security_hardening.sql  private file objects bound to their database row
++│   ├── migrations/0008_payment_intents.sql     customer payment intents and fulfilment guard
++│   ├── migrations/0009_cash_policy_and_payment_hardening.sql   owner cash policy, minimum order, payment guards
++│   ├── migrations/0010_print_agents.sql        print agents, rate limits, file retention
+ │   ├── functions/upload-file/                  upload, type and size checks, page count, storage
+ │   │   ├── index.ts                            Deno entry point (verify_jwt off)
+ │   │   └── checks.js                           pure checks, also tested in Node
+ │   ├── functions/owner-file-link/index.ts      signed link for an owner's order file (verify_jwt on)
++│   ├── functions/print-agent/index.ts          API for the shop print agent (no login; agent token)
++│   ├── functions/cleanup-files/index.ts        daily file deletion, called by the cleanup workflow (secret header)
+ │   ├── seed/demo_seed.sql                      dev-only test owners and shops
+ │   ├── tests/stage1_isolation_tests.sql        29 database checks, rolled back
+ │   ├── tests/stage3_owner_tests.sql            30 owner permission checks, rolled back
+@@ -66,7 +72,9 @@ printnest/
+ │   ├── tests/stage5_orders_tests.sql           23 order checks, rolled back
+ │   ├── tests/stage6_features_tests.sql         shop features and payment QR checks (run log not recorded)
+ │   ├── tests/stage7_stats_tests.sql            54 payment and statistics checks, rolled back
++│   ├── tests/stage8_print_tests.sql            checks for migration 0010 (print agents); file name is older
+ │   └── tests/upload_checks.test.js             15 upload check tests (Node)
++├── agent/                               print agent for a shop computer (Node 18.17+, see agent/README.md)
+ ├── tools/make_qr.py                            shop QR poster, SVG and manifest (printing)
+ ├── tools/make_icons.py                         app icons (PNG, standard library only)
+ ├── tools/vendor_qr.mjs                         turns the QR encoder into an ES module for the browser
+@@ -85,7 +93,7 @@ printnest/
+     ├── src/owner-stats.js  owner statistics page (earnings, orders, payments, services, activity, CSV)
+     ├── src/qr.js        QR code as SVG (on the page) or canvas (PNG download)
+     ├── src/vendor/qrcode/  QR encoder (MIT, Kazuhiko Arase; see LICENSE.txt)
+-    └── tests/           node:test unit tests (109); browser/ holds the Playwright browser checks (see its README)
++    └── tests/           node:test unit tests (163 on main, checked 11 Nov 2026); browser/ holds the Playwright browser checks (see its README)
+ ```
+ 
+ ## How the money, files and tenancy rules work
+@@ -189,7 +197,7 @@ requirement for this flow.
+     being refused a second time, a repeated file in one order, an item without a file,
+     expired and other-shop files, a refused multi-item order leaving nothing behind, the
+     one-file-one-item index, name and type limits, and owners seeing only their own file
+-    names. The fixtures stand in for the upload function, which the sandbox cannot call.
++    names. The fixtures stand in for the upload function, which the check environment cannot call.
+   - Stage 5: 23 checks in `supabase/tests/stage5_orders_tests.sql`, all pass with the new
+     file fixtures. An owner can move an order only along the allowed path, cannot change
+     its total, note or code, and cannot see other shops' orders.
+@@ -216,7 +224,7 @@ requirement for this flow.
+   checks off, because customers are anonymous. `owner-file-link` has them on. Both send
+   `Access-Control-Allow-Origin: *` (read in the code). The TypeScript syntax was checked
+   with the TypeScript compiler. **They have not been run under Deno or called live**,
+-  because the sandbox cannot reach the project's API.
++  because the check environment cannot reach the project's API.
+ - **Security advisor:** no new issues from migration 0003. The only warnings are the
+   intended ones: the file table has RLS on with no policies, on purpose. The customer RPCs
+   (`place_order`, `quote_order`, `track_order`) must be callable by anonymous customers,
+@@ -224,10 +232,10 @@ requirement for this flow.
+   Enable it in Supabase Auth (advisor link:
+   https://supabase.com/docs/guides/auth/password-security).
+ - **Browser checks, mocked backend** (headless Chromium at phone width, 390 px). The
+-  scripts live in `web/tests/browser/` with their own README. They still contain sandbox
+-  paths, so they need the small edits described there before they run on your computer.
+-  The customer-upload and owner-download checks (17 and 8) were run from the sandbox
+-  before the scripts were copied in, and are not in that folder.
++  scripts live in `web/tests/browser/` with their own README. They still contain paths from
++  the machine where they were written, so they need the small edits described there before they run on your computer.
++  The customer-upload and owner-download checks (17 and 8) were run from the check environment
++  before the scripts were copied in, and are not in that folder. No log for those runs is kept with this repository.
+   - Customer upload: 17 checks. A Word file is refused before any upload. A PDF uploads,
+     shows the server page count, and adds to the cart. The quote and order send a file
+     id and no page count. The upload sends no user token. The same file cannot go in
+@@ -263,7 +271,7 @@ requirement for this flow.
+ 
+ ## What is not verified
+ 
+-- **The Android APK has not been built.** This sandbox cannot reach npm, Gradle's
++- **The Android APK has not been built.** The check environment cannot reach npm, Gradle's
+   download servers or Google's Android servers (the proxy refuses those hosts). The APK
+   comes from the GitHub Actions workflow in `.github/workflows/android-apk.yml`, which
+   has not run yet. The Capacitor version (8.5.3) was taken from a release listing, not
+@@ -272,7 +280,7 @@ requirement for this flow.
+   in a desktop browser at phone width. Downloads (the QR PNG and the CSV exports) use a
+   browser download link, and the Android web view may not save them. The installable web
+   app saves them normally. A native save plugin is the fix if the APK is the main route.
+-- **Not run against the real sign-in or the real upload.** This sandbox cannot reach
++- **Not run against the real sign-in or the real upload.** The check environment cannot reach
+   `supabase.co`. Sign-up, email confirmation, sign-in, the upload, the payment QR upload
+   and the file link have not been tried against the live project from here. Try them on
+   your machine before relying on the owner pages.
+@@ -463,10 +471,9 @@ so regenerate and reprint.
+ 6. **Housekeeping:** delete the test rows above (needs your go-ahead), turn on leaked
+    password protection, and check the Site URL in Supabase Auth.
+ 7. **Stage 5:** live updates without a refresh.
+-8. **Stage 6:** local print agent, starting with a simulated printer.
+-9. **Stage 7:** connect Stripe, one-time licence checkout, licence entitlements.
+-10. **Stage 8:** automatic file deletion (unclaimed files after a day, claimed files after
+-    the order closes), rate limits on uploads and the public RPCs, audit log, and moving
+-    the browser check scripts into the repo.
++8. **Stage 6:** test the print agent on a real printer (not done). Merge the simulated-printer branch only after an owner decision.
++9. **Stage 7:** owner decisions D-MIG, CF-5 and EX-15 first, then the reviewed Stage 7 units. Licence checkout waits for legal review (C-1) and a payment provider decision.
++10. **Stage 8:** fix the cleanup workflow configuration (owner decision RB-05). Then confirm file deletion on the live project, and build the audit log.
++    Rate limits on uploads and the print agent exist; check the public RPCs.
+ 11. **Phase 1 still owed:** competitor research against the listed sites, the cost
+     model at 10 to 10,000 shops, and draft licence terms.
