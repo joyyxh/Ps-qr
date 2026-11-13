@@ -1,0 +1,11 @@
+MATCH owner_active_dated
+MATCH owner_active_lifetime
+MATCH owner_scheduled
+MATCH owner_expired
+MATCH owner_revoked
+MATCH owner_none
+MATCH staff_same_shop
+MATCH stranger
+MATCH anon_no_claims
+MATCH null_shop_id
+cases in fixture: 10; captured: 10; differing: 0; extra captured: []

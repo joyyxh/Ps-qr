@@ -1,0 +1,4 @@
+ agent/README.md            | 12 +++++++++---
+ agent/src/worker.mjs       | 22 +++++++++++++++++++++-
+ agent/test/worker.test.mjs | 32 ++++++++++++++++++++++++++++++++
+ 3 files changed, 62 insertions(+), 4 deletions(-)

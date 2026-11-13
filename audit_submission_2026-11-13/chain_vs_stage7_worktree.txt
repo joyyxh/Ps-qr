@@ -1,0 +1,16 @@
+Only in /home/claude/joyyxh/ps-qr-stage7: CLAUDE.md
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/OWNER_DECISION_SHEET.md and /home/claude/joyyxh/ps-qr-stage7/OWNER_DECISION_SHEET.md differ
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/STAGE7_DECISIONS.md and /home/claude/joyyxh/ps-qr-stage7/STAGE7_DECISIONS.md differ
+Only in /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/docs: STAGE7E_LICENCE_STATUS.md
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/package.json and /home/claude/joyyxh/ps-qr-stage7/web/package.json differ
+Only in /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/src: licence-status.js
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/src/owner-api.js and /home/claude/joyyxh/ps-qr-stage7/web/src/owner-api.js differ
+Only in /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/src: owner-licence.js
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/src/owner.js and /home/claude/joyyxh/ps-qr-stage7/web/src/owner.js differ
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/styles.css and /home/claude/joyyxh/ps-qr-stage7/web/styles.css differ
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/tests/browser/README.md and /home/claude/joyyxh/ps-qr-stage7/web/tests/browser/README.md differ
+Only in /home/claude/joyyxh/ps-qr-stage7/web/tests/browser: __pycache__
+Only in /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/tests/browser: licence-smoke.cjs
+Only in /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/tests: fixtures
+Only in /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/tests: licence-status.test.js
+Files /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/p5_chain_2026-11-13/tree/web/tests/owner-api.test.js and /home/claude/joyyxh/ps-qr-stage7/web/tests/owner-api.test.js differ

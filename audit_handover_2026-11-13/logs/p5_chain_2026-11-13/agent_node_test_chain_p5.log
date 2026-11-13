@@ -1,0 +1,382 @@
+TAP version 13
+# Subtest: pair saves the token, prints no token, and sends the code to the server
+ok 1 - pair saves the token, prints no token, and sends the code to the server
+  ---
+  duration_ms: 303.615454
+  type: 'test'
+  ...
+# Subtest: pair refuses an insecure server address before contacting anything
+ok 2 - pair refuses an insecure server address before contacting anything
+  ---
+  duration_ms: 2.904492
+  type: 'test'
+  ...
+# Subtest: set-printer only accepts a printer that exists on this computer
+ok 3 - set-printer only accepts a printer that exists on this computer
+  ---
+  duration_ms: 4.843898
+  type: 'test'
+  ...
+# Subtest: run refuses to start before the computer is paired
+ok 4 - run refuses to start before the computer is paired
+  ---
+  duration_ms: 1.7442
+  type: 'test'
+  ...
+# Subtest: doctor reports a failed connection and exits non-zero
+ok 5 - doctor reports a failed connection and exits non-zero
+  ---
+  duration_ms: 6.222751
+  type: 'test'
+  ...
+# Subtest: doctor sends the real printer list, so the owner keeps seeing the printers
+ok 6 - doctor sends the real printer list, so the owner keeps seeing the printers
+  ---
+  duration_ms: 3.143116
+  type: 'test'
+  ...
+# Subtest: unknown commands and help
+ok 7 - unknown commands and help
+  ---
+  duration_ms: 1.338189
+  type: 'test'
+  ...
+# Subtest: detects PDF, JPEG and PNG by their first bytes, not by file name
+ok 8 - detects PDF, JPEG and PNG by their first bytes, not by file name
+  ---
+  duration_ms: 2.06532
+  type: 'test'
+  ...
+# Subtest: wraps an RGB PNG in a valid one-page PDF with the picture as a Flate stream
+ok 9 - wraps an RGB PNG in a valid one-page PDF with the picture as a Flate stream
+  ---
+  duration_ms: 1.451418
+  type: 'test'
+  ...
+# Subtest: wraps a greyscale PNG with DeviceGray
+ok 10 - wraps a greyscale PNG with DeviceGray
+  ---
+  duration_ms: 0.535991
+  type: 'test'
+  ...
+# Subtest: wraps a JPEG without re-encoding it (DCTDecode)
+ok 11 - wraps a JPEG without re-encoding it (DCTDecode)
+  ---
+  duration_ms: 0.439587
+  type: 'test'
+  ...
+# Subtest: refuses PNG pictures with transparency, alpha or 16-bit depth
+ok 12 - refuses PNG pictures with transparency, alpha or 16-bit depth
+  ---
+  duration_ms: 1.212228
+  type: 'test'
+  ...
+# Subtest: refuses CMYK JPEG and other colour formats with a clear message
+ok 13 - refuses CMYK JPEG and other colour formats with a clear message
+  ---
+  duration_ms: 0.199977
+  type: 'test'
+  ...
+# Subtest: readImage rejects anything that is not a JPEG or PNG
+ok 14 - readImage rejects anything that is not a JPEG or PNG
+  ---
+  duration_ms: 0.245825
+  type: 'test'
+  ...
+# Subtest: reads the CUPS printer list, enabled state and default
+ok 15 - reads the CUPS printer list, enabled state and default
+  ---
+  duration_ms: 2.114065
+  type: 'test'
+  ...
+# Subtest: reads printer options, marking the default value with an asterisk
+ok 16 - reads printer options, marking the default value with an asterisk
+  ---
+  duration_ms: 0.556814
+  type: 'test'
+  ...
+# Subtest: colour and double-sided come only from the printer's own options
+ok 17 - colour and double-sided come only from the printer's own options
+  ---
+  duration_ms: 0.380111
+  type: 'test'
+  ...
+# Subtest: an IPP "one-sided" value is NOT read as double-sided
+ok 18 - an IPP "one-sided" value is NOT read as double-sided
+  ---
+  duration_ms: 0.128026
+  type: 'test'
+  ...
+# Subtest: lp arguments: printer, copies, colour, duplex, media, then "--" before the file
+ok 19 - lp arguments: printer, copies, colour, duplex, media, then "--" before the file
+  ---
+  duration_ms: 0.287517
+  type: 'test'
+  ...
+# Subtest: lp arguments leave out media the printer does not list, and pick a grey mode for black-and-white
+ok 20 - lp arguments leave out media the printer does not list, and pick a grey mode for black-and-white
+  ---
+  duration_ms: 0.222281
+  type: 'test'
+  ...
+# Subtest: Linux adapter lists printers with default and capability flags
+ok 21 - Linux adapter lists printers with default and capability flags
+  ---
+  duration_ms: 0.569181
+  type: 'test'
+  ...
+# Subtest: Linux adapter reports a missing CUPS as print_engine_missing
+ok 22 - Linux adapter reports a missing CUPS as print_engine_missing
+  ---
+  duration_ms: 0.590788
+  type: 'test'
+  ...
+# Subtest: Linux adapter submits with lp and returns the request id
+ok 23 - Linux adapter submits with lp and returns the request id
+  ---
+  duration_ms: 0.500644
+  type: 'test'
+  ...
+# Subtest: Linux adapter turns an lp refusal into spooler_error
+ok 24 - Linux adapter turns an lp refusal into spooler_error
+  ---
+  duration_ms: 0.523538
+  type: 'test'
+  ...
+# Subtest: reads Windows printer lists whether PowerShell returns one object or many
+ok 25 - reads Windows printer lists whether PowerShell returns one object or many
+  ---
+  duration_ms: 0.258542
+  type: 'test'
+  ...
+# Subtest: reads colour and duplex from the print configuration, and says "unknown" when absent
+ok 26 - reads colour and duplex from the print configuration, and says "unknown" when absent
+  ---
+  duration_ms: 0.564523
+  type: 'test'
+  ...
+# Subtest: SumatraPDF settings: copies, colour mode and duplex
+ok 27 - SumatraPDF settings: copies, colour mode and duplex
+  ---
+  duration_ms: 0.253044
+  type: 'test'
+  ...
+# Subtest: SumatraPDF arguments keep the printer name as one argument (no shell parsing)
+ok 28 - SumatraPDF arguments keep the printer name as one argument (no shell parsing)
+  ---
+  duration_ms: 0.125797
+  type: 'test'
+  ...
+# Subtest: finds SumatraPDF in the usual install folders only
+ok 29 - finds SumatraPDF in the usual install folders only
+  ---
+  duration_ms: 1.639692
+  type: 'test'
+  ...
+# Subtest: Windows adapter prints with SumatraPDF and reports a missing install clearly
+ok 30 - Windows adapter prints with SumatraPDF and reports a missing install clearly
+  ---
+  duration_ms: 0.326924
+  type: 'test'
+  ...
+# Subtest: Windows adapter reads printers through PowerShell and passes the name as an environment value
+ok 31 - Windows adapter reads printers through PowerShell and passes the name as an environment value
+  ---
+  duration_ms: 0.338306
+  type: 'test'
+  ...
+# Subtest: API client: only claim-style calls carry the agent token; pairing does not
+ok 32 - API client: only claim-style calls carry the agent token; pairing does not
+  ---
+  duration_ms: 28.664758
+  type: 'test'
+  ...
+# Subtest: API client turns the server's { code, message } into AgentApiError
+ok 33 - API client turns the server's { code, message } into AgentApiError
+  ---
+  duration_ms: 1.325766
+  type: 'test'
+  ...
+# Subtest: API client reports a dropped connection as "network", without the link or token
+ok 34 - API client reports a dropped connection as "network", without the link or token
+  ---
+  duration_ms: 0.369671
+  type: 'test'
+  ...
+# Subtest: file download refuses anything over the size limit
+ok 35 - file download refuses anything over the size limit
+  ---
+  duration_ms: 1.272268
+  type: 'test'
+  ...
+# Subtest: server address must be https, except a local test server
+ok 36 - server address must be https, except a local test server
+  ---
+  duration_ms: 0.345218
+  type: 'test'
+  ...
+# Subtest: config is saved and loaded back, and a missing file is "not paired"
+ok 37 - config is saved and loaded back, and a missing file is "not paired"
+  ---
+  duration_ms: 11.502696
+  type: 'test'
+  ...
+# Subtest: journal keeps an active job and pending reports across reads
+ok 38 - journal keeps an active job and pending reports across reads
+  ---
+  duration_ms: 6.418262
+  type: 'test'
+  ...
+# Subtest: a damaged journal stops the agent instead of guessing
+ok 39 - a damaged journal stops the agent instead of guessing
+  ---
+  duration_ms: 4.601714
+  type: 'test'
+  ...
+# Subtest: the test page is a valid PDF with a correct cross-reference table
+ok 40 - the test page is a valid PDF with a correct cross-reference table
+  ---
+  duration_ms: 0.970075
+  type: 'test'
+  ...
+# Subtest: does not print unless the server explicitly confirms the start (fail closed)
+ok 41 - does not print unless the server explicitly confirms the start (fail closed)
+  ---
+  duration_ms: 33.390851
+  type: 'test'
+  ...
+# Subtest: records "printing" on the server before the printer receives the file, then reports sent
+ok 42 - records "printing" on the server before the printer receives the file, then reports sent
+  ---
+  duration_ms: 6.577927
+  type: 'test'
+  ...
+# Subtest: does not touch the printer when the server does not confirm the start
+ok 43 - does not touch the printer when the server does not confirm the start
+  ---
+  duration_ms: 7.000578
+  type: 'test'
+  ...
+# Subtest: a printer error is reported once as failed and never retried by the agent
+ok 44 - a printer error is reported once as failed and never retried by the agent
+  ---
+  duration_ms: 9.743329
+  type: 'test'
+  ...
+# Subtest: an error code the server cannot accept is replaced with a safe one
+ok 45 - an error code the server cannot accept is replaced with a safe one
+  ---
+  duration_ms: 2.061647
+  type: 'test'
+  ...
+# Subtest: a colour order on a black-and-white printer fails before anything is sent
+ok 46 - a colour order on a black-and-white printer fails before anything is sent
+  ---
+  duration_ms: 1.701087
+  type: 'test'
+  ...
+# Subtest: an offline printer fails before anything is sent
+ok 47 - an offline printer fails before anything is sent
+  ---
+  duration_ms: 1.544901
+  type: 'test'
+  ...
+# Subtest: no printer chosen and no default fails with printer_not_found
+ok 48 - no printer chosen and no default fails with printer_not_found
+  ---
+  duration_ms: 3.997987
+  type: 'test'
+  ...
+# Subtest: the printer named on the order wins over this computer's fallback
+ok 49 - the printer named on the order wins over this computer's fallback
+  ---
+  duration_ms: 21.278508
+  type: 'test'
+  ...
+# Subtest: a file whose size differs from the upload is refused
+ok 50 - a file whose size differs from the upload is refused
+  ---
+  duration_ms: 1.324739
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is printed
+ok 51 - an unknown file type is refused and nothing is printed
+  ---
+  duration_ms: 1.014015
+  type: 'test'
+  ...
+# Subtest: a JPEG is wrapped in a PDF for printers that only accept PDF
+ok 52 - a JPEG is wrapped in a PDF for printers that only accept PDF
+  ---
+  duration_ms: 5.815562
+  type: 'test'
+  ...
+# Subtest: a finish report that cannot be sent is kept and sent later, once
+ok 53 - a finish report that cannot be sent is kept and sent later, once
+  ---
+  duration_ms: 10.283455
+  type: 'test'
+  ...
+# Subtest: a result the server no longer expects (409) is dropped without a retry loop
+ok 54 - a result the server no longer expects (409) is dropped without a retry loop
+  ---
+  duration_ms: 4.633767
+  type: 'test'
+  ...
+# Subtest: after a restart, a job the printer accepted is reported as sent
+ok 55 - after a restart, a job the printer accepted is reported as sent
+  ---
+  duration_ms: 7.36769
+  type: 'test'
+  ...
+# Subtest: after a restart during sending, nothing is reported and nothing is reprinted
+ok 56 - after a restart during sending, nothing is reported and nothing is reprinted
+  ---
+  duration_ms: 2.833443
+  type: 'test'
+  ...
+# Subtest: a revoked agent (401) stops the loop with AgentRevokedError
+ok 57 - a revoked agent (401) stops the loop with AgentRevokedError
+  ---
+  duration_ms: 1.824626
+  type: 'test'
+  ...
+# Subtest: run prints the one job it is given and stops when aborted
+ok 58 - run prints the one job it is given and stops when aborted
+  ---
+  duration_ms: 4.768949
+  type: 'test'
+  ...
+# Subtest: the status report lists printers with only the fields the server stores
+ok 59 - the status report lists printers with only the fields the server stores
+  ---
+  duration_ms: 1.125663
+  type: 'test'
+  ...
+# Subtest: order settings default to one black-and-white A4 copy and reject silly copy counts
+ok 60 - order settings default to one black-and-white A4 copy and reject silly copy counts
+  ---
+  duration_ms: 0.309164
+  type: 'test'
+  ...
+# Subtest: checkSettings refuses what the printer cannot do, and allows what it can
+ok 61 - checkSettings refuses what the printer cannot do, and allows what it can
+  ---
+  duration_ms: 0.100715
+  type: 'test'
+  ...
+# Subtest: choosePrinter prefers the order, then this computer's fallback, then the system default
+ok 62 - choosePrinter prefers the order, then this computer's fallback, then the system default
+  ---
+  duration_ms: 0.080315
+  type: 'test'
+  ...
+1..62
+# tests 62
+# suites 0
+# pass 62
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 853.805846

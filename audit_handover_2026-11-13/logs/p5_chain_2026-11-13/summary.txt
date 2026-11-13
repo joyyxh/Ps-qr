@@ -1,0 +1,12 @@
+agent exit=0
+# tests 62
+# pass 62
+# fail 0
+web exit=0
+# tests 212
+# pass 212
+# fail 0
+admin exit=0
+# tests 72
+# pass 72
+# fail 0

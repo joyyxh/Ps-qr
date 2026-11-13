@@ -1,0 +1,24 @@
+checksums: 14 listed, 14 files on disk
+config: publishable key set, service key: false
+RESULT: PASS (no secret value found)
+== secret key in config (expect exit 1)
+checksums: 14 listed, 14 files on disk
+FAIL config.js publishableKey is a service or secret key
+FAIL config.js sets a key but the URL is not https or the key is unusable
+config: publishable key set, service key: true
+FAIL secret key value in config.js
+RESULT: FAIL
+== service_role JWT in src/qr.js (expect exit 1)
+checksums: 14 listed, 14 files on disk
+config: empty (not configured), service key: false
+FAIL service_role token in src/qr.js
+RESULT: FAIL
+== tampered file, checksums not updated (expect exit 1)
+FAIL checksum mismatch: ./src/qr.js
+checksums: 14 listed, 14 files on disk
+config: empty (not configured), service key: false
+RESULT: FAIL
+== production-like bundle (expect exit 0)
+checksums: 14 listed, 14 files on disk
+config: empty (not configured), service key: false
+RESULT: PASS (no secret value found)
