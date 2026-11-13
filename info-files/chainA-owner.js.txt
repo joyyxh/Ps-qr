@@ -1,0 +1,1826 @@
+// Shop owner pages. Signed in, an owner works on one shop at a time through five
+// tabs: Home (what needs you now), Orders, Prices, Stats and More (shop details,
+// QR code, payment QR, printing computers, your shops and sign out).
+//
+// Security notes for anyone changing this file:
+// - Every value from the database goes through escapeHtml before it is shown.
+// - Writes are sent as the signed-in owner, so row level security decides what
+//   is allowed. The checks here are only there to give clear messages.
+// - Prices are typed in rupees and converted to whole paise (logic.js).
+//   The database stores and enforces them. The browser never works out a price.
+// - After every change the current tab is loaded again from the database, so the
+//   page shows what the database holds, not what the browser expects.
+
+import {
+  accountErrorMessage,
+  agentStatusLabel,
+  canSendToPrint,
+  CANCEL_REASONS,
+  cancelReasonLabel,
+  CASH_PAYMENT_TEXT,
+  chargeBasisLabel,
+  checkPaymentQrFile,
+  dashboardCounts,
+  describeOrderItem,
+  escapeHtml,
+  formatPaise,
+  isEmailAddress,
+  isNewPassword,
+  isIrreversibleMove,
+  isOpenOrder,
+  isOtpCode,
+  istToday,
+  latestJobsByItem,
+  needsOwnerAttention,
+  otpErrorMessage,
+  resendWaitSeconds,
+  nextPaymentActions,
+  orderActionLabel,
+  orderStatusOptions,
+  orderStatusView,
+  ownerStatusLabel,
+  paidOrderStopNote,
+  paiseToRupeesInput,
+  paperOptions,
+  paymentLabel,
+  printAgentFunctionUrl,
+  printerOptionLabel,
+  printerReady,
+  printFailureText,
+  REFUND_PRINTING_TEXT,
+  refundedWhilePrinting,
+  printingNotice,
+  printJobLabel,
+  publicAssetUrl,
+  publicBaseAddress,
+  retryOptions,
+  shopAddress,
+  shopOffersColour,
+  sortOldestFirst,
+  unitLabel,
+  validateCashPolicy,
+  validateChargesForm,
+  validatePaperSizesForm,
+  validateService,
+  validateShopDetails,
+  validateSlug,
+} from './logic.js';
+import { createStatsPages } from './owner-stats.js';
+import { qrCanvas, qrSvg } from './qr.js';
+
+const UNIT_OPTIONS = [
+  { value: 'per_side', label: 'Per printed side' },
+  { value: 'per_sheet', label: 'Per sheet (double-sided halves the sheets)' },
+  { value: 'per_copy', label: 'Per copy (one flat charge)' },
+];
+
+const CONNECTION_MESSAGE = 'Could not reach the server. Check your internet connection and try again.';
+
+// The five tabs, in the order of the bottom tab bar on a phone.
+const TABS = [
+  { key: 'home', label: 'Home', icon: '⌂' },
+  { key: 'orders', label: 'Orders', icon: '☰' },
+  { key: 'prices', label: 'Prices', icon: '₹' },
+  { key: 'stats', label: 'Stats', icon: '▤' },
+  { key: 'more', label: 'More', icon: '⋯' },
+];
+const TAB_KEYS = TABS.map((tab) => tab.key);
+const NOTICE_MILLISECONDS = 4000; // success messages disappear after four seconds
+
+// ---------- small HTML pieces that need no state ----------
+
+function toneHtml(tone, label) {
+  return `<span class="pill tone-${tone}">${escapeHtml(label)}</span>`;
+}
+
+function kpi(label, value, note = '') {
+  return `<article class="card kpi">
+      <p class="muted small">${escapeHtml(label)}</p>
+      <p class="value">${escapeHtml(String(value))}</p>
+      ${note ? `<p class="muted small">${escapeHtml(note)}</p>` : ''}
+    </article>`;
+}
+
+function toastHtml(text) {
+  return `<div class="toast" role="status" data-notice>
+      <span>${escapeHtml(text)}</span>
+      <button type="button" class="link" data-dismiss>Dismiss</button>
+    </div>`;
+}
+
+function skeletonHtml() {
+  return `<div class="skeleton-stack" aria-busy="true" aria-label="Loading">
+      <div class="skeleton"></div><div class="skeleton short"></div><div class="skeleton"></div>
+    </div>`;
+}
+
+function notFoundHtml() {
+  return `<section class="card">
+      <h1>Shop not found</h1>
+      <p class="muted">Either this shop does not exist, or your account is not an owner of it.</p>
+      <p><a href="#/owner">Back to your shops</a></p>
+    </section>`;
+}
+
+function printerPillHtml(printing) {
+  return printerReady(printing) ? toneHtml('ok', 'Printer ready') : toneHtml('warn', 'Printer not connected');
+}
+
+// The printers for the home page. The notice says what is wrong, if anything.
+function printerCardHtml(printing) {
+  if (!printing) {
+    return `<section class="card owner-card">
+        <h2>Printer</h2>
+        <p class="muted">Printer status is not available right now. Your orders still show.</p>
+      </section>`;
+  }
+  const agents = printing.agents ?? [];
+  const notice = printingNotice({ agents, jobs: printing.jobs ?? [] });
+  const list = agents.length
+    ? `<ul class="plain">${agents
+        .map(
+          (agent) =>
+            `<li><span>${escapeHtml(agent.name)}</span><span class="muted small">${escapeHtml(agentStatusLabel(agent))}</span></li>`
+        )
+        .join('')}</ul>`
+    : '<p class="muted">No printing computer is paired yet. Pair one under More, in Printing computers.</p>';
+  return `<section class="card owner-card">
+      <div class="between"><h2>Printer</h2>${printerPillHtml(printing)}</div>
+      ${list}
+      ${notice ? `<p class="banner">${escapeHtml(notice)}</p>` : ''}
+    </section>`;
+}
+
+// Example prices as a customer sees them. Only offered services, and colour only while
+// the shop offers colour printing, the same rule as the customer page.
+function pricePreviewHtml(shop, services, paperRows = [], charges = []) {
+  const offered = services.filter((service) => service.is_active);
+  const list = offered.length
+    ? `<ul class="plain">${offered
+        .map((service) => {
+          const lines = [];
+          if (service.bw_price_paise !== null) {
+            lines.push(`B&W ${formatPaise(service.bw_price_paise)} ${unitLabel(service.pricing_unit)}`);
+          }
+          if (service.colour_price_paise !== null && shopOffersColour(shop)) {
+            lines.push(`Colour ${formatPaise(service.colour_price_paise)} ${unitLabel(service.pricing_unit)}`);
+          }
+          return `<li><strong>${escapeHtml(service.name)}</strong>
+              <span class="muted small">${escapeHtml(lines.join(' · ') || 'Not orderable right now')}</span></li>`;
+        })
+        .join('')}</ul>`
+    : '<p class="muted">No service is shown to customers yet.</p>';
+  const minimum = Number(shop.minimum_order_paise ?? 0);
+  // The customer page names the unit of the service being ordered ("per printed side").
+  // This preview covers every offered service, so it names the unit only when they all share one.
+  const offeredUnits = [...new Set(offered.map((service) => service.pricing_unit))];
+  const surchargeUnit = offeredUnits.length === 1 ? unitLabel(offeredUnits[0]) : 'per billed unit';
+  const paperText = paperOptions(paperRows)
+    .filter((option) => option.offered)
+    .map((option) => (option.surchargePaise > 0 ? `${option.size} +${formatPaise(option.surchargePaise)} ${surchargeUnit}` : option.size))
+    .join(' · ');
+  const chargeText = charges
+    .filter((charge) => charge.is_active)
+    .map((charge) => `${escapeHtml(charge.label)} ${formatPaise(charge.amount_paise)} ${chargeBasisLabel(charge.basis)}`)
+    .join(' · ');
+  return `${list}
+    <p class="small"><strong>Paper:</strong> ${escapeHtml(paperText)}</p>
+    ${chargeText ? `<p class="small"><strong>Extra charges:</strong> ${chargeText}</p>` : ''}
+    ${minimum > 0 ? `<p class="muted small">Minimum order ${formatPaise(minimum)}</p>` : ''}
+    <p class="muted small">Changes apply to new orders. Existing orders keep their prices.</p>`;
+}
+
+// The page that wraps every shop tab: the side rail on wide screens, the title and
+// a notice or error line, the tab's content, and the tab bar on phones.
+function shellHtml({ shop, active, title, body, notice, error, headerAside, attention }) {
+  const base = `#/owner/shop/${encodeURIComponent(shop.slug)}`;
+  const links = TABS.map((tab) => {
+    const href = tab.key === 'home' ? base : `${base}/${tab.key}`;
+    const current = tab.key === active ? ' aria-current="page"' : '';
+    const count = tab.key === 'orders' && attention > 0 ? `<span class="count">${attention}</span>` : '';
+    return `<a href="${href}"${current}><span class="tab-icon" aria-hidden="true">${tab.icon}</span><span>${tab.label}</span>${count}</a>`;
+  }).join('');
+  return `
+    <div class="owner-shell">
+      <nav class="owner-rail" aria-label="Owner navigation">${links}</nav>
+      <div class="owner-main">
+        <header class="owner-head">
+          <div><p class="shop-name">${escapeHtml(shop.name)}</p><h1>${escapeHtml(title)}</h1></div>
+          ${headerAside}
+        </header>
+        ${notice ? toastHtml(notice) : ''}
+        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
+        <div class="owner-content">${body}</div>
+      </div>
+      <nav class="tabbar" aria-label="Owner navigation">${links}</nav>
+    </div>`;
+}
+
+export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNEST_CONFIG ?? {} }) {
+  let current = []; // the owner route being shown, used by "Try again"
+  let ownerUser = null; // the signed-in owner, kept for reloading after a change
+  let shops = []; // every shop this owner manages, for "Your shops"
+  let shop = null; // the shop whose page is on screen
+  let tab = 'home'; // the tab on screen
+  let orderView = null; // { orders, printing, jobsByItem, attention } for the shop on screen
+  let services = []; // Prices tab
+  let catalog = []; // Prices tab: printing features
+  let paperSizes = []; // Prices tab: the shop's paper-size rows (none means A4 only)
+  let customerPaper = null; // Prices tab: the sizes customers can choose (null when it could not be read)
+  let extraCharges = []; // Prices tab: the shop's extra charges, hidden ones included
+  let editingServiceId = null; // Prices tab: the service in the editor, if any
+  let pairing = null; // a pairing code shown on More until the owner leaves that tab
+  let ordersShowAll = false; // Orders tab: open orders only, or all orders
+  const statsPages = createStatsPages({
+    app,
+    ownerApi,
+    messageFor,
+    show: (html) => paintShell({ title: 'Statistics', body: html }),
+  });
+
+  // ---------- navigation and shared helpers ----------
+
+  function go(parts) {
+    const hash = '#/owner' + parts.map((part) => `/${encodeURIComponent(part)}`).join('');
+    if (window.location.hash === hash) {
+      render(parts);
+    } else {
+      window.location.hash = hash;
+    }
+  }
+
+  function show(html) {
+    app.innerHTML = html;
+  }
+
+  function on(selector, eventName, handler) {
+    app.querySelector(selector)?.addEventListener(eventName, handler);
+  }
+
+  function onAll(selector, eventName, handler) {
+    app.querySelectorAll(selector).forEach((el) => el.addEventListener(eventName, handler));
+  }
+
+  function setError(form, message) {
+    const el = form?.querySelector('[data-error]');
+    if (el) el.textContent = message ?? '';
+  }
+
+  function setTopError(message) {
+    const el = app.querySelector('[data-error-top]');
+    if (el) el.textContent = message ?? '';
+  }
+
+  function setBusy(form, busy) {
+    const button = form.querySelector('button[type="submit"]');
+    if (!button) return;
+    button.disabled = busy;
+    button.textContent = busy ? 'Please wait…' : button.dataset.label;
+  }
+
+  function messageFor(err) {
+    if (err instanceof TypeError) return CONNECTION_MESSAGE;
+    if (err.status === 401) return 'Your session has ended. Sign in again to continue.';
+    if (err.code === '23505') return 'That web address is already taken. Try a different one.';
+    if (err.code === '23514' && /shops_slug_reserved/.test(err.message)) {
+      return 'That web address is reserved. Choose another.';
+    }
+    if (/confirm your email address before creating a shop/i.test(err.message ?? '')) {
+      return 'Confirm your email address before you create a shop. Check your inbox for the code.';
+    }
+    if (err.code === '42501') return 'You do not have permission to do that.';
+    if (err.code === '22023') {
+      return 'That change is not allowed for this order. It may have changed since the page loaded. Refresh and try again.';
+    }
+    return err.message || 'Something went wrong. Please try again.';
+  }
+
+  // The address a QR code opens for this shop, plus a warning when customers could
+  // not reach that address (for example a local test address).
+  function customerAddress(slug) {
+    const { base, problem } = publicBaseAddress(config, window.location);
+    return { url: shopAddress(base, slug), problem };
+  }
+
+  async function signOut() {
+    await auth.signOut();
+    go([]);
+  }
+
+  // Draws the shop shell around a tab's content, then wires the shell's own controls.
+  function paintShell({ title, body, notice = '', error = '', headerAside = '', bind = null }) {
+    app.innerHTML = shellHtml({
+      shop,
+      active: tab,
+      title,
+      body,
+      notice,
+      error,
+      headerAside,
+      attention: orderView?.attention ?? 0,
+    });
+    bindShell();
+    bind?.();
+  }
+
+  // A success notice goes away by itself after a few seconds, and can be dismissed.
+  function bindShell() {
+    const toast = app.querySelector('[data-notice]');
+    if (!toast) return;
+    const timer = setTimeout(() => toast.remove(), NOTICE_MILLISECONDS);
+    toast.querySelector('[data-dismiss]')?.addEventListener('click', () => {
+      clearTimeout(timer);
+      toast.remove();
+    });
+  }
+
+  // The orders and printers of a shop, read together. If the printer status cannot load,
+  // the orders still show and the printer is marked unavailable.
+  async function loadOrderView(shopId) {
+    const [orders, printing] = await Promise.all([
+      ownerApi.listOrders(shopId),
+      ownerApi.printStatus(shopId).catch(() => null),
+    ]);
+    const jobsByItem = latestJobsByItem(printing?.jobs ?? []);
+    const attention = orders.filter((order) => needsOwnerAttention(order, jobsByItem)).length;
+    return { orders, printing, jobsByItem, attention };
+  }
+
+  // ---------- entry point, called by app.js for every #/owner route ----------
+
+  async function render(parts = []) {
+    current = parts;
+    show(skeletonHtml());
+    const [page = '', value = '', section = ''] = parts;
+    try {
+      // A verified owner who has not chosen a password yet goes no further (see completeSignup).
+      if (auth.hasPendingSignup()) return renderSetPassword();
+      const session = await auth.getSession();
+      if (!session) return renderSignIn('signin');
+      ownerUser = session.user;
+      if (page === 'reset') return renderResetPassword();
+      if (page === 'new') return renderNewShop();
+      if (page === 'shop' && value) return await renderShopPage(value, section || 'home');
+      return await renderEntry();
+    } catch (err) {
+      return renderFailure(err);
+    }
+  }
+
+  async function renderFailure(err) {
+    if (err.status === 401) {
+      await auth.signOut();
+      return renderSignIn('signin', messageFor(err));
+    }
+    show(
+      `<section class="card">
+        <h1>Something went wrong</h1>
+        <p class="error" role="alert">${escapeHtml(messageFor(err))}</p>
+        <p><button type="button" data-action="retry">Try again</button></p>
+      </section>`
+    );
+    on('[data-action="retry"]', 'click', () => render(current));
+  }
+
+  // ---------- sign in, registration and verification ----------
+  // An owner signs in with email and password. A new owner registers with email and
+  // password, then enters the one-time code emailed to them before the account opens.
+  // An owner whose email is still unverified is sent a new code when they sign in.
+  // Customers never reach these screens.
+
+  let pendingEmail = ''; // the address waiting for a verification code
+  let pendingSentAt = 0; // when the last verification code was sent, in milliseconds
+  let pendingPassword = ''; // the password typed at registration, kept in memory until the code is accepted
+  let resendTimer = null;
+
+  function clearResendTimer() {
+    if (resendTimer) clearInterval(resendTimer);
+    resendTimer = null;
+  }
+
+  function renderSignIn(mode = 'signin', notice = '') {
+    clearResendTimer();
+    pendingPassword = '';
+    if (mode === 'register') return renderRegister(notice);
+    if (mode === 'verify' && pendingEmail) return renderVerify(notice);
+    if (mode === 'forgot') return renderForgotPassword(notice);
+    return renderSignInForm(notice);
+  }
+
+  function renderSignInForm(notice = '') {
+    show(
+      `<section class="card">
+        <h1>Shop owner sign in</h1>
+        <p class="muted small">Only shop owners sign in here. Customers do not need an account.</p>
+        <form id="auth-form" class="grid">
+          <label>Email
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>Password
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" data-label="Sign in">Sign in</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-switch="forgot">Forgot password?</button></p>
+        <p><button type="button" class="link" data-switch="register">New owner? Create an account</button></p>
+      </section>`
+    );
+    on('#auth-form', 'submit', onSignInSubmit);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+  }
+
+  async function onSignInSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const email = String(data.get('email') ?? '').trim();
+    const password = String(data.get('password') ?? '');
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await auth.signIn(email, password);
+      go([]);
+    } catch (err) {
+      if (err.code === 'email_not_confirmed') {
+        return startVerification(email, 'Your email is not verified yet. We have sent you a new code.');
+      }
+      setError(form, accountErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
+
+  // An owner who has not verified yet gets a new code, then the code screen.
+  async function startVerification(email, notice) {
+    pendingEmail = email;
+    pendingPassword = ''; // this owner did not register here, so there is no password to save
+    try {
+      await auth.resendSignupCode(email);
+      pendingSentAt = Date.now();
+      renderVerify(notice);
+    } catch (err) {
+      if (err.status === 429) pendingSentAt = Date.now(); // a code went out a moment ago
+      renderVerify(err.status === 429 ? 'A code was sent a moment ago. Enter it, or wait a minute to resend.' : otpErrorMessage(err, 'resend'));
+    }
+  }
+
+  function renderRegister(notice = '') {
+    show(
+      `<section class="card">
+        <h1>Create an owner account</h1>
+        <p class="muted small">Only shop owners register here. Customers do not need an account.
+           We will email a one-time code to confirm your address.</p>
+        <form id="auth-form" class="grid">
+          <label>Email
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>Password (at least 8 characters)
+            <input name="password" type="password" minlength="8" autocomplete="new-password" required />
+          </label>
+          <button type="submit" data-label="Create account">Create account</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-switch="signin">Already have an account? Sign in</button></p>
+      </section>`
+    );
+    on('#auth-form', 'submit', onRegisterSubmit);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+  }
+
+  async function onRegisterSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const email = String(data.get('email') ?? '').trim();
+    const password = String(data.get('password') ?? '');
+    if (!isEmailAddress(email)) return setError(form, 'Enter a valid email address.');
+    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await auth.signUp(email, password);
+      pendingEmail = email;
+      pendingSentAt = Date.now(); // signing up has just emailed the first code
+      pendingPassword = password;
+      renderVerify('');
+    } catch (err) {
+      setError(form, accountErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
+
+  function renderVerify(notice = '') {
+    show(
+      `<section class="card">
+        <h1>Check your email</h1>
+        <p>Enter the one-time code we emailed to <strong>${escapeHtml(pendingEmail)}</strong>.
+           It can take a minute to arrive, and it may be in your spam folder. Next you will
+           choose the password you use to sign in.</p>
+        <form id="auth-form" class="grid">
+          <label>Verification code
+            <input name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required />
+          </label>
+          <button type="submit" data-label="Verify email">Verify email</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-action="resend">Resend code</button></p>
+        <p class="muted small">Already verified? <button type="button" class="link" data-switch="signin">Sign in with your password</button></p>
+      </section>`
+    );
+    on('#auth-form', 'submit', onVerifySubmit);
+    on('[data-action="resend"]', 'click', onResendCode);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    startResendCountdown();
+  }
+
+  // The resend button stays disabled, with a countdown, until the cooldown ends.
+  function startResendCountdown() {
+    const button = app.querySelector('[data-action="resend"]');
+    if (!button) return;
+    const update = () => {
+      if (!button.isConnected) return clearResendTimer();
+      const wait = resendWaitSeconds(pendingSentAt, Date.now());
+      button.disabled = wait > 0;
+      button.textContent = wait > 0 ? `Resend code in ${wait} s` : 'Resend code';
+      if (wait <= 0) clearResendTimer();
+    };
+    clearResendTimer();
+    update();
+    if (button.disabled) resendTimer = setInterval(update, 1000);
+  }
+
+  async function onResendCode(event) {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    try {
+      await auth.resendSignupCode(pendingEmail);
+      pendingSentAt = Date.now();
+      renderVerify('A new code is on its way.');
+    } catch (err) {
+      if (err.status === 429) pendingSentAt = Date.now();
+      renderVerify(otpErrorMessage(err, 'resend'));
+    }
+  }
+
+  async function onVerifySubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const token = String(new FormData(form).get('token') ?? '').replace(/\s+/g, '');
+    if (!isOtpCode(token)) return setError(form, 'Enter the code from the email. It has 6 to 10 digits.');
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await auth.verifySignupCode(pendingEmail, token);
+    } catch (err) {
+      setError(form, otpErrorMessage(err, 'verify'));
+      setBusy(form, false);
+      return;
+    }
+    clearResendTimer();
+    pendingEmail = '';
+    // The password typed at registration is saved now, so the owner's own password is the
+    // one that works. An owner who came here from sign-in chooses one on the next screen.
+    const password = pendingPassword;
+    pendingPassword = '';
+    if (!password) return renderSetPassword();
+    return finishSignup(password);
+  }
+
+  // Saves the password and opens the account. A failure is shown on the password screen.
+  async function finishSignup(password) {
+    try {
+      await auth.completeSignup(password);
+    } catch (err) {
+      return signupFailed(err);
+    }
+    return go([]);
+  }
+
+  // A confirmation that has ended sends the owner to Forgot password. Any other failure
+  // keeps the owner on the password screen to try again.
+  function signupFailed(err) {
+    if (err.code === 'signup_expired') return renderSignIn('forgot', err.message);
+    return renderSetPassword(accountErrorMessage(err));
+  }
+
+  // The password step: after the code or the confirmation link, before the account opens.
+  // Nothing stays signed in until a password is saved.
+  function renderSetPassword(notice = '') {
+    clearResendTimer();
+    show(`<section class="card">
+      <h1>Choose your password</h1>
+      <p class="muted small">Your email is confirmed. Choose the password you will use to sign in from now on.
+         It replaces any password set before the confirmation. Use at least 8 characters.</p>
+      <form id="set-password-form" class="grid">
+        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <button type="submit" data-label="Save password">Save password</button>
+        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+      </form>
+      <p class="muted small">Cannot save a password? <button type="button" class="link" data-switch="forgot">Use Forgot password</button></p>
+    </section>`);
+    on('#set-password-form', 'submit', onSetPasswordSubmit);
+    onAll('[data-switch]', 'click', (event) => {
+      auth.abandonSignup();
+      renderSignIn(event.currentTarget.dataset.switch);
+    });
+  }
+
+  async function onSetPasswordSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const password = String(data.get('password') ?? '');
+    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
+    if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
+    setError(form, '');
+    setBusy(form, true);
+    return finishSignup(password);
+  }
+
+  // ---------- password reset (a separate flow, unchanged) ----------
+
+  function renderForgotPassword(notice = '') {
+    show(
+      `<section class="card">
+        <h1>Reset your password</h1>
+        <p class="muted small">We email a reset link to owners who have a password.</p>
+        <form id="auth-form" class="grid">
+          <label>Email
+            <input name="email" type="email" autocomplete="email" required />
+          </label>
+          <button type="submit" data-label="Send reset link">Send reset link</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+      </section>`
+    );
+    on('#auth-form', 'submit', onForgotSubmit);
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+  }
+
+  async function onForgotSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const email = String(new FormData(form).get('email') ?? '').trim();
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await auth.recoverPassword(email);
+      showResetSent(email);
+    } catch (err) {
+      setError(form, accountErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
+
+  // The same message whether or not the address has an account, so the form cannot be
+  // used to find which emails are registered.
+  function showResetSent(email) {
+    show(
+      `<section class="card">
+        <h1>Check your email</h1>
+        <p>If <strong>${escapeHtml(email)}</strong> has an owner account with a password, we have emailed a reset link. Open it on this device to choose a new password.</p>
+        <p><button type="button" class="link" data-switch="signin">Go to sign in</button></p>
+      </section>`
+    );
+    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+  }
+
+  function renderResetPassword(notice = '') {
+    show(`<section class="card">
+      <h1>Choose a new password</h1>
+      <p class="muted small">Use at least 8 characters. This recovery link is short-lived.</p>
+      <form id="reset-form" class="grid">
+        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <button type="submit">Save new password</button>
+        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+      </form>
+    </section>`);
+    on('#reset-form', 'submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const password = String(data.get('password') ?? '');
+      if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
+      setBusy(form, true);
+      try {
+        await auth.updatePassword(password);
+        await auth.signOut();
+        renderSignIn('signin', 'Password changed. Sign in with your new password.');
+      } catch (err) {
+        setError(form, accountErrorMessage(err));
+        setBusy(form, false);
+      }
+    });
+  }
+
+
+  // ---------- which shop to open ----------
+
+  // "#/owner": the first shop's home page, or a welcome card when there is no shop yet.
+  async function renderEntry() {
+    const list = await ownerApi.listMyShops(ownerUser.id);
+    if (!list.length) return renderNoShop();
+    return renderShopPage(list[0].slug, 'home', list);
+  }
+
+  function renderNoShop() {
+    show(`<section class="card empty-page">
+        <p class="eyebrow">OWNER ACCOUNT</p>
+        <h1>Add your shop</h1>
+        <p class="muted">Create your shop to get a QR code for your counter, set your prices and receive orders.</p>
+        <p><a class="button" href="#/owner/new">Create your shop</a></p>
+        <p><button type="button" class="ghost" data-action="signout">Sign out</button></p>
+      </section>`);
+    on('[data-action="signout"]', 'click', signOut);
+  }
+
+  // Loads one shop and its tab. Every tab starts from fresh data.
+  async function renderShopPage(slug, section = 'home', known = null, { notice = '', error = '' } = {}) {
+    const list = known ?? (await ownerApi.listMyShops(ownerUser.id));
+    shops = list;
+    const found = list.find((item) => item.slug === slug);
+    if (!found) {
+      show(notFoundHtml());
+      return;
+    }
+    shop = found;
+    tab = TAB_KEYS.includes(section) ? section : 'home';
+    if (tab !== 'more') pairing = null;
+    if (tab !== 'prices') editingServiceId = null;
+    orderView = { shopId: shop.id, ...(await loadOrderView(shop.id)) };
+
+    if (tab === 'home') return paintHome({ notice, error });
+    if (tab === 'orders') return paintOrders({ notice, error });
+    if (tab === 'prices') return renderPrices({ notice, error });
+    if (tab === 'stats') return statsPages.open(shop);
+    return paintMore({ notice, error });
+  }
+
+  // Runs one change, then shows the same tab again from fresh data.
+  async function afterChange(change, notice) {
+    let message = '';
+    try {
+      await change();
+    } catch (err) {
+      if (err.status === 401) return renderFailure(err);
+      message = messageFor(err);
+    }
+    return reloadTab({ notice: message ? '' : notice, error: message });
+  }
+
+  async function reloadTab(options = {}) {
+    try {
+      await renderShopPage(shop.slug, tab, null, options);
+    } catch (err) {
+      renderFailure(err);
+    }
+  }
+
+  // ---------- create a shop ----------
+
+  function renderNewShop() {
+    show(
+      `<section class="card">
+        <h1>Create your shop</h1>
+        <p class="muted small">You can change the name, phone, address, services and prices later.
+           The web address cannot be changed after the shop is created.</p>
+        <form id="shop-form" class="grid">
+          <label>Shop name
+            <input name="name" maxlength="120" required />
+          </label>
+          <label>Web address (letters, numbers and hyphens)
+            <input name="slug" maxlength="40" autocapitalize="off" spellcheck="false" required />
+          </label>
+          <p id="slug-hint" class="hint muted"></p>
+          <label>Phone (optional)
+            <input name="phone" type="tel" maxlength="20" autocomplete="tel" />
+          </label>
+          <label>Address (optional)
+            <input name="address" maxlength="200" autocomplete="street-address" />
+          </label>
+          <button type="submit" data-label="Create shop">Create shop</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+        <p><button type="button" class="link" data-action="back">Back to your shops</button></p>
+      </section>`
+    );
+
+    on('input[name="slug"]', 'input', (event) => {
+      const slug = event.currentTarget.value.trim().toLowerCase();
+      const hint = app.querySelector('#slug-hint');
+      if (hint) hint.textContent = slug ? `Your shop page will be at ${customerAddress(slug).url}` : '';
+    });
+    on('#shop-form', 'submit', onCreateShop);
+    on('[data-action="back"]', 'click', () => go([]));
+  }
+
+  async function onCreateShop(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      const details = validateShopDetails({
+        name: data.get('name'),
+        phone: data.get('phone'),
+        address: data.get('address'),
+      });
+      const slug = validateSlug(data.get('slug'));
+      const created = await ownerApi.createShop({ slug, ...details });
+      go(['shop', created.slug]);
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+    }
+  }
+
+  // ---------- Home: what needs you now ----------
+
+  async function paintHome({ notice = '', error = '' } = {}) {
+    const today = istToday();
+    // The money received today is the database's own total, not a figure worked out here.
+    const summary = await ownerApi.statsSummary(shop.id, today, today).catch(() => null);
+    const { orders, printing, jobsByItem } = orderView;
+    const counts = dashboardCounts(orders, jobsByItem);
+    const received = summary?.earnings?.net_paise;
+    const attention = sortOldestFirst(orders.filter((order) => needsOwnerAttention(order, jobsByItem)));
+
+    const tiles = `
+      <section class="kpi-grid" aria-label="Summary">
+        ${kpi('Waiting approval', counts.waitingApproval)}
+        ${kpi(
+          'UPI payments to check',
+          counts.paymentsToCheck,
+          counts.amountToCheckPaise ? `${formatPaise(counts.amountToCheckPaise)} to check` : ''
+        )}
+        ${kpi('Ready to print', counts.readyToPrint)}
+        ${kpi('Received today', typeof received === 'number' ? formatPaise(received) : '—')}
+      </section>`;
+
+    let needs;
+    if (attention.length) {
+      needs = `<ul class="order-list">${attention.map(orderCard).join('')}</ul>`;
+    } else if (orders.length) {
+      needs = '<p class="muted">Nothing needs you right now.</p>';
+    } else {
+      needs = '<p class="muted empty-state">No orders yet. Share your shop QR code to get your first order.</p>';
+    }
+
+    const body = `
+      ${tiles}
+      <section class="card owner-card">
+        <div class="between">
+          <h2>Needs you now</h2>
+          <button type="button" class="link" data-action="refresh">Refresh</button>
+        </div>
+        ${needs}
+      </section>
+      ${printerCardHtml(printing)}
+      <section class="card owner-card">
+        <h2>Shop QR code</h2>
+        <p class="muted small">Customers scan this code at your counter to upload files and order.</p>
+        <details class="qr-details"${orders.length ? '' : ' open'}>
+          <summary class="button ghost">Show shop QR code</summary>
+          ${qrBlock(shop)}
+        </details>
+      </section>`;
+
+    paintShell({
+      title: 'Needs you now',
+      body,
+      notice,
+      error,
+      headerAside: printing ? printerPillHtml(printing) : '',
+      bind: () => {
+        bindOrderCards();
+        bindQr();
+        on('[data-action="refresh"]', 'click', () => reloadTab());
+      },
+    });
+  }
+
+  // ---------- Orders ----------
+
+  function paintOrders({ notice = '', error = '' } = {}) {
+    const { orders } = orderView;
+    const visible = ordersShowAll ? orders : orders.filter((order) => isOpenOrder(order.status));
+    let empty = '';
+    if (!visible.length) {
+      empty = orders.length
+        ? '<p class="muted">No open orders right now. Switch to all orders to see finished ones.</p>'
+        : '<p class="muted">No orders yet. They appear here when customers place them.</p>';
+    }
+    const body = `
+      <section class="card owner-card">
+        <div class="between">
+          <p class="muted small">Page counts were counted from each file when it was uploaded.</p>
+          <button type="button" class="link" data-action="refresh">Refresh</button>
+        </div>
+        <div class="segmented">
+          <button type="button" class="${ordersShowAll ? '' : 'on'}" data-action="filter" data-all="false">Open orders</button>
+          <button type="button" class="${ordersShowAll ? 'on' : ''}" data-action="filter" data-all="true">All orders</button>
+        </div>
+        ${visible.length ? `<ul class="order-list">${visible.map(orderCard).join('')}</ul>` : empty}
+      </section>`;
+    paintShell({
+      title: 'Orders',
+      body,
+      notice,
+      error,
+      bind: () => {
+        on('[data-action="refresh"]', 'click', () => reloadTab());
+        onAll('[data-action="filter"]', 'click', (event) => {
+          ordersShowAll = event.currentTarget.dataset.all === 'true';
+          paintOrders();
+        });
+        bindOrderCards();
+      },
+    });
+  }
+
+  function orderCard(order) {
+    const { jobsByItem } = orderView;
+    const status = orderStatusView(order, jobsByItem);
+    const items = (order.order_items ?? [])
+      .map((item) => {
+        // Items from before file upload have no file, so they get no button.
+        const file = item.file_id
+          ? `<span class="file-line"><span class="muted small">${escapeHtml(item.file_name ?? 'File')}</span>` +
+            `<button type="button" class="link" data-file-id="${escapeHtml(item.file_id)}" ` +
+            `data-file-order="${escapeHtml(order.id)}">Download file</button></span>`
+          : '';
+        return `<li><span>${escapeHtml(describeOrderItem(item))}</span>` +
+          `<span class="num">${formatPaise(item.amount_paise)}</span>${file}${jobLineHtml(order, item)}</li>`;
+      })
+      .join('');
+    const sendButton = canSendToPrint(order, jobsByItem)
+      ? `<button type="button" data-send-order="${escapeHtml(order.id)}" data-code="${escapeHtml(order.tracking_code)}">Send to printer</button>`
+      : '';
+    // "Start printing" is not offered here: Send to printer queues the files and starts printing.
+    const buttons = orderStatusOptions(order)
+      .filter((next) => next !== 'printing')
+      .map(
+        (next) => `
+        <button type="button" class="${isIrreversibleMove(next) ? 'danger' : ''}"
+                data-order-id="${escapeHtml(order.id)}" data-next="${escapeHtml(next)}"
+                data-code="${escapeHtml(order.tracking_code)}">${escapeHtml(orderActionLabel(next))}</button>`
+      )
+      .join('');
+    const placed = new Date(order.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    return `
+      <li class="order">
+        <div class="between">
+          <span class="mono">${escapeHtml(order.tracking_code)}</span>
+          ${toneHtml(status.tone, status.label)}
+        </div>
+        <p class="muted small">${escapeHtml(placed)} · Total ${formatPaise(order.total_paise)}</p>
+        <ul class="plain">${items}</ul>
+        ${order.customer_note ? `<p class="note"><strong>Customer note:</strong> ${escapeHtml(order.customer_note)}</p>` : ''}
+        ${paymentSection(order)}
+        ${paidOrderStopNote(order) ? `<p class="muted small">${escapeHtml(paidOrderStopNote(order))}</p>` : ''}
+        ${sendButton || buttons ? `<div class="actions">${sendButton}${buttons}</div>` : ''}
+      </li>`;
+  }
+
+  // Payment line, payment buttons and (for cancelled or rejected orders) the reason.
+  // The database checks every change, so these buttons only show what is allowed.
+  function paymentSection(order) {
+    const payButtons = nextPaymentActions(order)
+      .map(
+        (step) => `
+        <button type="button" class="${step.danger ? 'danger' : ''}"
+                data-pay-order="${escapeHtml(order.id)}" data-pay-action="${escapeHtml(step.action)}"
+                data-pay-channel="${escapeHtml(step.channel ?? '')}" data-pay-code="${escapeHtml(order.tracking_code)}"
+                data-pay-amount="${escapeHtml(String(order.total_paise))}">${escapeHtml(step.label)}</button>`
+      )
+      .join('');
+    const stopped = order.status === 'cancelled' || order.status === 'rejected';
+    const reasonOptions = CANCEL_REASONS.map(
+      (reason) =>
+        `<option value="${escapeHtml(reason)}"${reason === order.cancel_reason ? ' selected' : ''}>` +
+        `${escapeHtml(cancelReasonLabel(reason))}</option>`
+    ).join('');
+    const reason = stopped
+      ? `<label class="small">Reason
+           <select data-reason-order="${escapeHtml(order.id)}" data-reason-code="${escapeHtml(order.tracking_code)}">
+             <option value="">${order.cancel_reason ? 'Change the reason' : 'Choose a reason'}</option>
+             ${reasonOptions}
+           </select>
+         </label>`
+      : '';
+    return `<p class="small"><strong>Payment:</strong> ${escapeHtml(paymentLabel(order))}</p>
+      ${payButtons ? `<div class="actions">${payButtons}</div>` : ''}
+      ${reason}`;
+  }
+
+  // The job status under one order item, with "Print again" when a retry is allowed.
+  function jobLineHtml(order, item) {
+    const job = orderView.jobsByItem.get(item.id);
+    if (!job) return '';
+    const failure = refundedWhilePrinting(order, job) ? REFUND_PRINTING_TEXT : printFailureText(job);
+    const retry = retryOptions(job);
+    const again = retry
+      ? `<button type="button" class="link" data-retry-job="${escapeHtml(job.id)}"
+                 data-retry-confirm="${retry.confirmMayHavePrinted}" data-retry-warning="${escapeHtml(retry.warning)}"
+                 data-code="${escapeHtml(order.tracking_code)}">Print again</button>`
+      : '';
+    return `<span class="job-line small">${escapeHtml(printJobLabel(job.status))}` +
+      `${failure ? `: ${escapeHtml(failure)}` : ''} ${again}</span>`;
+  }
+
+  // The order buttons are the same on Home and Orders, so they are wired in one place.
+  function bindOrderCards() {
+    onAll('[data-order-id]', 'click', onOrderAction);
+    onAll('[data-file-id]', 'click', onFileLink);
+    onAll('[data-pay-order]', 'click', onPaymentAction);
+    onAll('[data-reason-order]', 'change', onReasonChange);
+    onAll('[data-send-order]', 'click', onSendToPrint);
+    onAll('[data-retry-job]', 'click', onRetryJob);
+  }
+
+  async function onOrderAction(event) {
+    const button = event.currentTarget;
+    const { orderId, next: status, code } = button.dataset;
+    if (isIrreversibleMove(status) && !window.confirm(`${orderActionLabel(status)} order ${code}? This cannot be undone.`)) {
+      return;
+    }
+    button.disabled = true;
+    return afterChange(
+      () => ownerApi.updateOrderStatus(shop.id, orderId, status),
+      `Order ${code} is now ${ownerStatusLabel(status).toLowerCase()}.`
+    );
+  }
+
+  async function onPaymentAction(event) {
+    const button = event.currentTarget;
+    const { payOrder, payAction, payChannel, payCode, payAmount } = button.dataset;
+    if (
+      payAction === 'refund' &&
+      !window.confirm(`Record a refund of ${formatPaise(Number(payAmount))} for order ${payCode}? This cannot be undone.`)
+    ) {
+      return;
+    }
+    button.disabled = true;
+    return afterChange(
+      () => ownerApi.setOrderPayment(payOrder, payAction, payChannel || null),
+      `Payment updated for order ${payCode}.`
+    );
+  }
+
+  async function onReasonChange(event) {
+    const select = event.currentTarget;
+    const reason = select.value;
+    if (!reason) return;
+    select.disabled = true;
+    return afterChange(
+      () => ownerApi.setCancelReason(select.dataset.reasonOrder, reason),
+      `Reason saved for order ${select.dataset.reasonCode}.`
+    );
+  }
+
+  // Opens a file through a five-minute link. The link is only made after the server
+  // confirms this owner's shop.
+  async function onFileLink(event) {
+    const button = event.currentTarget;
+    const { fileId, fileOrder } = button.dataset;
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Opening…';
+    try {
+      const link = await ownerApi.getFileLink(fileOrder, fileId);
+      // Not noopener: the call returns null when the browser blocks the tab, which we need to know.
+      const tab = window.open(link.url, '_blank');
+      if (tab) {
+        tab.opener = null;
+      } else {
+        setTopError('Your browser blocked the new tab. Allow pop-ups for this site and try again.');
+      }
+    } catch (err) {
+      setTopError(messageFor(err));
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = label;
+      }
+    }
+  }
+
+  // ---------- automatic printing ----------
+
+  // Sends a paid order's files to the printing computers. The notice says "sent", not
+  // "printed": a page only prints when a computer picks the job up.
+  async function onSendToPrint(event) {
+    const button = event.currentTarget;
+    const { sendOrder, code } = button.dataset;
+    button.disabled = true;
+    return afterChange(
+      () => ownerApi.approveForPrint(sendOrder),
+      `Order ${code} was sent to the printing computer. It prints when the computer picks it up.`
+    );
+  }
+
+  // Printing again asks for a second confirmation when the page may already have come out.
+  async function onRetryJob(event) {
+    const button = event.currentTarget;
+    const { retryJob, retryConfirm, retryWarning, code } = button.dataset;
+    const mayHavePrinted = retryConfirm === 'true';
+    if (mayHavePrinted && !window.confirm(`${retryWarning}\n\nPrint order ${code} again?`)) return;
+    button.disabled = true;
+    return afterChange(
+      () => ownerApi.retryPrintJob(retryJob, mayHavePrinted),
+      `Order ${code} was queued to print again.`
+    );
+  }
+
+  // ---------- Prices: services, printing features, cash rules ----------
+
+  async function renderPrices(options = {}) {
+    [services, catalog, paperSizes, extraCharges, customerPaper] = await Promise.all([
+      ownerApi.listServices(shop.id),
+      ownerApi.listFeatureCatalog(),
+      ownerApi.listPaperSizes(shop.id),
+      ownerApi.listExtraCharges(shop.id),
+      // What customers can choose (migration 0013). Null when it cannot be read: the owner's offer is shown instead.
+      ownerApi.listCustomerPaperSizes(shop.slug).catch(() => null),
+    ]);
+    paintPrices(options);
+  }
+
+  function paintPrices({ notice = '', error = '' } = {}) {
+    const editing = services.find((service) => service.id === editingServiceId) ?? null;
+    const rows = services
+      .map((service) => {
+        const bw = service.bw_price_paise === null ? '–' : formatPaise(service.bw_price_paise);
+        const colour = service.colour_price_paise === null ? '–' : formatPaise(service.colour_price_paise);
+        const hidden = service.is_active ? '' : ' <span class="muted small">(hidden from customers)</span>';
+        return `
+          <tr>
+            <td>${escapeHtml(service.name)}${hidden}</td>
+            <td>${escapeHtml(unitLabel(service.pricing_unit))}</td>
+            <td class="num">${bw}</td>
+            <td class="num">${colour}</td>
+            <td><button type="button" class="link" data-edit="${escapeHtml(service.id)}">Edit</button></td>
+          </tr>`;
+      })
+      .join('');
+    const serviceTable = services.length
+      ? `<div class="table-wrap">
+           <table class="breakdown">
+             <thead><tr><th>Service</th><th>Charged</th><th class="num">B&amp;W</th><th class="num">Colour</th><th></th></tr></thead>
+             <tbody>${rows}</tbody>
+           </table>
+         </div>`
+      : '<p class="muted">No services yet. Add one below.</p>';
+
+    const selectedUnit = editing?.pricing_unit ?? 'per_side';
+    const unitOptions = UNIT_OPTIONS.map(
+      (option) =>
+        `<option value="${option.value}"${option.value === selectedUnit ? ' selected' : ''}>${escapeHtml(option.label)}</option>`
+    ).join('');
+
+    const body = `
+      <div class="prices-layout">
+        <div class="prices-main">
+          <section class="card owner-card">
+            <h2>Services and prices</h2>
+            ${serviceTable}
+          </section>
+          <section class="card owner-card">
+            <h2>${editing ? 'Edit service' : 'Add a service'}</h2>
+            <form id="service-form" class="grid">
+              <input type="hidden" name="serviceId" value="${escapeHtml(editing?.id ?? '')}" />
+              <label>Service name
+                <input name="name" maxlength="80" required value="${escapeHtml(editing?.name ?? '')}" />
+              </label>
+              <label>Charged
+                <select name="pricingUnit">${unitOptions}</select>
+              </label>
+              <label>Black and white price in rupees (leave empty if not offered)
+                <input name="bwPrice" inputmode="decimal" placeholder="for example 2 or 2.50"
+                       value="${escapeHtml(paiseToRupeesInput(editing?.bw_price_paise))}" />
+              </label>
+              <label>Colour price in rupees (leave empty if not offered)
+                <input name="colourPrice" inputmode="decimal" placeholder="for example 10"
+                       value="${escapeHtml(paiseToRupeesInput(editing?.colour_price_paise))}" />
+              </label>
+              <label class="check">
+                <input name="isActive" type="checkbox" ${editing?.is_active === false ? '' : 'checked'} />
+                Show this service to customers
+              </label>
+              <button type="submit" data-label="${editing ? 'Save service' : 'Add service'}">
+                ${editing ? 'Save service' : 'Add service'}
+              </button>
+              ${editing ? '<button type="button" class="link" data-action="cancel-edit">Cancel editing</button>' : ''}
+              <p class="error" data-error role="alert"></p>
+            </form>
+          </section>
+          ${paperSizesCard()}
+          ${extraChargesCard()}
+          ${featuresCard(shop, catalog)}
+          ${cashPolicyCard(shop)}
+        </div>
+        <aside class="card owner-card">
+          <h2>Customer preview</h2>
+          <p class="muted small">What a customer who scans your code sees.</p>
+          ${pricePreviewHtml(shop, services, customerPaper ?? paperSizes, extraCharges)}
+        </aside>
+      </div>`;
+
+    paintShell({
+      title: 'Prices',
+      body,
+      notice,
+      error,
+      bind: () => {
+        on('#service-form', 'submit', onSaveService);
+        on('#features-form', 'submit', onSaveFeatures);
+        on('#cash-policy-form', 'submit', onSaveCashPolicy);
+        on('#paper-form', 'submit', onSavePaper);
+        on('#charges-form', 'submit', onSaveCharges);
+        on('#charges-form', 'click', onChargesClick);
+        on('[data-action="cancel-edit"]', 'click', () => {
+          editingServiceId = null;
+          paintPrices();
+        });
+        onAll('[data-edit]', 'click', (event) => {
+          editingServiceId = event.currentTarget.dataset.edit;
+          paintPrices();
+        });
+      },
+    });
+  }
+
+  // Yes/no switches for each feature. Customers only see the features that are on.
+  // Paper sizes the shop prints on. A size left unticked is not offered. The extra charge is per billed unit.
+  function paperSizesCard() {
+    const rows = paperOptions(paperSizes)
+      .map(
+        (option) => `
+          <tr data-paper-row="${option.size}">
+            <td><strong>${option.size}</strong></td>
+            <td><label class="check"><input type="checkbox" data-offered${option.offered ? ' checked' : ''} aria-label="Offer ${option.size}" /> Offer</label></td>
+            <td class="num"><input data-surcharge inputmode="decimal" placeholder="0" aria-label="Extra charge for ${option.size} in rupees per billed unit" value="${escapeHtml(paiseToRupeesInput(option.surchargePaise))}" /></td>
+          </tr>`
+      )
+      .join('');
+    return `
+      <section class="card owner-card">
+        <h2>Paper sizes</h2>
+        <p class="muted small">Sizes customers can choose. An extra charge is added to each billed unit of that size.
+           Changes apply to new orders. Existing orders keep their prices.</p>
+        ${paperSizes.length ? '' : '<p class="notice small">Not saved yet. Until you save, customers can choose A4 only.</p>'}
+        ${paperSizesRefusedNote()}
+        <form id="paper-form" class="grid">
+          <div class="table-wrap">
+            <table class="breakdown">
+              <thead><tr><th>Size</th><th>Offered</th><th class="num">Extra per unit (₹)</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <button type="submit" data-label="Save paper sizes">Save paper sizes</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>`;
+  }
+
+  // A size the owner offers that customers cannot order, because a print computer here cannot choose its tray.
+  function paperSizesRefusedNote() {
+    if (!customerPaper) return '';
+    const shown = new Set(customerPaper.filter((row) => row.is_offered).map((row) => row.paper_size));
+    const hidden = paperSizes.filter((row) => row.is_offered && !shown.has(row.paper_size)).map((row) => row.paper_size);
+    if (!hidden.length) return '';
+    return `<p class="notice small">Customers cannot order ${escapeHtml(hidden.join(' or '))} from this shop. ` +
+      'A print computer here cannot choose that paper tray, so QRquick refuses those orders before any charge. ' +
+      'Your offer is kept, and it applies again once the computer can choose the tray.</p>';
+  }
+
+  // Charges added to every order at this shop, such as a binding fee. Up to ten.
+  function extraChargesCard() {
+    const rows = extraCharges.map((charge) => chargeRowHtml(charge)).join('');
+    return `
+      <section class="card owner-card">
+        <h2>Extra charges</h2>
+        <p class="muted small">Added to every order at your shop, and shown to customers before they order. Up to 10.
+           Changes apply to new orders. Existing orders keep their prices.</p>
+        <form id="charges-form" class="grid">
+          <div id="charge-rows" class="grid">${rows}</div>
+          <p class="muted small" data-charge-empty${extraCharges.length ? ' hidden' : ''}>No extra charges yet.</p>
+          <button type="button" class="link" data-add-charge${extraCharges.length >= 10 ? ' disabled' : ''}>Add a charge</button>
+          <button type="submit" data-label="Save extra charges">Save extra charges</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>`;
+  }
+
+  function chargeRowHtml(charge) {
+    return `
+          <fieldset class="charge-row" data-charge-row>
+            <legend class="sr-only">Extra charge</legend>
+            <label>Name
+              <input data-charge-label maxlength="60" placeholder="for example Binding fee" value="${escapeHtml(charge.label ?? '')}" />
+            </label>
+            <label>Amount in rupees
+              <input data-charge-amount inputmode="decimal" placeholder="for example 20" value="${escapeHtml(paiseToRupeesInput(charge.amount_paise))}" />
+            </label>
+            <label>Charged
+              <select data-charge-basis>
+                <option value="per_order"${charge.basis === 'per_item' ? '' : ' selected'}>Once per order</option>
+                <option value="per_item"${charge.basis === 'per_item' ? ' selected' : ''}>For each file</option>
+              </select>
+            </label>
+            <label class="check"><input type="checkbox" data-charge-active${charge.is_active === false ? '' : ' checked'} /> Show to customers</label>
+            <button type="button" class="link" data-remove-charge>Remove</button>
+          </fieldset>`;
+  }
+
+  // Add and remove work on the rows in the page. Nothing is saved until the form is submitted.
+  function onChargesClick(event) {
+    const container = app.querySelector('#charge-rows');
+    if (!container) return;
+    if (event.target.closest('[data-add-charge]')) {
+      if (container.querySelectorAll('[data-charge-row]').length < 10) {
+        container.insertAdjacentHTML('beforeend', chargeRowHtml({ basis: 'per_order', is_active: true }));
+      }
+    } else if (event.target.closest('[data-remove-charge]')) {
+      event.target.closest('[data-charge-row]')?.remove();
+    } else {
+      return;
+    }
+    updateChargeControls();
+  }
+
+  function updateChargeControls() {
+    const count = app.querySelectorAll('[data-charge-row]').length;
+    app.querySelector('[data-add-charge]')?.toggleAttribute('disabled', count >= 10);
+    app.querySelector('[data-charge-empty]')?.toggleAttribute('hidden', count > 0);
+  }
+
+  async function onSavePaper(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setError(form, '');
+    let sizes;
+    try {
+      const rows = [...form.querySelectorAll('[data-paper-row]')].map((row) => ({
+        size: row.dataset.paperRow,
+        offered: row.querySelector('[data-offered]').checked,
+        surcharge: row.querySelector('[data-surcharge]').value,
+      }));
+      sizes = validatePaperSizesForm(rows);
+    } catch (err) {
+      setError(form, messageFor(err));
+      return;
+    }
+    setBusy(form, true);
+    try {
+      await ownerApi.savePaperSizes(shop.id, sizes);
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+      return;
+    }
+    return reloadTab({ notice: 'Paper sizes saved. Customers now see the updated sizes.' });
+  }
+
+  async function onSaveCharges(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setError(form, '');
+    let charges;
+    try {
+      const rows = [...form.querySelectorAll('[data-charge-row]')].map((row) => ({
+        label: row.querySelector('[data-charge-label]').value,
+        amount: row.querySelector('[data-charge-amount]').value,
+        basis: row.querySelector('[data-charge-basis]').value,
+        isActive: row.querySelector('[data-charge-active]').checked,
+      }));
+      charges = validateChargesForm(rows);
+    } catch (err) {
+      setError(form, messageFor(err));
+      return;
+    }
+    setBusy(form, true);
+    try {
+      await ownerApi.saveExtraCharges(shop.id, charges);
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+      return;
+    }
+    return reloadTab({ notice: 'Extra charges saved. Customers now see the updated charges.' });
+  }
+
+  function featuresCard(shopRow, featureCatalog) {
+    const items = featureCatalog
+      .map((feature) => {
+        const isOn = shopRow.features?.[feature.key] === true;
+        const note = feature.affects_orders ? ' <span class="muted small">(priced when customers order)</span>' : '';
+        return `
+          <label class="check">
+            <input type="checkbox" name="feature" value="${escapeHtml(feature.key)}"${isOn ? ' checked' : ''} />
+            <span>${escapeHtml(feature.label)}${note}</span>
+          </label>`;
+      })
+      .join('');
+    return `
+      <section class="card owner-card">
+        <h2>Printing features</h2>
+        <p class="muted small">Tick what your shop offers. Customers see only the features that are ticked.
+           Turning colour printing off does not remove your colour prices. It only stops customers choosing colour.</p>
+        <form id="features-form" class="grid">
+          <div class="feature-list">${items}</div>
+          <button type="submit" data-label="Save features">Save features</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>`;
+  }
+
+  function cashPolicyCard(shopRow) {
+    return `<section class="card owner-card">
+      <h2>Cash and order rules</h2>
+      <form id="cash-policy-form" class="grid">
+        <p class="muted small">Customers see this: ${escapeHtml(CASH_PAYMENT_TEXT)} Cash timing is fixed, so it is not a setting.</p>
+        <label>Minimum order amount in rupees
+          <input name="minimumOrder" inputmode="decimal" placeholder="0 for no minimum"
+                 value="${escapeHtml(paiseToRupeesInput(shopRow.minimum_order_paise ?? 0))}" />
+        </label>
+        <p class="muted small">These rules are enforced by the database and shown to customers before submission.</p>
+        <button type="submit" data-label="Save cash rules">Save cash rules</button>
+        <p class="error" data-error role="alert"></p>
+      </form>
+    </section>`;
+  }
+
+  async function onSaveService(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const serviceId = String(data.get('serviceId') ?? '');
+    setError(form, '');
+    let fields;
+    try {
+      fields = validateService({
+        name: data.get('name'),
+        pricingUnit: data.get('pricingUnit'),
+        bwPrice: data.get('bwPrice'),
+        colourPrice: data.get('colourPrice'),
+        isActive: data.get('isActive') === 'on',
+      });
+    } catch (err) {
+      setError(form, messageFor(err));
+      return;
+    }
+    setBusy(form, true);
+    try {
+      if (serviceId) {
+        await ownerApi.updateService(shop.id, serviceId, fields);
+      } else {
+        await ownerApi.createService(shop.id, fields);
+      }
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+      return;
+    }
+    editingServiceId = null;
+    return reloadTab({ notice: serviceId ? 'Service saved.' : 'Service added.' });
+  }
+
+  async function onSaveFeatures(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const chosen = new Set(new FormData(form).getAll('feature'));
+    const features = Object.fromEntries(catalog.map((feature) => [feature.key, chosen.has(feature.key)]));
+    setError(form, '');
+    setBusy(form, true);
+    try {
+      await ownerApi.saveFeatures(shop.id, features);
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+      return;
+    }
+    return reloadTab({ notice: 'Features saved. Customers now see the updated list.' });
+  }
+
+  async function onSaveCashPolicy(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setError(form, '');
+    setBusy(form, true);
+    let fields;
+    try {
+      fields = validateCashPolicy({ minimumRupees: data.get('minimumOrder') });
+      await ownerApi.updateShop(shop.id, fields);
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+      return;
+    }
+    return reloadTab({ notice: 'Cash rules saved.' });
+  }
+
+  // ---------- More: shop details, QR code, payment QR, printers, shops, account ----------
+
+  function paintMore({ notice = '', error = '' } = {}) {
+    const address = customerAddress(shop.slug);
+    const shopLinks = shops
+      .map(
+        (item) => `
+        <li class="owner-shop-card">
+          <div class="between">
+            <a href="#/owner/shop/${encodeURIComponent(item.slug)}"><strong>${escapeHtml(item.name)}</strong></a>
+            <span class="shop-status ${item.is_open ? 'is-open' : ''}">${item.is_open ? 'Open' : 'Closed'}</span>
+          </div>
+          <span class="muted small">/${escapeHtml(item.slug)}</span>
+        </li>`
+      )
+      .join('');
+
+    const body = `
+      <section class="card owner-card">
+        <h2>Shop status</h2>
+        <p class="${shop.is_open ? 'badge ok' : 'badge closed'}">
+          ${shop.is_open ? 'Open for orders' : 'Closed. Customers can see prices but cannot order.'}
+        </p>
+        <p><button type="button" data-action="toggle-open">${shop.is_open ? 'Close shop' : 'Open shop'}</button></p>
+      </section>
+
+      <section class="card owner-card">
+        <h2>Shop details</h2>
+        <form id="details-form" class="grid">
+          <label>Shop name
+            <input name="name" maxlength="120" required value="${escapeHtml(shop.name)}" />
+          </label>
+          <label>Phone
+            <input name="phone" type="tel" maxlength="20" value="${escapeHtml(shop.phone ?? '')}" />
+          </label>
+          <label>Address
+            <input name="address" maxlength="200" value="${escapeHtml(shop.address ?? '')}" />
+          </label>
+          <button type="submit" data-label="Save details">Save details</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>
+
+      <section class="card owner-card">
+        <h2>Customer page and QR code</h2>
+        <label>Customer page address
+          <input readonly value="${escapeHtml(address.url)}" />
+        </label>
+        ${qrBlock(shop)}
+      </section>
+
+      ${paymentQrCard(shop)}
+
+      <section class="card owner-card">
+        <h2>Printing computers</h2>
+        ${printPanelHtml()}
+      </section>
+
+      <section class="card owner-card">
+        <h2>Your shops</h2>
+        <ul class="list owner-shop-list">${shopLinks}</ul>
+        <p><a class="button secondary" href="#/owner/new">+ Create another shop</a></p>
+      </section>
+
+      <section class="card owner-card">
+        <h2>Account</h2>
+        <p class="muted small">Signed in as ${escapeHtml(ownerUser?.email ?? '')}</p>
+        <p><button type="button" class="ghost" data-action="signout">Sign out</button></p>
+      </section>`;
+
+    paintShell({
+      title: 'More',
+      body,
+      notice,
+      error,
+      bind: () => {
+        on('#details-form', 'submit', onSaveDetails);
+        on('#payment-qr-form', 'submit', onUploadPaymentQr);
+        on('[data-action="remove-payment-qr"]', 'click', onRemovePaymentQr);
+        on('[data-action="toggle-open"]', 'click', onToggleOpen);
+        on('[data-action="signout"]', 'click', signOut);
+        on('[data-print-action="pair"]', 'click', onPairPrinter);
+        onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
+        onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
+        bindQr();
+        const pageAddress = app.querySelector('input[readonly]');
+        pageAddress?.addEventListener('focus', () => pageAddress.select());
+      },
+    });
+  }
+
+  // The QR code, or a warning when customers could not reach the page address.
+  function qrBlock(shopRow) {
+    const address = customerAddress(shopRow.slug);
+    if (address.problem) {
+      return `<p class="banner" role="alert">${escapeHtml(address.problem)} QR generation is disabled until a verified HTTPS customer URL is configured.</p>`;
+    }
+    return `<div class="qr-row">
+        <div class="qr-box">${qrSvg(address.url)}</div>
+        <div class="qr-text">
+          <p class="muted small">Print this code and place it at your counter. Customers scan it to open their page, upload files and place an order.</p>
+          <button type="button" data-action="download-qr">Download QR as PNG</button>
+        </div>
+      </div>`;
+  }
+
+  function bindQr() {
+    on('[data-action="download-qr"]', 'click', () => downloadQr(shop.slug));
+  }
+
+  // Saves the shop's QR code as a PNG for printing. It is drawn in the browser
+  // from the same address shown on the page.
+  function downloadQr(slug) {
+    const { url, problem } = customerAddress(slug);
+    if (problem) {
+      setTopError(`${problem} QR generation is disabled until a verified HTTPS customer URL is configured.`);
+      return;
+    }
+    qrCanvas(url, 12).toBlob((blob) => {
+      if (!blob) {
+        setTopError('The QR code could not be saved. Try again.');
+        return;
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `qrquick-${slug}-qr.png`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    }, 'image/png');
+  }
+
+  // The payment QR is shown to customers on the shop page and after they order.
+  function paymentQrCard(shopRow) {
+    const current = shopRow.payment_qr_path
+      ? `<img class="payment-qr-preview" alt="Your payment QR code"
+              src="${escapeHtml(publicAssetUrl(config.supabaseUrl, shopRow.payment_qr_path))}" />
+         <p><button type="button" class="link" data-action="remove-payment-qr">Remove payment QR</button></p>`
+      : '<p class="muted">No payment QR yet.</p>';
+    return `
+      <section class="card owner-card">
+        <h2>Payment QR code</h2>
+        <p class="muted small">Upload the QR code from your UPI app or bank (PNG or JPEG, up to 2 MB).
+           Customers see it on your page and after they place an order, so they can pay you.</p>
+        ${current}
+        <form id="payment-qr-form" class="grid">
+          <label>${shopRow.payment_qr_path ? 'Replace with a new image' : 'Choose the image'}
+            <input name="qr" type="file" accept="image/png,image/jpeg" required />
+          </label>
+          <button type="submit" data-label="Upload payment QR">Upload payment QR</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>`;
+  }
+
+  async function onSaveDetails(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setError(form, '');
+    setBusy(form, true);
+    let details;
+    try {
+      details = validateShopDetails({
+        name: data.get('name'),
+        phone: data.get('phone'),
+        address: data.get('address'),
+      });
+      await ownerApi.updateShop(shop.id, details);
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+      return;
+    }
+    return reloadTab({ notice: 'Shop details saved.' });
+  }
+
+  async function onUploadPaymentQr(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const file = new FormData(form).get('qr');
+    setError(form, '');
+    const problem = checkPaymentQrFile(file);
+    if (problem) {
+      setError(form, problem);
+      return;
+    }
+    setBusy(form, true);
+    try {
+      await ownerApi.uploadPaymentQr(shop.id, file, shop.payment_qr_path);
+    } catch (err) {
+      setError(form, messageFor(err));
+      setBusy(form, false);
+      return;
+    }
+    return reloadTab({ notice: 'Payment QR saved. Customers will see it on your page.' });
+  }
+
+  async function onRemovePaymentQr(event) {
+    if (!window.confirm('Remove the payment QR from your shop? Customers will no longer see it.')) return;
+    event.currentTarget.disabled = true;
+    return afterChange(
+      () => ownerApi.removePaymentQr(shop.id, shop.payment_qr_path),
+      'Payment QR removed.'
+    );
+  }
+
+  async function onToggleOpen() {
+    const opening = !shop.is_open;
+    return afterChange(
+      () => ownerApi.updateShop(shop.id, { is_open: opening }),
+      opening
+        ? 'Your shop is open. Customers can place orders.'
+        : 'Your shop is closed. Customers cannot place orders.'
+    );
+  }
+
+  // The printing computers and the pairing box. Only the shop owner can pair, rename or remove them.
+  function printPanelHtml() {
+    const printing = orderView.printing;
+    if (!printing) {
+      return '<p class="muted small">Automatic printing status is not available right now.</p>';
+    }
+    const agents = printing.agents ?? [];
+    const notice = printingNotice({ agents, jobs: printing.jobs ?? [] });
+    const rows = agents.map((agent) => agentRowHtml(agent, printing.is_owner)).join('');
+    const pairingBox = pairing
+      ? `<div class="notice" data-pairing>
+           <p><strong>Pairing code: <span class="mono">${escapeHtml(pairing.code)}</span></strong>
+              Valid until ${escapeHtml(new Date(pairing.expires_at).toLocaleTimeString('en-IN', { timeStyle: 'short' }))}. Use it once.</p>
+           <p class="small">On the shop computer, open a terminal in the agent folder and run:</p>
+           <p class="mono small">qrquick-print-agent pair ${escapeHtml(printAgentFunctionUrl(config.supabaseUrl))} ${escapeHtml(pairing.code)}</p>
+         </div>`
+      : '';
+    return `
+      <div class="print-panel">
+        ${notice ? `<p class="banner">${escapeHtml(notice)}</p>` : ''}
+        ${rows || '<p class="muted small">No computer is connected for printing yet.</p>'}
+        ${printing.is_owner
+          ? '<div class="actions"><button type="button" data-print-action="pair">Connect a printing computer</button></div>'
+          : ''}
+        ${pairingBox}
+      </div>`;
+  }
+
+  function agentRowHtml(agent, isOwner) {
+    const options = (agent.printers ?? [])
+      .map(
+        (printer) =>
+          `<option value="${escapeHtml(printer.name)}"${printer.name === agent.chosen_printer ? ' selected' : ''}>` +
+          `${escapeHtml(printerOptionLabel(printer))}</option>`
+      )
+      .join('');
+    const controls = isOwner
+      ? `<label class="small">Printer
+           <select data-agent-printer="${escapeHtml(agent.id)}">
+             <option value="">Use this computer's default</option>
+             ${options}
+           </select>
+         </label>
+         <button type="button" class="link danger" data-print-action="revoke"
+                 data-agent-id="${escapeHtml(agent.id)}" data-agent-name="${escapeHtml(agent.name)}">Remove</button>`
+      : '';
+    return `<div class="agent-row">
+        <span><strong>${escapeHtml(agent.name)}</strong> · ${escapeHtml(agentStatusLabel(agent))}</span>
+        ${controls}
+      </div>`;
+  }
+
+  async function onPairPrinter(event) {
+    event.currentTarget.disabled = true;
+    try {
+      pairing = await ownerApi.createPrintPairing(shop.id);
+    } catch (err) {
+      return reloadTab({ error: messageFor(err) });
+    }
+    return paintMore();
+  }
+
+  async function onRevokePrinter(event) {
+    const { agentId, agentName } = event.currentTarget.dataset;
+    if (!window.confirm(`Remove "${agentName}"? It stops printing until it is paired again.`)) return;
+    return afterChange(() => ownerApi.revokePrintAgent(agentId), `"${agentName}" was removed.`);
+  }
+
+  async function onAgentPrinterChange(event) {
+    const select = event.currentTarget;
+    select.disabled = true;
+    return afterChange(
+      () => ownerApi.setAgentPrinter(select.dataset.agentPrinter, select.value || null),
+      'The printer for that computer was saved.'
+    );
+  }
+
+  return { render };
+}

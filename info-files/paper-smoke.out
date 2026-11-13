@@ -1,0 +1,20 @@
+PASS  A4 is selected to start
+PASS  A3 can be chosen
+PASS  Letter is disabled because the shop does not offer it
+PASS  Letter says it is not offered here, in words  (Letter (not offered at this shop) Choose another size)
+PASS  A3 shows its extra charge in the unit of the service picked
+PASS  A4 shows no extra charge
+PASS  the shop extra charge is shown before ordering  (Extra charges at this shop: Binding fee ₹20.00 per order. They are added to your total.)
+PASS  the cart line names the paper size  (Document printing · poster.pdf (2 pages) × 1 copy · B&W, single-sided, A3 paper Remove)
+PASS  the quote shows the paper surcharge on the line  (Item Billed Amount Document printing · poster.pdf · A3 paper 2 per printed side × ₹2.00 + ₹2.00 for A3 paper ₹8.00 Binding fee · per order 1 × ₹20.00 ₹20.00 Total · cash ₹28.00 The shop's system recalculates this when you place the order.)
+PASS  the quote shows the extra charge as its own row  (Item Billed Amount Document printing · poster.pdf · A3 paper 2 per printed side × ₹2.00 + ₹2.00 for A3 paper ₹8.00 Binding fee · per order 1 × ₹20.00 ₹20.00 Total · cash ₹28.00 The shop's system recalculates this when you place the order.)
+PASS  the quote total includes the charge: ₹28.00  (Item Billed Amount Document printing · poster.pdf · A3 paper 2 per printed side × ₹2.00 + ₹2.00 for A3 paper ₹8.00 Binding fee · per order 1 × ₹20.00 ₹20.00 Total · cash ₹28.00 The shop's system recalculates this when you place the order.)
+PASS  the quote request sends the chosen paper size and no prices  ({"service_id":"cccccccc-0000-0000-0000-000000000001","file_id":"file-1","copies":1,"colour":false,"duplex":false,"paper_size":"A3"})
+PASS  the order request sends paper size A3 and no prices  ({"service_id":"cccccccc-0000-0000-0000-000000000001","file_id":"file-1","copies":1,"colour":false,"duplex":false,"paper_size":"A3"})
+PASS  with no paper rows, A4 is the only size offered
+PASS  with no paper rows, A3 is disabled
+PASS  with no paper rows, Letter is disabled
+PASS  A4 with no surcharge is priced: ₹24.00  (Item Billed Amount Document printing · poster.pdf · A4 paper 2 per printed side × ₹2.00 ₹4.00 Binding fee · per order 1 × ₹20.00 ₹20.00 Total · cash ₹24.00 The shop's system recalculates this when you place the order.)
+PASS  no page errors or console errors
+
+ALL CHECKS PASSED

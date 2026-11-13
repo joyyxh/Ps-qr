@@ -1,0 +1,6 @@
+web_npm_test exit=0 :: cd web && npm test
+agent_npm_test_node_22 exit=0 :: cd agent && npm test
+admin_presence_and_test exit=0 :: if [ -f admin/package.json ]; then cd admin && npm test; else echo admin absent; fi
+sql_harness_parse exit=0 :: if ls supabase/tests/licence_7c/*.py >/dev/null 2>&1; then python3 -c "import ast, glob; files = sorted(glob.glob('supabase/tests/licence_7c/*.py')); assert files, 'no harness files'; [ast.parse(open(f, encoding='utf-8').read(), f) for f in files]; print(len(files), 'harness files parse')"; else echo harness absent; fi
+node_guard_v22 exit=0 :: node -e "const p = process.versions.node.split('.').map(Number); if (p[0] < 18 || (p[0] === 18 && p[1] < 17)) { console.error('too old'); process.exit(1); } console.log('Node ' + process.versions.node);"
+node18 matrix leg: NOT RUN (Node 18 not installed locally; only Node v22.22.0 available)

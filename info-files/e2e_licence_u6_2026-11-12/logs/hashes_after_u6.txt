@@ -1,0 +1,6 @@
+5b152d73c9579af1c17c8f9d6e45456c26fe9c12b41bfbb76b9ca9c34450574c  web/styles.css
+07052a1f93c02aaf8e87f7e6737ccab407e5490bcea8eae21cd59f2acf5fd292  web/tests/browser/features-smoke.cjs
+2566e8e32e04be67d7181232580f5c5e201e073e2700c487abfd5bd463f2a649  web/tests/browser/licence-smoke.cjs
+9f92091040b49fc98b51b58631eda636722aa3c261102cfcfdca223df2c53dd8  web/tests/browser/owner-smoke.cjs
+740115a8de2a5153650b46539781fc73139991b7b3f6ab4c8b63aae6ad05d05a  web/tests/browser/qr-smoke.cjs
+69a2edfa25ab8a2d0d0eb6097ed5a5d140c1c03d6b42c6ccab9698144f682bdc  web/tests/browser/stats-smoke.cjs

@@ -1,0 +1,67 @@
+PASS  unconfigured: shows the not-configured view
+PASS  unconfigured: sign-in view hidden
+PASS  unconfigured: no request leaves localhost  (127.0.0.1:37389)
+PASS  unconfigured: no console or page errors
+PASS  unknown 375px: sign-in view shown
+PASS  unknown 375px: MFA step shown before the dashboard
+PASS  unknown 375px: dashboard shown after aal2
+PASS  unknown 375px: signed-in email shown
+PASS  unknown 375px: only payment entry is listed as not available
+PASS  unknown 375px: nothing is filled in before a shop is chosen
+PASS  unknown 375px: review is off before a licence view is loaded
+PASS  unknown 375px: search finds the shop by name
+PASS  unknown 375px: shop ID and state version come from the server, read-only
+PASS  unknown 375px: licence view shows the state and its version
+PASS  unknown 375px: coverage ID is shown with its coverage
+PASS  unknown 375px: first audit page shows two entries and offers older ones
+PASS  unknown 375px: older entries are appended and the paging control hides at the end
+PASS  unknown 375px: the audit list does not show the recording admin's user ID (N5)
+PASS  unknown 375px: choosing a coverage fills its ID, read-only
+PASS  unknown 375px: review shows the shop, the version and the reason before sending
+PASS  unknown 375px: a dropped request is reported as unknown, not as done
+PASS  unknown 375px: retry returns the stored result (replay), no double write
+PASS  unknown 375px: both sends carry the same request ID  (2 calls)
+PASS  unknown 375px: both sends carry an identical payload
+PASS  unknown 375px: payload has only the grant keys and no hash or user field  (shop_id,expected_state_version,confirm,reason,grant_kind,start,end,backdate_confirm)
+PASS  unknown 375px: after the commit the licence view and audit reload, with the new version and entry
+PASS  unknown 375px: no horizontal page scroll  (overflow 0px)
+INFO  screenshot written to /tmp/admin-dashboard-375.png
+PASS  unknown 375px: sign-out returns to sign-in and hides the dashboard
+PASS  unknown 375px: sign-out clears the chosen shop from the page
+PASS  unknown 375px: all requests went to localhost or the stub only  (127.0.0.1:37389,smoke-stub.supabase.co)
+INFO  unknown 375px: expected deliberate-abort log (1)
+PASS  unknown 375px: no unexpected console or page errors
+PASS  rejection: sign-in view shown
+PASS  rejection: MFA step shown before the dashboard
+PASS  rejection: dashboard shown after aal2
+PASS  rejection: signed-in email shown
+PASS  rejection: only payment entry is listed as not available
+PASS  rejection: nothing is filled in before a shop is chosen
+PASS  rejection: review is off before a licence view is loaded
+PASS  rejection: search finds the shop by name
+PASS  rejection: shop ID and state version come from the server, read-only
+PASS  rejection: licence view shows the state and its version
+PASS  rejection: coverage ID is shown with its coverage
+PASS  rejection: first audit page shows two entries and offers older ones
+PASS  rejection: older entries are appended and the paging control hides at the end
+PASS  rejection: the audit list does not show the recording admin's user ID (N5)
+PASS  rejection: choosing a coverage fills its ID, read-only
+PASS  rejection: review shows the shop, the version and the reason before sending
+PASS  rejection: a stale version gives a plain message that names the change
+PASS  rejection: rejection shows the server code
+PASS  rejection: the licence view is reloaded after a stale rejection, with the same version
+PASS  rejection: the review is cleared after a rejection
+PASS  rejection: sign-out returns to sign-in and hides the dashboard
+PASS  rejection: sign-out clears the chosen shop from the page
+PASS  rejection: all requests went to localhost or the stub only  (127.0.0.1:37389,smoke-stub.supabase.co)
+PASS  rejection: no unexpected console or page errors
+PASS  enrol: sign-in view shown
+PASS  enrol: enrolment shows an SVG data image
+PASS  enrol: enrolment shows the manual key as text
+PASS  enrol: dashboard shown after aal2
+PASS  enrol: signed-in email shown
+PASS  enrol: only payment entry is listed as not available
+PASS  enrol: sign-out returns to sign-in and hides the dashboard
+PASS  enrol: sign-out clears the chosen shop from the page
+PASS  enrol: all requests went to localhost or the stub only  (127.0.0.1:37389,smoke-stub.supabase.co)
+PASS  enrol: no unexpected console or page errors

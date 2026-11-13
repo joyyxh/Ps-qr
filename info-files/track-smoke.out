@@ -1,0 +1,16 @@
+PASS  the timeline has the five steps
+PASS  exactly one step is marked as the current step
+PASS  the current step is Approved  (● Approved (Now))
+PASS  the step before it is done
+PASS  the steps after it are still to come
+PASS  the state is written in words, not only colour
+PASS  the step labels use the six customer words
+PASS  a Refresh button is shown
+PASS  the keep-the-code note is shown
+PASS  Refresh asks for the order again  (calls 1 -> 2)
+PASS  after Refresh the current step is Ready for pickup
+PASS  a cancelled order shows one terminal message
+PASS  a cancelled order has no timeline
+PASS  no page errors or console errors
+
+ALL CHECKS PASSED

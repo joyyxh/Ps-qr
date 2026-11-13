@@ -1,0 +1,33 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-20T08:55:00Z" },
+  "title": "QRquick UI Redesign",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 300, "w": 390, "h": 844, "title": "Customer · Home" },
+    "Customer-Order.dc.html": { "x": 470, "y": 300, "w": 390, "h": 844, "title": "Customer · Upload and settings" },
+    "Customer-Review.dc.html": { "x": 940, "y": 300, "w": 390, "h": 844, "title": "Customer · Review and pay" },
+    "Customer-Track.dc.html": { "x": 1410, "y": 300, "w": 390, "h": 844, "title": "Customer · Track order" },
+    "Owner-Dashboard.dc.html": { "x": 0, "y": 1560, "w": 1280, "h": 800, "title": "Owner · Dashboard", "expand": "fill" },
+    "Owner-Pricing.dc.html": { "x": 1360, "y": 1560, "w": 1280, "h": 800, "title": "Owner · Services and pricing", "expand": "fill" },
+    "Owner-Phone.dc.html": { "x": 2720, "y": 1560, "w": 390, "h": 844, "title": "Owner · Phone" },
+    "Brand.dc.html": { "x": 0, "y": 2860, "w": 880, "h": 560, "title": "Brand · Logo and colours" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Customer-Order.dc.html",
+    "Customer-Review.dc.html",
+    "Customer-Track.dc.html",
+    "Owner-Dashboard.dc.html",
+    "Owner-Pricing.dc.html",
+    "Owner-Phone.dc.html",
+    "Brand.dc.html"
+  ],
+  "notes": {
+    "t1": { "x": 0, "y": 0, "text": "Customer website: scan, upload, pay, track", "kind": "title1", "maxW": 1840 },
+    "t2": { "x": 0, "y": 1300, "text": "Owner app: dashboard, pricing, phone approval", "kind": "title1", "maxW": 1840 },
+    "t3": { "x": 0, "y": 2600, "text": "Brand and theme", "kind": "title1", "maxW": 1840 }
+  },
+  "designSystems": []
+}

@@ -1,0 +1,10 @@
+README.md
+agent/README.md
+agent/src/cli.mjs
+agent/src/printers/simulated.mjs
+agent/src/simulation.mjs
+agent/src/worker.mjs
+agent/test/run-wiring.test.mjs
+agent/test/simulated.test.mjs
+agent/test/simulation.test.mjs
+docs/PRINTING_STATUS.md

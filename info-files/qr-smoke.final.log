@@ -1,0 +1,18 @@
+PASS  local: address field shows the QR address  (http://127.0.0.1:5173/#/s/demo-xerox)
+PASS  local: warning shown only for a local address  (["This is a local address, so customers cannot open the QR code. Set publicBaseUrl in config.js to the published web address."])
+PASS  local: code is drawn on the page
+PASS  local: on-screen code scans to the shop address  (decoded=http://127.0.0.1:5173/#/s/demo-xerox)
+PASS  local: download is named for the shop  (printnest-demo-xerox-qr.png)
+PASS  local: downloaded PNG scans to the shop address  (decoded=http://127.0.0.1:5173/#/s/demo-xerox)
+PASS  local: no horizontal scroll at phone width  (overflow=0px)
+PASS  local: no JavaScript errors
+PASS  published: address field shows the QR address  (https://printnest.example/#/s/demo-xerox)
+PASS  published: warning shown only for a local address  ([])
+PASS  published: code is drawn on the page
+PASS  published: on-screen code scans to the shop address  (decoded=https://printnest.example/#/s/demo-xerox)
+PASS  published: download is named for the shop  (printnest-demo-xerox-qr.png)
+PASS  published: downloaded PNG scans to the shop address  (decoded=https://printnest.example/#/s/demo-xerox)
+PASS  published: no horizontal scroll at phone width  (overflow=0px)
+PASS  published: no JavaScript errors
+
+16 of 16 checks passed.

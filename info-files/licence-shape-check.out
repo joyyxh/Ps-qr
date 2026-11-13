@@ -1,0 +1,29 @@
+Output format is unaligned.
+BEGIN
+SET
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 2
+DO
+OWNER ACTIVE dated | {"ok": true, "active": true, "no_expiry": false, "access_end": "2027-12-31T18:30:00+00:00", "next_start": null}
+DO
+OWNER ACTIVE life  | {"ok": true, "active": true, "no_expiry": true, "access_end": null, "next_start": null}
+DO
+OWNER SCHEDULED    | {"ok": true, "active": false, "no_expiry": false, "access_end": null, "next_start": "2026-12-01T18:30:00+00:00"}
+DO
+OWNER EXPIRED      | {"ok": true, "active": false, "no_expiry": false, "access_end": null, "next_start": null}
+DO
+OWNER REVOKED      | {"ok": true, "active": false, "no_expiry": false, "access_end": null, "next_start": null}
+DO
+OWNER NONE         | {"ok": true, "active": false, "no_expiry": false, "access_end": null, "next_start": null}
+DO
+DO
+STAFF same shop    | {"ok": false, "code": "forbidden"}
+DO
+STRANGER           | {"ok": false, "code": "forbidden"}
+DO
+ANON (no claims)   | {"ok": false, "code": "forbidden"}
+DO
+NULL shop id       | {"ok": false, "code": "forbidden"}
+ROLLBACK

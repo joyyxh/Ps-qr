@@ -1,0 +1,45 @@
+PASS pinned domain qrquick-licence-request-v1
+PASS pinned inputs and expected bytes equal the reference (16 vectors)
+PASS enum (NFC only, no trim) ' one_month '
+PASS enum (NFC only, no trim) 'one_month\t'
+PASS enum (NFC only, no trim) 'month\xa0'
+PASS enum (NFC only, no trim) 'one_month'
+PASS padded token is not an allowed grant kind
+PASS sql vector grant_one_month_defaults 9f80ea0e8556be07
+PASS sql vector grant_one_month_backdate_false ce12024d33a594f2
+PASS sql vector grant_one_year_backdate_confirmed 01273be8e8298348
+PASS sql vector grant_lifetime e19f92a83dbeecf5
+PASS sql vector grant_custom_date_only ec6328da2a589fca
+PASS sql vector grant_custom_offset_plus0530 ec6328da2a589fca
+PASS sql vector grant_custom_utc_same_instants ec6328da2a589fca
+PASS sql vector grant_custom_one_microsecond_later 227dbee3548df64a
+PASS sql vector grant_reason_nfd_with_trailing_spaces 5fa7dc122635e247
+PASS sql vector grant_reason_nfc_no_spaces 5fa7dc122635e247
+PASS sql vector extend_month a76406b1b045e9f9
+PASS sql vector extend_year 009a9d52d2b393f6
+PASS sql vector revoke_lowercase_target e0190b6528fec7eb
+PASS sql vector revoke_uppercase_target e0190b6528fec7eb
+PASS sql vector replace_one_year 3afed25fc44ebbb9
+PASS sql vector replace_custom 44718b86c16c95f8
+PASS must differ grant_one_month_defaults / grant_one_month_backdate_false
+PASS must differ grant_custom_date_only / grant_custom_one_microsecond_later
+PASS must differ extend_month / extend_year
+PASS must differ revoke_lowercase_target / replace_one_year
+PASS must match, group G5 ['grant_custom_date_only', 'grant_custom_offset_plus0530', 'grant_custom_utc_same_instants']
+PASS must match, group N1 ['grant_reason_nfd_with_trailing_spaces', 'grant_reason_nfc_no_spaces']
+PASS must match, group R1 ['revoke_lowercase_target', 'revoke_uppercase_target']
+PASS normalisation 'Café promo  '
+PASS normalisation ' one_month '
+PASS normalisation '\xa0x'
+PASS normalisation '\tx'
+PASS normalisation '   '
+PASS normalisation '2027-04-01'
+PASS normalisation '2027-04-01T00:00:00+05:30'
+PASS normalisation '2027-03-31T18:30:00Z'
+PASS normalisation '2027-04-01T00:00:00.123456+05:30'
+PASS normalisation '2027-04-01T00:00:00.1234567+05:30'
+PASS normalisation '2027-04-01T00:00:00'
+PASS normalisation '2027-02-30'
+PASS normalisation '2027-04-01 00:00:00+05:30'
+PASS normalisation ''
+FAILURES: 0

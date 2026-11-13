@@ -1,0 +1,38 @@
+BEGIN
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+                              name                              | ok |                             detail                             
+----------------------------------------------------------------+----+----------------------------------------------------------------
+ S01 owner A sees the new order                                 | t  | count=1
+ S02 owner A approves a pending order                           | t  | rows=1
+ S03 owner A starts printing                                    | t  | rows=1
+ S04 owner A marks it ready                                     | t  | rows=1
+ S05 owner A marks it completed                                 | t  | rows=1
+ S06 a completed order cannot be cancelled                      | t  | 22023: invalid order status change from completed to cancelled
+ S07 a pending order cannot skip straight to completed          | t  | 22023: invalid order status change from pending to completed
+ S08 owner A cannot change the total                            | t  | 42501: permission denied for table orders
+ S09 owner A cannot change the customer note                    | t  | 42501: permission denied for table orders
+ S10 owner A cannot change the tracking code                    | t  | 42501: permission denied for table orders
+ S11 owner A rejects a pending order                            | t  | rows=1
+ S12 a rejected order cannot be approved later                  | t  | 22023: invalid order status change from rejected to approved
+ S13 owner A cannot see other-print orders                      | t  | count=0
+ S14 owner A cannot change other-print orders (silently 0 rows) | t  | rows=0
+ S15 owner A cannot see other-print order items                 | t  | count=0
+ S16 owner A sees the items of own order                        | t  | count=1
+ S17 order items are an immutable snapshot                      | t  | 42501: permission denied for table order_items
+ S18 both demo-xerox orders are listed for shop A               | t  | count=2
+ S19 owner B sees own other-print order                         | t  | count=1
+ S20 owner B cannot see demo-xerox orders                       | t  | count=0
+ S21 owner B cannot change demo-xerox orders (silently 0 rows)  | t  | rows=0
+ S22 anonymous visitors cannot list orders                      | t  | 42501: permission denied for table orders
+ S23 anonymous visitors cannot change orders                    | t  | 42501: permission denied for table orders
+(23 rows)
+
+ROLLBACK

@@ -1,0 +1,57 @@
+BEGIN
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+                                 name                                  | ok |                                                                                                                                                                                                   detail                                                                                                                                                                                                   
+-----------------------------------------------------------------------+----+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ S01 the feature catalogue has eight entries                           | t  | count=8
+ S02 only colour printing and double-sided are enforced at ordering    | t  | count=2
+ S03 anon can read the catalogue                                       | t  | count=8
+ S04 anon cannot add a feature to the catalogue                        | t  | 42501: permission denied for table feature_catalog
+ S05 anon can read a shop's features (the customer page needs them)    | t  | count=1
+ S06 anon cannot change a shop's features                              | t  | 42501: permission denied for table shops
+ S07 anon cannot call set_shop_features                                | t  | 42501: permission denied for function set_shop_features
+ S08 a new shop starts with colour and double-sided on, lamination off | t  | checked
+ S09 an owner cannot change features with a direct update              | t  | 42501: permission denied for table shops
+ S10 an unknown feature key is refused                                 | t  | 22023: unknown feature: karaoke
+ S11 a feature value that is not yes or no is refused                  | t  | 22023: feature lamination must be yes or no
+ S12 features must be an object                                        | t  | 22023: features must be an object
+ S13 owner A turns colour printing off                                 | t  | ok
+ S14 the change keeps the other features as they were                  | t  | count=1
+ S15 owner A turns lamination on                                       | t  | ok
+ S16 a partial change keeps colour printing off                        | t  | count=1
+ S17 owner B cannot change demo-xerox features                         | t  | 42501: you do not have permission to change this shop
+ S18 a colour quote is refused while colour printing is off            | t  | 22023: this shop is not offering colour printing right now
+ S19 a colour order is refused while colour printing is off            | t  | 22023: this shop is not offering colour printing right now
+ S20 a B&W quote still works while colour is off (2 pages x 200)       | t  | {"items": [{"colour": false, "copies": 1, "duplex": false, "file_id": "807ac054-2f4f-4515-a0b3-1cfa046730e9", "file_name": "two.pdf", "page_count": 2, "service_id": "cccccccc-0000-0000-0000-000000000001", "amount_paise": 400, "pricing_unit": "per_side", "service_name": "Document printing", "billable_units": 2, "unit_price_paise": 200}], "shop_name": "Demo Xerox Centre", "total_paise": 400}
+ S21 owner A turns double-sided off and colour back on                 | t  | ok
+ S22 a double-sided quote is refused while double-sided is off         | t  | 22023: this shop is not offering double-sided printing right now
+ S23 a double-sided order is refused while double-sided is off         | t  | 22023: this shop is not offering double-sided printing right now
+ S24 a colour quote works again once colour is on (2 pages x 1000)     | t  | {"items": [{"colour": true, "copies": 1, "duplex": false, "file_id": "807ac054-2f4f-4515-a0b3-1cfa046730e9", "file_name": "two.pdf", "page_count": 2, "service_id": "cccccccc-0000-0000-0000-000000000001", "amount_paise": 2000, "pricing_unit": "per_side", "service_name": "Document printing", "billable_units": 2, "unit_price_paise": 1000}], "shop_name": "Demo Xerox Centre", "total_paise": 2000}
+ S25 owner A switches double-sided back on                             | t  | ok
+ S26 the shop-assets bucket is public, 2 MB, PNG and JPEG only         | t  | count=1
+ S27 anon cannot upload a payment QR                                   | t  | 42501: new row violates row-level security policy for table "objects"
+ S28 owner A uploads a payment QR into their own folder                | t  | ok
+ S29 owner A cannot upload into another shop's folder                  | t  | 42501: new row violates row-level security policy for table "objects"
+ S30 owner A attaches the uploaded payment QR                          | t  | ok
+ S31 the shop row now points at that file                              | t  | count=1
+ S32 owner A cannot attach a file from another shop's folder           | t  | 22023: that file does not belong to this shop
+ S33 owner A cannot attach a file that was never uploaded              | t  | P0002: the payment QR file was not found. Upload it again.
+ S34 owner A removes the payment QR                                    | t  | ok
+ S35 the shop row no longer has a payment QR                           | t  | count=1
+ S36 owner B cannot attach a payment QR to demo-xerox                  | t  | 42501: you do not have permission to change this shop
+ S37 the table refuses a payment QR path with the wrong shape          | t  | 23514: new row for relation "shops" violates check constraint "shops_payment_qr_path_shape"
+ S38 the table refuses features that are not an object                 | t  | 23514: new row for relation "shops" violates check constraint "shops_features_is_object"
+ S39 owner A renames their own shop to look like a folder path         | t  | ok
+ S40 owner A still cannot upload into shop B's folder                  | t  | 42501: new row violates row-level security policy for table "objects"
+ S41 owner A cannot delete shop B's file with SQL                      | t  | 42501: Direct deletion from storage tables is not allowed. Use the Storage API instead.
+ S42 shop B's file is still there afterwards                           | t  | count=1
+(42 rows)
+
+ROLLBACK

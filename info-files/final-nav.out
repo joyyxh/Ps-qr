@@ -1,0 +1,36 @@
+PASS  360px home: "Scan shop QR" is visible
+PASS  360px home: "Add your shop" is visible
+PASS  360px home: the track field is visible
+PASS  360px home: no old bottom bar in the page
+PASS  360px home: no sideways scrolling  (overflow=0px)
+PASS  360px track: home field opens #/track/ABCD2345
+PASS  360px track: the code is filled in
+PASS  360px track: no sideways scrolling  (overflow=0px)
+PASS  360px scan: "Scan shop QR" opens the scan page
+PASS  360px scan: no sideways scrolling  (overflow=0px)
+PASS  360px shop: the slug opens #/s/demo-xerox
+PASS  360px shop: the order steps are visible
+PASS  360px shop: the order steps have three labels
+PASS  360px shop: no sideways scrolling  (overflow=0px)
+PASS  360px brand: the logo returns to home
+PASS  360px scan: Cancel returns to home
+PASS  360px no JavaScript errors
+PASS  390px home: "Scan shop QR" is visible
+PASS  390px home: "Add your shop" is visible
+PASS  390px home: the track field is visible
+PASS  390px home: no old bottom bar in the page
+PASS  390px home: no sideways scrolling  (overflow=0px)
+PASS  390px track: home field opens #/track/ABCD2345
+PASS  390px track: the code is filled in
+PASS  390px track: no sideways scrolling  (overflow=0px)
+PASS  390px scan: "Scan shop QR" opens the scan page
+PASS  390px scan: no sideways scrolling  (overflow=0px)
+PASS  390px shop: the slug opens #/s/demo-xerox
+PASS  390px shop: the order steps are visible
+PASS  390px shop: the order steps have three labels
+PASS  390px shop: no sideways scrolling  (overflow=0px)
+PASS  390px brand: the logo returns to home
+PASS  390px scan: Cancel returns to home
+PASS  390px no JavaScript errors
+
+ALL CHECKS PASSED

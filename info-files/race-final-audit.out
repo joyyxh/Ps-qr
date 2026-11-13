@@ -1,0 +1,17 @@
+== refund race checks (scratch database qrquick_scratch, server /var/run/postgresql:5432)
+R1 claim, then refund in another session
+   PASS  R1 the claim commits (claimed=685dae1a-4344-4e89-9ea2-5fdbed4cf8c4)
+   PASS  R1 the refund waits for the claim and then succeeds ({"sub" : "aaaaaaaa-0000-0000-0000-000000000001", "role" : "authenticated"} refund=refunded )
+   PASS  R1 the claimed job is cancelled by the refund (cancelled order_not_printable)
+   PASS  R1 the agent's start report is refused ({"role" : "service_role"} ERROR:  lease_lost CONTEXT:  PL/pgSQL function agent_mark_printing(text,uuid,integer) line 17 )
+R2 refund first, then the agent claims
+   PASS  R2 the refund commits ({"sub" : "aaaaaaaa-0000-0000-0000-000000000001", "role" : "authenticated"} refund=refunded )
+   PASS  R2 the agent does not claim the refunded job ({"role" : "service_role"} claimed=none )
+   PASS  R2 the refunded job is cancelled (cancelled order_not_printable)
+R3 start report and refund overlap (known limit: a job already printing is not stopped)
+   PASS  R3 the start report commits (started=true)
+   PASS  R3 the refund completes after the start report (no deadlock) ({"sub" : "aaaaaaaa-0000-0000-0000-000000000001", "role" : "authenticated"} refund=refunded )
+   PASS  R3 the order is refunded (refunded)
+   PASS  R3 the job already printing is left printing (known limit) (printing -)
+
+== refund race checks: all passed

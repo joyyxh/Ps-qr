@@ -1,0 +1,18 @@
+PASS  signed out shows the owner sign-in form
+PASS  wrong password shows a clear message
+PASS  owner session is kept in sessionStorage
+PASS  owner session is not kept in localStorage
+PASS  stored session does not contain the password
+PASS  owner list request carries the owner token
+PASS  home counts the orders waiting for approval  (value=2)
+PASS  home lists the orders that need the owner
+UNMOCKED GET /rest/v1/shop_paper_sizes
+UNMOCKED GET /rest/v1/shop_extra_charges
+SMOKE TEST CRASHED: locator.waitFor: Timeout 8000ms exceeded.
+Call log:
+[2m  - waiting for getByText('Services and prices').first() to be visible[22m
+
+    at waitText (/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/owner-sweep.cjs:280:56)
+    at /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/owner-sweep.cjs:350:9 {
+  name: 'TimeoutError'
+}

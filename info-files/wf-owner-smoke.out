@@ -1,0 +1,84 @@
+PASS  signed out shows the owner sign-in form
+PASS  wrong password shows a clear message
+PASS  owner session is kept in sessionStorage
+PASS  owner session is not kept in localStorage
+PASS  stored session does not contain the password
+PASS  owner list request carries the owner token
+PASS  home counts the orders waiting for approval  (value=2)
+PASS  home lists the orders that need the owner
+PASS  owner sees all services, including hidden ones  (rows=2)
+PASS  hidden service is labelled
+PASS  customer page address is shown  (https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  toggle sends only is_open  ({"is_open":false})
+PASS  toggle carries the owner token
+PASS  shop state changed in the database mock
+PASS  edit form is filled with the current price  (value=2)
+PASS  service edit is limited to one service in this shop  (/rest/v1/services?id=eq.cccccccc-0000-0000-0000-000000000001&shop_id=eq.bbbbbbbb-0000-0000-0000-000000000001)
+PASS  service edit sends paise, not rupees
+PASS  invalid price is rejected before any request
+PASS  new colour-only service saved with paise
+PASS  new service is tied to this shop
+PASS  saved service is shown again on reload, with its colour price and unit  (
+            Spiral binding
+            per copy
+            –
+            ₹40.00
+            Edit
+          )
+PASS  paper card says A4 only until the owner saves
+PASS  before saving, only A4 is ticked as offered
+PASS  no paper size offered is refused before any request
+PASS  saving sends all three sizes, with the A3 surcharge as paise (₹2 = 200)  ([{"paper_size":"A4","offered":true,"surcharge_paise":0},{"paper_size":"A3","offered":true,"surcharge_paise":200},{"paper_size":"Letter","offered":false,"surcharge_paise":0}])
+PASS  a charge is saved in paise, for each file, and shown to customers  ([{"label":"Binding fee","amount_paise":2000,"basis":"per_item","is_active":true}])
+PASS  the customer preview shows the saved paper surcharge and charge  (Customer preview What a customer who scans your code sees. Document printing B&W ₹2.50 per printed side · Colour ₹10.00 per printed side Spiral binding Colour ₹40.00 per copy Paper: A4 · A3 +₹2.00 per billed unit Extra charges: Binding fee ₹20.00 per file Changes apply to new orders. Existing orders keep their prices.)
+PASS  no more than ten charges can be added
+PASS  a blank charge name is refused before any request
+PASS  shop name is escaped (no <b> or <img> rendered)
+PASS  no script ran from the shop name
+PASS  orders page lists the two open orders
+PASS  order shows its tracking code
+PASS  customer note is shown as text, not markup
+PASS  approve sends only the new status, to one order in this shop, with the owner token  (/rest/v1/orders?id=eq.ord-1&shop_id=eq.bbbbbbbb-0000-0000-0000-000000000001)
+PASS  approved order offers the next steps, not reject
+PASS  rejecting asks for confirmation first  (Reject order WXYZ2345? This cannot be undone.)
+PASS  reject sends only the new status
+PASS  the open list no longer shows the rejected order
+PASS  all orders shows both orders
+PASS  a rejected order offers no buttons
+PASS  the rejected order shows its status as Cancelled
+PASS  a file cancelled by a refund shows Not printed with the reason  (Not printed: The order was refunded, so this file was not printed.)
+PASS  the refunded order shows Not printed as its status too  (REFD2345
+Not printed
+
+15 Oct 2026, 5:30 pm · Total ₹24.00
+
+Refund test print · 12 pages × 1 copy · B&W, single-sided
+₹24.00
+Not printed: The order was refunded, so this file was not printed.
+
+Payment:)
+PASS  a cancelled file offers no Print again button
+PASS  a refunded order is not offered Send to print
+PASS  a refund during printing warns that the file may still print and cannot be recalled  (REFD9999
+Refunded while printing
+
+15 Oct 2026, 6:30 pm · Total ₹12.00
+
+Printing refund test · 6 pages × 1 copy · B&W, single-sided
+₹12.00
+Printing: The order was refunded after this file reached the printer. It may still print, and it cannot be recalled from here. Check the printer.
+
+Payment: Refund)
+PASS  the refunded-while-printing order shows its status
+PASS  a file already printing offers no Print again button
+PASS  the refund-while-printing order is not offered Send to print
+PASS  create shop sends slug and details to create_shop
+PASS  new shop has its customer page address on More
+PASS  duplicate web address shows a clear message
+PASS  customer page sends no token  (5 calls)
+PASS  customer page hides the closed shop's ordering
+PASS  sign out clears the stored session
+PASS  no horizontal scroll at phone width  (overflow=0px)
+PASS  no JavaScript errors in the browser
+
+58 of 58 checks passed.

@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: a fixture with one unpaid job refuses the whole file, so nothing is simulated
+ok 1 - a fixture with one unpaid job refuses the whole file, so nothing is simulated
+  ---
+  duration_ms: 20.925567
+  type: 'test'
+  ...
+# Subtest: only a literal approved and paid order can be simulated
+ok 2 - only a literal approved and paid order can be simulated
+  ---
+  duration_ms: 6.338825
+  type: 'test'
+  ...
+# Subtest: a file outside the fixture folder is refused
+ok 3 - a file outside the fixture folder is refused
+  ---
+  duration_ms: 10.267915
+  type: 'test'
+  ...
+# Subtest: job ids, states and attempt numbers are checked, and a repeated job id is refused
+ok 4 - job ids, states and attempt numbers are checked, and a repeated job id is refused
+  ---
+  duration_ms: 7.216614
+  type: 'test'
+  ...
+# Subtest: a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+ok 5 - a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+  ---
+  duration_ms: 22.651923
+  type: 'test'
+  ...
+# Subtest: the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+ok 6 - the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+  ---
+  duration_ms: 22.069293
+  type: 'test'
+  ...
+# Subtest: printing and needs-check jobs are never claimed or printed again
+ok 7 - printing and needs-check jobs are never claimed or printed again
+  ---
+  duration_ms: 20.528836
+  type: 'test'
+  ...
+# Subtest: settings the simulated printer cannot do are refused before anything is simulated
+ok 8 - settings the simulated printer cannot do are refused before anything is simulated
+  ---
+  duration_ms: 4.9278
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is simulated
+ok 9 - an unknown file type is refused and nothing is simulated
+  ---
+  duration_ms: 10.92703
+  type: 'test'
+  ...
+# Subtest: a picture is wrapped in a PDF and then simulated
+ok 10 - a picture is wrapped in a PDF and then simulated
+  ---
+  duration_ms: 17.838105
+  type: 'test'
+  ...
+# Subtest: a file whose size does not match what was ordered is refused
+ok 11 - a file whose size does not match what was ordered is refused
+  ---
+  duration_ms: 7.386942
+  type: 'test'
+  ...
+# Subtest: a missing file is reported as a failed download, and nothing is simulated
+ok 12 - a missing file is reported as a failed download, and nothing is simulated
+  ---
+  duration_ms: 4.33673
+  type: 'test'
+  ...
+# Subtest: the in-memory server refuses a result that would skip the printing step
+ok 13 - the in-memory server refuses a result that would skip the printing step
+  ---
+  duration_ms: 0.981568
+  type: 'test'
+  ...
+# Subtest: the in-memory server keeps the job rules that migration 0010 states
+ok 14 - the in-memory server keeps the job rules that migration 0010 states
+  ---
+  duration_ms: 0.638581
+  type: 'test'
+  ...
+# Subtest: a server that never runs out of jobs stops at the safety limit instead of hanging
+ok 15 - a server that never runs out of jobs stops at the safety limit instead of hanging
+  ---
+  duration_ms: 9.534432
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer is refused before any request, even against a localhost server
+ok 16 - run --simulated-printer is refused before any request, even against a localhost server
+  ---
+  duration_ms: 10.462155
+  type: 'test'
+  ...
+# Subtest: run refuses an unknown option before any request
+ok 17 - run refuses an unknown option before any request
+  ---
+  duration_ms: 8.035611
+  type: 'test'
+  ...
+# Subtest: simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+ok 18 - simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+  ---
+  duration_ms: 24.106218
+  type: 'test'
+  ...
+# Subtest: simulate with a fixture file runs it offline and prints a summary
+ok 19 - simulate with a fixture file runs it offline and prints a summary
+  ---
+  duration_ms: 22.641587
+  type: 'test'
+  ...
+# Subtest: simulate with an unpaid job in the file stops before anything starts
+ok 20 - simulate with an unpaid job in the file stops before anything starts
+  ---
+  duration_ms: 5.75647
+  type: 'test'
+  ...
+# Subtest: simulate refuses extra arguments and a file that does not exist
+ok 21 - simulate refuses extra arguments and a file that does not exist
+  ---
+  duration_ms: 3.953682
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 380.997616

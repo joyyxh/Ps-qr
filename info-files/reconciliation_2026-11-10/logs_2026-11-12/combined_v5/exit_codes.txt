@@ -1,0 +1,6 @@
+licence exit=0
+owner exit=0
+qr exit=0
+features exit=1
+stats exit=0
+DONE

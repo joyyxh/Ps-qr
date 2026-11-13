@@ -1,0 +1,52 @@
+PASS   orders page opens with the open order
+PASS   one orders request on open (requests=1)
+PASS   status says updates are automatic
+PASS   no refresh before 25 s (requests=1)
+PASS   refresh at 25 s
+PASS   held refresh started
+PASS   no second request while one is waiting (requests=3)
+PASS   refresh resumes after the held reply
+PASS   no requests while the page is hidden (requests=4)
+PASS   refresh at once when the page is visible again
+PASS   quick hidden/visible toggles add no extra request (requests=6)
+PASS   timer resumes after the toggles
+PASS   failed refresh is attempted
+PASS   failure says updates are paused (Automatic updates are paused because the connection failed. The list shows the last update. Use Refresh to try again.)
+PASS   last list is still on screen after a failure
+PASS   no retry before the 25 s backoff
+PASS   first retry after 25 s
+PASS   second retry waits 50 s (requests=9)
+PASS   second retry at 50 s
+PASS   third retry waits 100 s (requests=10)
+PASS   recovery refresh at 100 s
+PASS   status returns to automatic after recovery
+PASS   Refresh button sends one request
+PASS   Refresh leaves the list in place
+PASS   unchanged refresh happens
+PASS   unchanged data does not redraw the list
+PASS   changed refresh happens
+PASS   new order appears without a reload (cards=2)
+PASS   list was redrawn for the change
+PASS   approve shows its message
+PASS   a changed poll redraws the list
+PASS   the message survives a changed poll (notice="Order QR-0001 is now approved.")
+PASS   the message survives a second changed poll within a minute
+PASS   a changed poll after a minute clears the message (notice="")
+PASS   orders still update after the message clears (cards=6)
+PASS   manual Refresh still asks for printer status after a failure
+PASS   printer failure leaves order updates live (Updates automatically while this page is open.)
+PASS   printer panel says status is not available
+PASS   no printer status request during the 5 minute wait (extra=0)
+PASS   orders keep updating during the wait (cards=16 expected=16)
+PASS   printer status is asked again once the wait has passed (extra=1)
+PASS   the next wait does not repeat the read (extra=1)
+PASS   recovery: manual Refresh reads printer status
+PASS   printer panel is back after recovery
+PASS   automatic refresh reads printer status again after recovery (extra=3)
+PASS   expired session is reported
+PASS   no requests after the session has ended (requests=40)
+PASS   leaving the Orders page stops automatic refresh (requests=40)
+PASS   the Orders list is gone after leaving
+PASS   no page errors
+
+all checks passed

@@ -1,0 +1,6 @@
+applied P1_stage7_governance.patch
+applied P2_7B_7C_database.patch
+applied P3_7D_admin.patch
+applied P4_7E_web.patch
+admin exit=0
+web exit=0

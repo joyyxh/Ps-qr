@@ -1,0 +1,2 @@
+psql: error: connection to server on socket "<HOME>/.stage7c-pg16/sock/.s.PGSQL.55433" failed: Connection refused
+	Is the server running locally and accepting connections on that socket?

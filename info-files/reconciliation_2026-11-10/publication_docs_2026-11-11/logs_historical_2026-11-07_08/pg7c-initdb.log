@@ -1,0 +1,9 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C.UTF-8".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+initdb: error: could not access directory "<SCRATCH>/pg7c-data": Permission denied

@@ -1,0 +1,70 @@
+
+== registration
+PASS sign-in screen has no code field
+PASS 1 registration shows the 6-digit code input
+PASS   no session is stored while the code is pending
+PASS 2 an incorrect code is refused with a message
+PASS   an incorrect code stores no session and saves no password
+PASS 3 a correct code is verified and the password is saved once
+PASS   the saved password is the one typed at registration, sent with the new owner token
+PASS 4 account opens: session for new@example.com, no code or sign-in form left on screen
+PASS   no separate password-choice step on the registration path
+PASS   no page errors
+   supabase calls: POST /auth/v1/signup | POST /auth/v1/verify | POST /auth/v1/verify | PUT /auth/v1/user | GET /rest/v1/shop_memberships
+
+== save fails then retry
+PASS 5 a failed password save shows the password step with a message
+PASS   the failed save leaves the owner signed out and nothing saved
+PASS   retrying the save opens the account for retry@example.com
+PASS   no page errors
+   supabase calls: POST /auth/v1/signup | POST /auth/v1/verify | PUT /auth/v1/user | PUT /auth/v1/user | GET /rest/v1/shop_memberships
+
+== password sign-in
+PASS 6 a wrong password shows a message and stores no session
+PASS 7 email and password open the account, with no code step
+PASS   no page errors
+   supabase calls: POST /auth/v1/token?grant_type=password | POST /auth/v1/token?grant_type=password | GET /rest/v1/shop_memberships
+
+== unverified sign-in
+PASS 8 unverified sign-in sends a new code and shows the code input
+PASS   the notice says the email is not verified yet
+PASS   no session is stored at this point
+PASS   a correct code leads to the password-choice step
+PASS   still no session before a password is saved
+PASS   the chosen password is saved and the account opens
+PASS   no page errors
+   supabase calls: POST /auth/v1/token?grant_type=password | POST /auth/v1/resend | POST /auth/v1/verify | PUT /auth/v1/user | GET /rest/v1/shop_memberships
+
+== forgot password
+PASS 9 forgot password sends a recovery request and shows the neutral message
+PASS   no session is stored by the recovery request
+PASS   no page errors
+   supabase calls: POST /auth/v1/recover
+
+== reset link
+PASS 10 reset link opens the new-password form and the token is removed from the address
+PASS   the new password is saved with the recovery token
+PASS   the owner is signed out and asked to sign in with the new password
+PASS   no page errors
+   supabase calls: GET /auth/v1/user | PUT /auth/v1/user | POST /auth/v1/logout
+
+== confirmation link
+PASS 11 confirmation link goes to the password step, after reading the user
+PASS   the link alone does not open the account (no stored session yet)
+PASS   the token is removed from the address
+PASS   saving the password opens the account for the confirmed address
+PASS   no page errors
+   supabase calls: GET /auth/v1/user | PUT /auth/v1/user | GET /rest/v1/shop_memberships
+
+== reload on code screen
+PASS 12 reload on the code screen returns to sign-in, with no session and no saved password
+PASS   the owner can still finish by signing in again and choosing a password
+PASS   no page errors
+   supabase calls: POST /auth/v1/signup | POST /auth/v1/token?grant_type=password | POST /auth/v1/resend | POST /auth/v1/verify
+
+== reload on confirmation step
+PASS 13 reload on the confirmation password step returns to sign-in, with no session and no saved password
+PASS   no page errors
+   supabase calls: GET /auth/v1/user
+
+41 of 41 checks passed

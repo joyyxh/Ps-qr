@@ -1,0 +1,364 @@
+TAP version 13
+# Subtest: fixture: lifetime coverage is active with no expiry
+ok 1 - fixture: lifetime coverage is active with no expiry
+  ---
+  duration_ms: 1.805669
+  type: 'test'
+  ...
+# Subtest: fixture: dated coverage is active until its end, read as an instant
+ok 2 - fixture: dated coverage is active until its end, read as an instant
+  ---
+  duration_ms: 0.220127
+  type: 'test'
+  ...
+# Subtest: fixture: a scheduled reply carries the next start and is not active
+ok 3 - fixture: a scheduled reply carries the next start and is not active
+  ---
+  duration_ms: 0.203345
+  type: 'test'
+  ...
+# Subtest: fixture: expired, revoked and no coverage give the same inactive result, which the RPC does not distinguish
+ok 4 - fixture: expired, revoked and no coverage give the same inactive result, which the RPC does not distinguish
+  ---
+  duration_ms: 0.452037
+  type: 'test'
+  ...
+# Subtest: fixture: every denial reply is forbidden and none is read as a licence
+ok 5 - fixture: every denial reply is forbidden and none is read as a licence
+  ---
+  duration_ms: 0.142082
+  type: 'test'
+  ...
+# Subtest: a reply that is not an object is malformed
+ok 6 - a reply that is not an object is malformed
+  ---
+  duration_ms: 0.166919
+  type: 'test'
+  ...
+# Subtest: ok must be exactly true or a forbidden refusal
+ok 7 - ok must be exactly true or a forbidden refusal
+  ---
+  duration_ms: 0.136357
+  type: 'test'
+  ...
+# Subtest: a missing field is never read as active
+ok 8 - a missing field is never read as active
+  ---
+  duration_ms: 0.135047
+  type: 'test'
+  ...
+# Subtest: wrong field types are malformed
+ok 9 - wrong field types are malformed
+  ---
+  duration_ms: 0.6594
+  type: 'test'
+  ...
+# Subtest: active replies must be internally consistent
+ok 10 - active replies must be internally consistent
+  ---
+  duration_ms: 0.32855
+  type: 'test'
+  ...
+# Subtest: a timestamp without a stated zone is malformed, so the device time zone cannot change the result
+ok 11 - a timestamp without a stated zone is malformed, so the device time zone cannot change the result
+  ---
+  duration_ms: 0.111898
+  type: 'test'
+  ...
+# Subtest: inactive and scheduled replies must be internally consistent
+ok 12 - inactive and scheduled replies must be internally consistent
+  ---
+  duration_ms: 0.057081
+  type: 'test'
+  ...
+# Subtest: no reply shape can produce an active state unless it says active
+ok 13 - no reply shape can produce an active state unless it says active
+  ---
+  duration_ms: 0.091902
+  type: 'test'
+  ...
+# Subtest: failure reasons separate offline, network, auth, server and unknown
+ok 14 - failure reasons separate offline, network, auth, server and unknown
+  ---
+  duration_ms: 0.1939
+  type: 'test'
+  ...
+# Subtest: IST formatting shows the exclusive end in Asia/Kolkata
+ok 15 - IST formatting shows the exclusive end in Asia/Kolkata
+  ---
+  duration_ms: 0.201362
+  type: 'test'
+  ...
+# Subtest: display: lifetime, dated and scheduled coverage say what the backend status says
+ok 16 - display: lifetime, dated and scheduled coverage say what the backend status says
+  ---
+  duration_ms: 0.262654
+  type: 'test'
+  ...
+# Subtest: display: inactive shows no reason, because the RPC gives none
+ok 17 - display: inactive shows no reason, because the RPC gives none
+  ---
+  duration_ms: 0.108651
+  type: 'test'
+  ...
+# Subtest: display: an end time that has already passed asks for a refresh and does not say printing is permitted
+ok 18 - display: an end time that has already passed asks for a refresh and does not say printing is permitted
+  ---
+  duration_ms: 0.257865
+  type: 'test'
+  ...
+# Subtest: display: a scheduled start that has already passed asks for a refresh
+ok 19 - display: a scheduled start that has already passed asks for a refresh
+  ---
+  duration_ms: 0.068674
+  type: 'test'
+  ...
+# Subtest: display: every unavailable reason is never shown as active or as inactive
+ok 20 - display: every unavailable reason is never shown as active or as inactive
+  ---
+  duration_ms: 0.193613
+  type: 'test'
+  ...
+# Subtest: display: forbidden and malformed replies are unavailable, not active
+ok 21 - display: forbidden and malformed replies are unavailable, not active
+  ---
+  duration_ms: 0.077366
+  type: 'test'
+  ...
+# Subtest: display: offline and inactive are clearly different
+ok 22 - display: offline and inactive are clearly different
+  ---
+  duration_ms: 0.126279
+  type: 'test'
+  ...
+# Subtest: display: an auth failure offers a way back to sign in
+ok 23 - display: an auth failure offers a way back to sign in
+  ---
+  duration_ms: 0.061998
+  type: 'test'
+  ...
+# Subtest: display: loading and idle show no licence facts
+ok 24 - display: loading and idle show no licence facts
+  ---
+  duration_ms: 0.054946
+  type: 'test'
+  ...
+# Subtest: timeHasPassed only flags a time that is in the past
+ok 25 - timeHasPassed only flags a time that is in the past
+  ---
+  duration_ms: 0.05617
+  type: 'test'
+  ...
+# Subtest: controller: open shows loading, then the ready status with the check time
+ok 26 - controller: open shows loading, then the ready status with the check time
+  ---
+  duration_ms: 0.289765
+  type: 'test'
+  ...
+# Subtest: controller: a malformed reply is unavailable and never active
+ok 27 - controller: a malformed reply is unavailable and never active
+  ---
+  duration_ms: 0.093833
+  type: 'test'
+  ...
+# Subtest: controller: a forbidden reply is unavailable, with the forbidden reason
+ok 28 - controller: a forbidden reply is unavailable, with the forbidden reason
+  ---
+  duration_ms: 0.066292
+  type: 'test'
+  ...
+# Subtest: controller: request failures map to auth, network and server reasons, never to active
+ok 29 - controller: request failures map to auth, network and server reasons, never to active
+  ---
+  duration_ms: 0.246313
+  type: 'test'
+  ...
+# Subtest: controller: offline sends no request and says offline
+ok 30 - controller: offline sends no request and says offline
+  ---
+  duration_ms: 0.06654
+  type: 'test'
+  ...
+# Subtest: controller: a shop switch drops the earlier shop's late reply
+ok 31 - controller: a shop switch drops the earlier shop's late reply
+  ---
+  duration_ms: 0.28024
+  type: 'test'
+  ...
+# Subtest: controller: a late failure for an earlier shop does not overwrite the current shop
+ok 32 - controller: a late failure for an earlier shop does not overwrite the current shop
+  ---
+  duration_ms: 0.150788
+  type: 'test'
+  ...
+# Subtest: controller: sign-out during a check drops the reply and keeps no licence data
+ok 33 - controller: sign-out during a check drops the reply and keeps no licence data
+  ---
+  duration_ms: 0.10786
+  type: 'test'
+  ...
+# Subtest: controller: after close, refresh does nothing and sends no request
+ok 34 - controller: after close, refresh does nothing and sends no request
+  ---
+  duration_ms: 0.055213
+  type: 'test'
+  ...
+# Subtest: controller: overlapping refresh presses share one request
+ok 35 - controller: overlapping refresh presses share one request
+  ---
+  duration_ms: 0.140037
+  type: 'test'
+  ...
+# Subtest: controller: a refresh after a finished check sends a new request
+ok 36 - controller: a refresh after a finished check sends a new request
+  ---
+  duration_ms: 0.074007
+  type: 'test'
+  ...
+# Subtest: controller: a refresh clears the earlier status, so old data is not shown as freshly checked
+ok 37 - controller: a refresh clears the earlier status, so old data is not shown as freshly checked
+  ---
+  duration_ms: 0.0585
+  type: 'test'
+  ...
+# Subtest: controller: a failed refresh after a success shows no status
+ok 38 - controller: a failed refresh after a success shows no status
+  ---
+  duration_ms: 0.072556
+  type: 'test'
+  ...
+# Subtest: controller: the view is a copy, so a caller cannot change the state by editing it
+ok 39 - controller: the view is a copy, so a caller cannot change the state by editing it
+  ---
+  duration_ms: 0.052582
+  type: 'test'
+  ...
+# Subtest: the browser reads licence status through one owner RPC and never the licence tables
+ok 40 - the browser reads licence status through one owner RPC and never the licence tables
+  ---
+  duration_ms: 0.660592
+  type: 'test'
+  ...
+# Subtest: the licence screen has one action, Refresh, and no grant, extend, revoke or replace control
+ok 41 - the licence screen has one action, Refresh, and no grant, extend, revoke or replace control
+  ---
+  duration_ms: 0.302346
+  type: 'test'
+  ...
+# Subtest: the shop page links to the licence screen only for owners, and sign-out and navigation clear it
+ok 42 - the shop page links to the licence screen only for owners, and sign-out and navigation clear it
+  ---
+  duration_ms: 0.288835
+  type: 'test'
+  ...
+# Subtest: the licence view is switched off in the Android owner bundle (config.ownerApp), and only there
+ok 43 - the licence view is switched off in the Android owner bundle (config.ownerApp), and only there
+  ---
+  duration_ms: 0.363811
+  type: 'test'
+  ...
+# Subtest: with the view switched off, opening it for an owner sends no request and draws nothing
+ok 44 - with the view switched off, opening it for an owner sends no request and draws nothing
+  ---
+  duration_ms: 2.680575
+  type: 'test'
+  ...
+# Subtest: with the view on, the owner gets one check and staff get none (control for the test above)
+ok 45 - with the view on, the owner gets one check and staff get none (control for the test above)
+  ---
+  duration_ms: 0.482266
+  type: 'test'
+  ...
+# Subtest: every owner request is sent with the owner token and the publishable key
+ok 46 - every owner request is sent with the owner token and the publishable key
+  ---
+  duration_ms: 24.607642
+  type: 'test'
+  ...
+# Subtest: signed-out owners get a 401 and no request is sent
+ok 47 - signed-out owners get a 401 and no request is sent
+  ---
+  duration_ms: 0.450422
+  type: 'test'
+  ...
+# Subtest: listMyShops reads the owner memberships and sorts the shops by name
+ok 48 - listMyShops reads the owner memberships and sorts the shops by name
+  ---
+  duration_ms: 5.665631
+  type: 'test'
+  ...
+# Subtest: createShop calls the create_shop function with the shop details
+ok 49 - createShop calls the create_shop function with the shop details
+  ---
+  duration_ms: 0.605886
+  type: 'test'
+  ...
+# Subtest: updateShop sends only the editable shop columns, so the slug cannot be changed
+ok 50 - updateShop sends only the editable shop columns, so the slug cannot be changed
+  ---
+  duration_ms: 0.491773
+  type: 'test'
+  ...
+# Subtest: updateShop reports a permission error when the database changes no rows
+ok 51 - updateShop reports a permission error when the database changes no rows
+  ---
+  duration_ms: 0.501234
+  type: 'test'
+  ...
+# Subtest: createService takes the shop from the page, not from the submitted fields
+ok 52 - createService takes the shop from the page, not from the submitted fields
+  ---
+  duration_ms: 0.435468
+  type: 'test'
+  ...
+# Subtest: updateService is limited to one service in one shop
+ok 53 - updateService is limited to one service in one shop
+  ---
+  duration_ms: 0.520444
+  type: 'test'
+  ...
+# Subtest: updateService reports a permission error when no service was changed
+ok 54 - updateService reports a permission error when no service was changed
+  ---
+  duration_ms: 0.587415
+  type: 'test'
+  ...
+# Subtest: pickFields keeps only allowed keys that were given
+ok 55 - pickFields keeps only allowed keys that were given
+  ---
+  duration_ms: 0.327263
+  type: 'test'
+  ...
+# Subtest: the browser code never contains a service-role or secret key
+ok 56 - the browser code never contains a service-role or secret key
+  ---
+  duration_ms: 2.397137
+  type: 'test'
+  ...
+# Subtest: shopLicenceStatus calls the owner read RPC with the shop id and the owner token only
+ok 57 - shopLicenceStatus calls the owner read RPC with the shop id and the owner token only
+  ---
+  duration_ms: 1.547225
+  type: 'test'
+  ...
+# Subtest: shopLicenceStatus sends no request for a signed-out user
+ok 58 - shopLicenceStatus sends no request for a signed-out user
+  ---
+  duration_ms: 0.212499
+  type: 'test'
+  ...
+# Subtest: shopLicenceStatus surfaces a missing function as an error with its HTTP status
+ok 59 - shopLicenceStatus surfaces a missing function as an error with its HTTP status
+  ---
+  duration_ms: 0.764256
+  type: 'test'
+  ...
+1..59
+# tests 59
+# suites 0
+# pass 59
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 236.021964

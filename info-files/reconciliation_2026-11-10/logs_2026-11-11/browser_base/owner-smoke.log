@@ -1,0 +1,41 @@
+PASS  signed out shows the owner sign-in form
+PASS  wrong password shows a clear message
+FAIL  owner session is kept in sessionStorage
+PASS  owner session is not kept in localStorage
+FAIL  stored session does not contain the password
+PASS  owner list request carries the owner token
+PASS  owner sees all services, including hidden ones  (rows=2)
+PASS  hidden service is labelled
+PASS  customer page address is shown  (https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  toggle sends only is_open  ({"is_open":false})
+PASS  toggle carries the owner token
+PASS  shop state changed in the database mock
+PASS  edit form is filled with the current price  (value=2)
+PASS  service edit is limited to one service in this shop  (/rest/v1/services?id=eq.cccccccc-0000-0000-0000-000000000001&shop_id=eq.bbbbbbbb-0000-0000-0000-000000000001)
+PASS  service edit sends paise, not rupees
+PASS  invalid price is rejected before any request
+PASS  new colour-only service saved with paise
+PASS  new service is tied to this shop
+PASS  shop name is escaped (no <b> or <img> rendered)
+PASS  no script ran from the shop name
+PASS  orders page lists the two open orders
+PASS  order shows its tracking code
+PASS  customer note is shown as text, not markup
+PASS  approve sends only the new status, to one order in this shop, with the owner token  (/rest/v1/orders?id=eq.ord-1&shop_id=eq.bbbbbbbb-0000-0000-0000-000000000001)
+FAIL  approved order offers the next steps, not reject
+PASS  rejecting asks for confirmation first  (Reject order WXYZ2345? This cannot be undone.)
+PASS  reject sends only the new status
+PASS  the open list no longer shows the rejected order
+PASS  all orders shows both orders
+PASS  a rejected order offers no buttons
+PASS  the rejected order shows its status
+PASS  create shop sends slug and details to create_shop
+PASS  new shop opens on its manager page
+PASS  duplicate web address shows a clear message
+SMOKE TEST CRASHED: locator.waitFor: Timeout 8000ms exceeded.
+Call log:
+[2m  - waiting for getByText('Add a print item').first() to be visible[22m
+
+    at /home/claude/joyyxh/ps-qr-stage7/web/tests/browser/owner-smoke.cjs:477:70 {
+  name: 'TimeoutError'
+}

@@ -1,0 +1,98 @@
+PASS  signed out shows the owner sign-in form
+PASS  wrong password shows a clear message
+PASS  owner session is kept in sessionStorage
+PASS  owner session is not kept in localStorage
+PASS  stored session does not contain the password
+PASS  owner list request carries the owner token
+PASS  home counts the orders waiting for approval  (value=2)
+PASS  home lists the orders that need the owner
+PASS  owner sees all services, including hidden ones  (rows=2)
+PASS  hidden service is labelled
+PASS  customer page address is shown  (https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  toggle sends only is_open  ({"is_open":false})
+PASS  toggle carries the owner token
+PASS  shop state changed in the database mock
+PASS  edit form is filled with the current price  (value=2)
+PASS  service edit is limited to one service in this shop  (/rest/v1/services?id=eq.cccccccc-0000-0000-0000-000000000001&shop_id=eq.bbbbbbbb-0000-0000-0000-000000000001)
+PASS  service edit sends paise, not rupees
+PASS  invalid price is rejected before any request
+PASS  new colour-only service saved with paise
+PASS  new service is tied to this shop
+PASS  saved service is shown again on reload, with its colour price and unit  (
+            Spiral binding
+            per copy
+            –
+            ₹40.00
+            Edit
+          )
+PASS  paper card says A4 only until the owner saves
+PASS  before saving, only A4 is ticked as offered
+PASS  no paper size offered is refused before any request
+PASS  saving sends all three sizes, with the A3 surcharge as paise (₹2 = 200)  ([{"paper_size":"A4","offered":true,"surcharge_paise":0},{"paper_size":"A3","offered":true,"surcharge_paise":200},{"paper_size":"Letter","offered":false,"surcharge_paise":0}])
+PASS  a charge is saved in paise, for each file, and shown to customers  ([{"label":"Binding fee","amount_paise":2000,"basis":"per_item","is_active":true}])
+PASS  the customer preview shows the saved paper surcharge and charge  (Customer preview What a customer who scans your code sees. Document printing B&W ₹2.50 per printed side · Colour ₹10.00 per printed side Spiral binding Colour ₹40.00 per copy Paper: A4 · A3 +₹2.00 per billed unit Extra charges: Binding fee ₹20.00 per file Changes apply to new orders. Existing orders keep their prices.)
+PASS  no more than ten charges can be added
+PASS  a blank charge name is refused before any request
+PASS  shop name is escaped (no <b> or <img> rendered)
+PASS  no script ran from the shop name
+PASS  orders page lists the two open orders
+PASS  order shows its tracking code
+PASS  customer note is shown as text, not markup
+PASS  approve sends only the new status, to one order in this shop, with the owner token  (/rest/v1/orders?id=eq.ord-1&shop_id=eq.bbbbbbbb-0000-0000-0000-000000000001)
+PASS  approved order offers the next steps, not reject
+PASS  rejecting asks for confirmation first  (Reject order WXYZ2345? This cannot be undone.)
+PASS  reject sends only the new status
+PASS  the open list no longer shows the rejected order
+PASS  all orders shows both orders
+PASS  a rejected order offers no buttons
+PASS  the rejected order shows its status as Cancelled
+PASS  create shop sends slug and details to create_shop
+PASS  new shop has its customer page address on More
+PASS  duplicate web address shows a clear message
+PASS  customer page sends no token  (5 calls)
+PASS  customer page hides the closed shop's ordering
+AUDIT w=360 light home    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=2 h=1284 h1="Needs you now"
+AUDIT w=360 light orders  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=1245 h1="Orders"
+AUDIT w=360 light prices  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=4128 h1="Prices"
+AUDIT w=360 light stats   overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=5642 h1="Statistics"
+AUDIT w=360 light more    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=3024 h1="More"
+AUDIT w=360 dark  home    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=2 h=1284 h1="Needs you now"
+AUDIT w=360 dark  orders  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=1245 h1="Orders"
+AUDIT w=360 dark  prices  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=4128 h1="Prices"
+AUDIT w=360 dark  stats   overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=5642 h1="Statistics"
+AUDIT w=360 dark  more    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=3024 h1="More"
+AUDIT w=390 light home    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=2 h=1244 h1="Needs you now"
+AUDIT w=390 light orders  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=1226 h1="Orders"
+AUDIT w=390 light prices  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=4061 h1="Prices"
+AUDIT w=390 light stats   overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=5501 h1="Statistics"
+AUDIT w=390 light more    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=2988 h1="More"
+AUDIT w=390 dark  home    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=2 h=1244 h1="Needs you now"
+AUDIT w=390 dark  orders  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=1226 h1="Orders"
+AUDIT w=390 dark  prices  overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=4061 h1="Prices"
+AUDIT w=390 dark  stats   overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=5501 h1="Statistics"
+AUDIT w=390 dark  more    overflow=0 off=0 clip=0 tab=flex padB=84px kpiCols=0 h=2988 h1="More"
+AUDIT w=768 light home    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=4 h=1017 h1="Needs you now"
+AUDIT w=768 light orders  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=920 h1="Orders"
+AUDIT w=768 light prices  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=3395 h1="Prices"
+AUDIT w=768 light stats   overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=4233 h1="Statistics"
+AUDIT w=768 light more    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=2574 h1="More"
+AUDIT w=768 dark  home    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=4 h=1017 h1="Needs you now"
+AUDIT w=768 dark  orders  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=920 h1="Orders"
+AUDIT w=768 dark  prices  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=3395 h1="Prices"
+AUDIT w=768 dark  stats   overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=4233 h1="Statistics"
+AUDIT w=768 dark  more    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=2574 h1="More"
+AUDIT w=1280 light home    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=4 h=1088 h1="Needs you now"
+AUDIT w=1280 light orders  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=962 h1="Orders"
+AUDIT w=1280 light prices  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=3275 h1="Prices"
+AUDIT w=1280 light stats   overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=4436 h1="Statistics"
+AUDIT w=1280 light more    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=2788 h1="More"
+AUDIT w=1280 dark  home    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=4 h=1088 h1="Needs you now"
+AUDIT w=1280 dark  orders  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=962 h1="Orders"
+AUDIT w=1280 dark  prices  overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=3275 h1="Prices"
+AUDIT w=1280 dark  stats   overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=4436 h1="Statistics"
+AUDIT w=1280 dark  more    overflow=0 off=0 clip=0 tab=none padB=0px kpiCols=0 h=2788 h1="More"
+PASS  sign out clears the stored session
+PASS  no horizontal scroll at phone width  (overflow=0px)
+PASS  no JavaScript errors in the browser
+
+50 of 50 checks passed.

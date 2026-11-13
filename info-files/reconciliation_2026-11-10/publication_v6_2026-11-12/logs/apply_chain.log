@@ -1,0 +1,4 @@
+P2_7B_7C_database_v5.patch check+apply exit=0
+P3_7D_admin.patch check+apply exit=0
+U6_browser_smoke_and_layout.patch check+apply exit=0
+P4_7E_web_v5.patch check+apply exit=0

@@ -1,0 +1,35 @@
+PASS  web build: the owner-only Android switch is off
+PASS  owner sees a Licence link on the shop page
+PASS  active dated licence says it is active until a time  (← Back to Alpha Print |  | Licence |  | Read only. This shows the licence the server holds for this shop. Nothing on this page changes it. | )
+PASS  licence check sends one owner RPC with the shop id and owner token  ({"method":"POST","path":"/rest/v1/rpc/shop_licence_status","auth":"Bearer owner-token","body":{"p_shop_id":"aaaaaaaa-0000-0000-0000-00000000000a"}})
+PASS  the licence page sends no call to the licence tables
+PASS  printing shows as permitted (backend status)
+PASS  the page offers only Refresh, not any licence change  (["Refresh"])
+PASS  refresh button is disabled while a check runs
+PASS  overlapping refresh presses make one request  (new=1)
+PASS  lifetime coverage shows no expiry and printing permitted
+PASS  inactive shows no printing access, with no reason given
+PASS  scheduled coverage shows the next start, and printing not permitted now
+PASS  forbidden reply is unavailable, and the old Access until line is gone
+PASS  forbidden reply does not show printing as permitted
+PASS  malformed reply is unavailable, never active
+PASS  network failure is unavailable, distinct from inactive
+PASS  server failure is unavailable, with a retry hint
+PASS  offline shows its own message, not inactive
+PASS  offline sends no licence request
+PASS  shop switch: Beta shows its own status after Alpha replies late  (← Back to Beta Print |  | Licence)
+PASS  sign-out clears the stored session
+PASS  sign-out leaves no licence text on screen, even after a late reply
+PASS  staff see no Licence link on the shop page
+PASS  staff who open the licence page directly are told it is for owners
+PASS  staff open page sends no licence request
+PASS  no horizontal scroll at phone width (390px)  (overflow=0px)
+PASS  no JavaScript errors in the browser
+PASS  Android bundle: the owner-only switch is on
+PASS  Android bundle: the shop page has no Licence link
+PASS  Android bundle: the rest of the owner shop page still shows
+PASS  Android bundle: the licence address shows the shop page, not the licence screen
+PASS  Android bundle: opening the licence address sends no licence request  (new=0)
+PASS  Android bundle: no JavaScript errors in the browser
+
+33 of 33 checks passed.

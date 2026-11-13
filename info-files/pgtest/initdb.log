@@ -1,0 +1,10 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default database encoding has accordingly been set to "SQL_ASCII".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+initdb: error: could not access directory "/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/pgtest/data": Permission denied

@@ -1,0 +1,448 @@
+--- /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/STAGE7_DECISIONS.orig.md	2026-10-29 14:45:38.397821507 +0000
++++ STAGE7_DECISIONS.md	2026-10-30 04:09:52.026145370 +0000
+@@ -1,7 +1,7 @@
+ # Stage 7 decisions: draft for owner review
+ 
+ **Status:** DRAFT PROPOSAL. This file is not an approval of any business, legal, tax, pricing, or technical decision.
+-**Date:** 2026-10-29. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A).
++**Date:** 2026-10-29. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
+ **Worktree:** `/home/claude/joyyxh/ps-qr-stage7`, branch `stage7-payments`, base `origin/main` at `717717b`
+ **Committed:** No. Untracked draft.
+ 
+@@ -253,6 +253,8 @@
+ 
+ ## 7. Pricing options (all PENDING OWNER APPROVAL)
+ 
++**Blocked (decision I, 2026-10-29, §12B): no option is approved. Pricing, minimum amount, tax treatment, and published prices stay blocked until reviewed.**
++
+ All options: 12-month term, paid by a new payment each year, no automatic renewal. Figures use the assumptions in §5. The base tables assume every shop pays from month one (§5B). Revenue is conditional on a working payment channel (§8). **PENDING OWNER APPROVAL.**
+ 
+ | | **A: Low-cost pilot** | **B: Recommended proposal** | **C: Higher-priced** |
+@@ -330,9 +332,9 @@
+ 2. **Term.** Proposal: 12 months; the owner pays again each year; no automatic renewal. Options: yearly manual renewal; one-time (not recommended, since recurring costs need recurring income). **PENDING OWNER APPROVAL.**
+ 3. **Price.** Proposal: Option B, ₹1,499 incl. GST, as the starting point. Options: A (₹499 pilot); C (₹2,999); other. **PENDING OWNER APPROVAL.**
+ 4. **GST route.** No option chosen. Options: (a) stay unregistered and charge no GST, only if a CA confirms the exemption applies; (b) register and charge GST on an inclusive price. Input credit: whether a registered shop can claim input credit on the licence depends on QRquick issuing valid GST invoices. This claim is **unsourced** in this draft. Whether QRquick can claim input credit on its own costs, and the reverse-charge treatment of foreign services, are **not modelled**. **PENDING OWNER APPROVAL. CA review required.**
+-5. **Trial.** Proposal: 30 days, no card, one per owner account. Options: none; 14 days. A trial delays first payment and is not modelled as lost revenue (§5B). **PENDING OWNER APPROVAL.**
++5. **Trial.** **Deferred out of Stage 7 (2026-10-29 direction, §12B, conflict C-10).** Proposal: 30 days, no card, one per owner account. Options: none; 14 days. A trial delays first payment and is not modelled as lost revenue (§5B). **PENDING OWNER APPROVAL.**
+ 6. **Refunds.** Proposal: full refund within 7 days. After that, only for duplicate charges or a QRquick outage. QRquick absorbs the processor fee: ₹35.38 per year on a ₹1,499 card payment at 2.36%, or ₹29.98 at the derived 2.00%. Each Stripe dispute costs ₹1,000 (§3, Stripe pricing row). That is Stripe's dispute fee. Pausing the licence during a dispute does not itself cost ₹1,000. **PENDING OWNER APPROVAL. Lawyer review required.**
+-7. **Expiry behaviour.** Proposal: no new customer orders. In-flight paid orders finish. The print agent claims no new jobs. Owners keep read and CSV export. **Licence expiry does not itself delete data.** Order files follow the retention schedule: 30 days after finish, which is **not deployed** (§5C). Whether licence expiry should also change the deletion schedule is a separate decision. **PENDING OWNER APPROVAL.**
++7. **Expiry behaviour.** *Partly superseded 2026-10-29 (§12B): decision A (printing only, no order blocking), B (queued jobs held), C (no retries while inactive).* Original proposal: no new customer orders. In-flight paid orders finish. The print agent claims no new jobs. Owners keep read and CSV export. **Licence expiry does not itself delete data.** Order files follow the retention schedule: 30 days after finish, which is **not deployed** (§5C). Whether licence expiry should also change the deletion schedule is a separate decision. **PENDING OWNER APPROVAL.**
+ 8. **Existing shops.** Proposal: free for 12 months from launch, with 30 days' written notice before the first charge. Effect as drafted: no licence revenue from these shops in year one. Decision 8 does not say whether the paid term is extended. The illustrations assume it is not, so that revenue is **forgone**, not deferred (§5B). Existing-shop count (N): [OWNER TO PROVIDE]. Illustration at N = 100 (arithmetic only): year-one net −₹65,700 on Free (E ≤ 1.5) or −₹88,500 on Pro (E > 1.5), against +₹57,796 or +₹34,996 if all pay from month one. Accrual break-even month 26 (Free) or 43 (Pro). Cash turns positive in month 13 under annual receipts. **PENDING OWNER APPROVAL.**
+ 9. **Processor.** Options: Stripe, only if an active account or invite exists; Razorpay, only after its India signup is verified; defer. Neither is confirmed available. Every revenue projection in §8 assumes a working channel. **PENDING OWNER APPROVAL.**
+ 10. **Stage 6 merge order.** Proposal: owner reviews and merges Stage 6 before Stage 7 is rebased. Not merged by me. **PENDING OWNER APPROVAL.**
+@@ -401,13 +403,14 @@
+ - No payment-provider, Stripe, Razorpay, or Supabase calls. No credentials used.
+ - Phase 2 has not started. No implementation has begun.
+ - Admin-grant and manual licence design added (§12A). Design only: no code, migration, Edge Function, UI, or enforcement.
++- Stage 7 decision record added 2026-10-29 (§12B). Documentation only. No implementation, setup, tests, migration, or commit.
+ - **Waiting for owner review.**
+ 
+ ---
+ 
+ ## 12A. Manual licence management and admin-granted access (design, added 2026-10-29)
+ 
+-**Status: DESIGN ONLY. Nothing is implemented.** No migration, Edge Function, admin UI, shop-app screen, or licence enforcement exists or is approved. Every decision in this section is **PENDING OWNER APPROVAL**. No licence state below is approved policy. Next free migration number: 0011 (CLAUDE.md).
++**Status: DESIGN ONLY. Nothing is implemented.** No migration, Edge Function, admin UI, shop-app screen, or licence enforcement exists or is approved. Every decision in this section is **PENDING OWNER APPROVAL**. No licence state below is approved policy. Next free migration number: 0011 (CLAUDE.md). **Update 2026-10-29:** the decisions in §12B supersede conflicting text in this section. Corrections are marked *Corrected 2026-10-29*. Decision status is in §12B.3.
+ 
+ ### 12A.1 Scope
+ 
+@@ -434,25 +437,25 @@
+ 
+ ### 12A.4 Architecture
+ 
+-- **Database:** new licence tables with RLS deny-all for client roles. All writes go through `SECURITY DEFINER` RPCs. Each RPC first checks `is_platform_admin()`, and if decision 14 is yes, `auth.jwt()->>'aal' = 'aal2'`. Each RPC writes its audit row in the same transaction. `EXECUTE` is revoked from `public` and `anon` and granted to `authenticated` only.
++- **Database:** new licence tables with RLS deny-all for client roles. All writes go through `SECURITY DEFINER` RPCs. Each RPC first checks `is_platform_admin()`, and if decision 14 is yes, `auth.jwt()->>'aal' = 'aal2'`. Each RPC writes its audit row in the same transaction. `EXECUTE` is revoked from `public`, `anon`, and `authenticated` on internal helpers. Admin RPCs are granted to `authenticated` only, and each checks admin status and aal2 itself. *Corrected 2026-10-29 (R9, §12B.5).*
+ - **Why RPCs rather than an Edge Function with the service key:** the check, the write, and the audit happen in one transaction, and no service key is needed. This matches the existing RPC pattern (`set_order_payment`, `set_shop_features`). An Edge Function stays an option if a later stage needs one.
+ - **Admin UI:** a separate private app (hosting, decision 15). It holds the publishable key and the admin's session only. It calls admin RPCs and nothing else. The shop app has no link to it.
+-- **Shop read:** `shop_licence_status(p_shop_id)` returns the state label and expiry date only. It is available to users who pass `is_shop_owner()`. It never returns reasons, actor IDs, payment references, or notes.
++- **Shop read:** `shop_licence_status(p_shop_id)` returns only: active or inactive; the access end date and time in Asia/Kolkata, or no-expiry; and the next start date when relevant. *Decision D, §12B.* Owner only, through `is_shop_owner()`. Staff receive nothing. It never returns basis, reasons, actor IDs, payment references, notes, audit rows, or coverage IDs.
+ - **No service-role key** appears in `web/`, `mobile/`, the admin UI, or any committed file.
+ 
+ ### 12A.5 Proposed data model
+ 
+ - **`platform_admins`:** as in §12A.3.
+-- **`licence_coverages`:** append-only records of access. Columns: `id`, `shop_id`, `kind` (`trial` | `paid_verified` | `admin_grant` | `lifetime_grant`), `starts_at`, `ends_at` (null only for `lifetime_grant`), `revoked_at` (null until revoked), `revoked_by`, `revoke_reason`, `payment_id` (required for `paid_verified`, null otherwise), `reason` (required), `created_by`, `created_at`, `request_id` (unique).
+-  - Checks: `ends_at > starts_at`; `revoked_at >= starts_at`; `lifetime_grant` has no `ends_at`; every other kind has one.
+-  - Trigger: the only permitted update sets `revoked_at`, `revoked_by`, and `revoke_reason`, once, from null, with every other column unchanged. Deletes are blocked.
+-- **`licence_payments`:** manual payment records. Columns: `id`, `shop_id`, `amount_paise` (greater than 0), `currency` (INR only), `method` (`upi_direct` | `bank_transfer` | `cash` | `cheque` | `other`), `external_reference` (required except for `cash`), `received_on`, `status` (`recorded` | `verified` | `reversed`), `recorded_by`, `recorded_at`, `verified_by`, `verified_at`, `reversed_by`, `reversed_at`, `reversal_reason`, `note` (internal).
++- **`licence_coverages`:** append-only records of access. Columns: `id`, `shop_id`, `kind` (`admin_grant` | `lifetime_grant` in Stage 7B; `paid_verified` and `trial` deferred, §12B.2 M5 and §12B.9 C-10), `starts_at`, `ends_at` (null only for `lifetime_grant`), `revoked_at` (null until revoked), `revoked_by`, `revoke_reason`, `payment_id` (deferred with `paid_verified`; null for all Stage 7B kinds), `reason` (required), `created_by`, `created_at`, `request_id` (unique). *Corrected 2026-10-29 (R7):* `shop_id` on this table and on `licence_payments` is enforced by a composite foreign key to the payment, so a coverage's shop must match its payment's shop.
++  - Checks: `ends_at > starts_at`; `lifetime_grant` has no `ends_at`; every other kind has one. *Corrected 2026-10-29 (fix 1):* the earlier check `revoked_at >= starts_at` is replaced by a trigger rule: `revoked_at >= created_at` and `revoked_at <= clock_timestamp()` at write time. A cancelled future period is therefore stored with `revoked_at` = now.
++  - Trigger: the only permitted update sets `revoked_at`, `revoked_by`, and `revoke_reason`, once, from null. *Corrected 2026-10-29 (R6):* the trigger compares `to_jsonb(new)` and `to_jsonb(old)` with those three keys removed, rather than listing columns. Deletes and TRUNCATE are blocked. *UNVERIFIED until staging.*
++- **`licence_payments`:** **deferred (M5, §12B.2).** Not built until pricing, minimum amount, tax treatment, and the payment-recording policy are approved. Proposed columns, for later review: `id`, `shop_id`, `amount_paise` (greater than 0), `currency` (INR only), `method` (`upi_direct` | `bank_transfer` | `cash` | `cheque` | `other`), `external_reference` (required except for `cash`), `received_on`, `status` (`recorded` | `verified` | `reversed`), `recorded_by`, `recorded_at`, `verified_by`, `verified_at`, `reversed_by`, `reversed_at`, `reversal_reason`, `note` (internal).
+   - Unique index on (`method`, `external_reference`) where the reference is present, so one bank or UPI transaction cannot be verified twice.
+   - Records are never deleted. Corrections are made by reversal.
+   - No foreign key to `orders`, `order_items`, or any customer payment table.
+ - **`licence_audit_log`:** append-only (§12A.9).
+-- **`shop_licence_meta`:** one row per shop holding `state_version`, incremented by trigger on every coverage change. Admin RPCs take `expected_state_version` and reject stale requests.
+-- **`shop_licence_state(shop_id, at)`:** a deterministic SQL function that derives state from the coverage rows (§12A.6).
++- **`shop_licence_meta`:** one row per shop holding `state_version`. *Corrected 2026-10-29 (R1, R2):* the row is created lazily through `licence_lock_shop` (no trigger on `shops`). The version is incremented once per admin RPC request, inside the RPC, not by triggers. Admin RPCs take `expected_state_version` and reject stale requests.
++- **`shop_licence_state(shop_id, at)`:** a deterministic SQL function that derives state from the coverage rows (§12A.6). Internal only: no client role is granted EXECUTE (R9, R10).
+ 
+ ### 12A.6 Access states and precedence
+ 
+@@ -460,31 +463,31 @@
+ 
+ **Access** is granted if any coverage is effective at `t`. Overlaps are allowed and do not add time.
+ 
+-The **state label** is chosen in this order, highest first:
++*Corrected 2026-10-29 (state-machine fixes 1–11, §12B.5).* The **state** is chosen in this order. The first match wins. Only ACTIVE grants access.
++
++1. **ACTIVE:** an effective coverage contains `t`. **Basis** describes current access only: the highest-ranked effective kind (`lifetime_grant`, then `admin_grant`; `paid_verified` is deferred, M5). `access_until` is the end of the contiguous block that contains `t` (algorithm in §12B.5). Lifetime gives no expiry.
++2. **SCHEDULED:** no effective coverage at `t`, and at least one valid future coverage. `next_start` is shown.
++3. **REVOKED:** no effective coverage, and the latest-ending valid coverage ended by revocation. If two coverages end at the same instant and one was revoked, the state is REVOKED (proposal; owner confirmation pending, §12B.5 fix 5).
++4. **EXPIRED:** no effective coverage, and the latest-ending valid coverage ended naturally.
++5. **NONE:** no valid coverage ever. NONE is not ACTIVE, so it blocks printing once enforcement is on (decisions A to C).
+ 
+-1. **LIFETIME:** an effective `lifetime_grant`.
+-2. **ADMIN GRANT:** an effective `admin_grant`. Expiry shown is the latest effective end.
+-3. **PAID (MANUALLY VERIFIED):** an effective `paid_verified`. Gateway payments would be a new kind, added only after §9 decision 9 is approved and gateway access is verified (§4).
+-4. **FREE TRIAL:** an effective `trial`.
+-5. **REVOKED:** no effective coverage, and the most recently ended coverage ended by revocation.
+-6. **EXPIRED:** no effective coverage, and the most recently ended coverage ended naturally.
+-7. **NONE:** no coverage ever. Treated as expired for enforcement (decision 18).
++A coverage cancelled before its start has an end at or before its start. It is dropped from every state. The FREE TRIAL state is removed because trials are deferred (§9 item 5).
+ 
+-The label does not change access. It only sets what is displayed and reported.
++*Corrected 2026-10-29:* the state decides access, not only the display.
+ 
+ **Operations**, each recorded as a coverage change:
+ 
+-- **Grant** (1 month, 1 year, custom, or lifetime): the new coverage starts now, unless an explicitly confirmed backdate is given (decision 16). A custom grant needs a start and an end, with the end after the start.
++- **Grant** (1 month, 1 year, custom, or lifetime): the new coverage starts now, unless an explicitly confirmed backdate is given (decision 16). A custom grant needs a start and an end, with the end after the start. *Approved convention (M4):* custom dates are entered as Asia/Kolkata calendar dates. The start is inclusive at 00:00 IST, and the end is exclusive at 00:00 IST on the entered end date. A custom grant is an administrative grant, not a paid transaction, and has no `payment_id`.
+ - **Extend:** a new coverage starting at the current latest effective end (or now, if none). The old record's end is never edited.
+-- **Revoke:** sets `revoked_at` on one coverage record, effective now. Not retroactive. Other coverages are untouched.
++- **Revoke:** sets `revoked_at` on one coverage record, effective now. Not retroactive. Other coverages are untouched. *Approved (M2):* refused when the coverage's natural end has already passed. Cancelling a future period is allowed (fix 1).
+ - **Replace:** in one transaction, revokes the named coverage (effective now) and creates the new coverage starting now. The two audit rows share one `request_id`.
+-- Revoking a `paid_verified` period is a separate choice (decision 17). It does not refund anything.
++- Revoking a `paid_verified` period is deferred with the paid path (M5). Payment reversal revokes its linked coverage (H, §12B). No revocation refunds anything.
+ 
+ ### 12A.7 Manual payment verification
+ 
+ 1. **Record:** the owner enters a payment received outside the app: shop, amount, method, reference, received date, and internal note. Status becomes `recorded`. Access does not change.
+-2. **Verify:** after checking external evidence (bank statement, UPI app record, or receipt), the owner verifies the payment. The RPC requires `confirm = true`, a matching `expected_state_version`, and a chosen term. It creates one `paid_verified` coverage linked to the payment, and sets status `verified`.
+-3. **Reverse:** for a refund or a wrong entry. Requires a reason and `confirm = true`. Sets status `reversed` and revokes the linked coverage, effective now.
++2. **Verify:** *Deferred (M5).* When approved: after checking external evidence (bank statement, UPI app record, or receipt), the owner verifies the payment. The RPC requires `confirm = true` and a matching `expected_state_version`. The term is fixed at 12 calendar months (M4), calculated from the exact server timestamp taken after the shop lock (J). The owner does not choose a term. Verification is refused while a lifetime grant is effective (F). It creates one `paid_verified` coverage linked to the payment and sets status `verified`.
++3. **Reverse:** for a refund or a wrong entry. Requires a reason and `confirm = true`. Sets status `reversed`. *Approved (H, M2):* in the same transaction, a linked coverage that is current is cut at now, and a future one is cancelled. If the linked period has already ended, only the payment status changes. Admin grants are never changed by a reversal.
+ 
+ Rules:
+ 
+@@ -494,34 +497,35 @@
+ 
+ ### 12A.8 Rules for all admin RPCs
+ 
+-- Every admin RPC: (a) runs `is_platform_admin()`; (b) requires a non-empty reason for grants, revocations, replacements, and reversals; (c) requires `confirm = true`; (d) requires `expected_state_version`; (e) requires a `request_id` (uuid). A repeated `request_id` returns the original result without a second change; (f) writes an audit row in the same transaction; (g) on denial, writes a `denied` audit row (decision 20) and returns no state.
++- Every admin RPC: (a) runs `is_platform_admin()`; (b) requires a non-empty reason for grants, revocations, replacements, and reversals; (c) requires `confirm = true`; (d) requires `expected_state_version`; (e) requires a `request_id` (uuid). A repeated `request_id` with the same payload hash returns the original result without a second change. The same `request_id` with a different payload is a conflict (R5). (f) writes an audit row in the same transaction; (g) on denial, returns `{ok: false, code: 'forbidden'}` as a committed result, not a raised error, so the denial record and the rate-limit counter survive (R3). The same code is returned for every denial reason. Detailed denial records and their cap are in §12B.7 (M3).
+ - Shop owners and staff can call only `shop_licence_status`. They cannot call any write RPC.
+ - A platform admin cannot act as a shop user, and a shop owner cannot act as a platform admin. Platform admin status is not shop membership. If the owner also owns a shop, the owner can grant that shop, and the action is logged the same way.
+ - The typed shop-slug confirmation is a UI step. The server checks only `confirm = true`, the state version, and admin identity.
++- *Added 2026-10-29 (R11):* an admin cannot disable their own admin row, and the last active admin cannot be disabled. Disabling through the RPC is audited. The break-glass SQL in §12A.3 remains the only other path.
+ 
+ ### 12A.9 Audit log
+ 
+-- Table `licence_audit_log`: `id`, `created_at`, `actor_user_id`, `shop_id`, `action` (`grant`, `extend`, `revoke`, `replace`, `payment_record`, `payment_verify`, `payment_reverse`, `denied`), `reason`, `coverage_id`, `payment_id`, `licence_start`, `licence_end`, `before` (jsonb), `after` (jsonb), `request_id`.
++- Table `licence_audit_log`: `id`, `created_at`, `actor_user_id`, `shop_id`, `action` (`grant`, `extend`, `revoke`, `replace`, `enforcement_change`; `payment_record`, `payment_verify`, and `payment_reverse` are deferred with M5). Denied attempts are not written here. They go to `licence_denials` (§12B.7, M8). `reason`, `coverage_id`, `payment_id`, `licence_start`, `licence_end`, `before` (jsonb), `after` (jsonb), `request_id`.
+ - Written in the same transaction as the change. Append-only: UPDATE, DELETE, and TRUNCATE are blocked by trigger and revoked from all roles.
+ - Readable only by platform admins, through an RPC. Not readable by shop owners.
+-- Contains personal data: actor UUID, shop identity, and dates. Retention period and DPDP handling are decision 20 and need lawyer review (§4).
++- Contains personal data: actor UUID, shop identity, and dates. Retention period and DPDP handling are decision 20 and need lawyer review (§4). *Retention split (M8, §12B.8):* consequential audit rows and replay records are kept separately from temporary denial logs. Denial retention is 90 days, subject to security and legal review. No retention job exists or is approved.
+ - Every row carries actor, shop, action, reason, timestamp, and the relevant licence dates, as the owner brief requires.
+ 
+ ### 12A.10 Expiry and revocation
+ 
+ - Expiry is computed at read time from `ends_at`. Access needs no cron job. A notice job is a later stage.
+-- Expired, revoked, and NONE shops follow Decision 7 once enforcement exists: no new customer orders, in-flight orders finish, the print agent claims no new jobs, and owners keep read and CSV export. Enforcement is not part of this design and needs its own approval.
+-- Revocation takes effect at `revoked_at`. It does not alter orders, print jobs, customer files, or statistics.
+-- Licence expiry or revocation never deletes data. The 30-day file retention schedule (not deployed, §5C) is separate.
++- *Corrected 2026-10-29 (decisions A, B, C; §12B.2):* once enforcement exists, it applies to printing only. For SCHEDULED, EXPIRED, REVOKED, and NONE shops: no new print jobs, no retries, queued jobs held until ACTIVE, jobs already printing finish, the agent receives no claims, and `mark_printing` refuses. Customer checkout and order placement are not blocked. Owners keep read and CSV export. Enforcement is not started and needs its own approval (7F).
++- Revocation takes effect at `revoked_at`. It does not alter orders, customer files, or statistics. Its only effect on printing is through the 7F gate.
++- Licence expiry or revocation does not itself delete any data. The 30-day file retention schedule (not deployed, §5C) is separate. *Proposal M1 (§12B.6), not approved for implementation:* a job held only because the licence is inactive fails after 7 days. Whether its file then becomes purgeable is an open conflict (§12B.9 C-1).
+ - Grace period: decision 18.
+ 
+ ### 12A.11 Required tests (before any stage is approved to ship)
+ 
+ SQL tests run only on a staging copy (CLAUDE.md). Minimum matrix:
+ 
+-- No coverage gives NONE. Trial only gives TRIAL. Trial plus paid overlap gives PAID.
+-- Admin 1 month, then time passes, gives EXPIRED. Revocation mid-period gives REVOKED. If a paid period is also effective, the label falls back to PAID and access continues.
+-- Lifetime plus an expiring admin grant gives LIFETIME. Revoking the lifetime grant while an admin grant is still effective gives ADMIN GRANT.
++- No coverage gives NONE. Trial and paid-overlap cases are deferred with the trial kind (§9 item 5) and the paid path (M5).
++- Admin 1 month, then time passes, gives EXPIRED. Revocation mid-period gives REVOKED. (The paid fallback case is deferred with M5.)
++- Lifetime plus an expiring admin grant gives ACTIVE with basis lifetime. Revoking the lifetime grant while an admin grant is still effective gives ACTIVE with basis admin grant.
+ - Half-open boundaries: `t = ends_at` and `t = revoked_at` are not effective.
+ - An extension starts exactly at the old end, with no gap and no added overlap.
+ - Replace is atomic: a failure partway leaves the old coverage in place.
+@@ -532,21 +536,22 @@
+ - An admin JWT without `aal2` is denied, if decision 14 is yes.
+ - Audit rows cannot be updated or deleted.
+ - Coverage rows accept only the one-time revocation update.
+-- Licence actions leave `orders` unchanged. A checksum of `payment_status` and `order_payments` is taken before and after.
++- Licence actions leave `orders` unchanged. A checksum of the `orders` payment columns (`payment_status`, `payment_channel`, `paid_at`, `refunded_at`, `refund_paise`, `payment_verified_by`, `payment_verified_at`) and the `order_events` row count is taken before and after. *Corrected 2026-10-29: `order_payments` does not exist in any migration.*
+ - `shop_licence_status` returns no reason, actor, or reference fields.
++- The full test list, updated for the §12B decisions, is in §12B.11. No test has been run.
+ 
+ ### 12A.12 Implementation stages (proposed; none started or approved)
+ 
+ - **7A. Owner inputs:** decisions 13–20; the Auth user UUID; MFA confirmation; admin UI hosting. No code.
+-- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, and `shop_licence_meta`. SQL tests on staging.
+-- **7C. Admin RPCs and the read RPC:** grant, extend, revoke, replace, manual payment record, verify, and reverse; `shop_licence_status`; denial logging. Full matrix from §12A.11 on staging.
+-- **7D. Admin UI:** a separate private app with login, shop search, grant and revoke forms with confirmation, payment entry, and an audit view. Browser smoke test on staging.
+-- **7E. Shop read-only status:** owner web view, and Android only if decision 19 asks for it. No enforcement.
+-- **7F. Enforcement:** Decision 7 behaviour in order intake and the print agent. Separate approval gate.
++- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, and `shop_licence_meta`. Excludes `paid_verified`, `trial`, and `licence_payments` (M5; conflict C-5). Built to the corrections in §12B.5 and the tests in §12B.11. SQL tests on staging only, after separate approvals for local setup and for migration creation.
++- **7C. Admin RPCs and the read RPC:** grant, extend, revoke (with the M2 rule), and replace; `shop_licence_status` (owner read RPC); denial logging (M3, M8). Manual payment record, verify, and reverse are deferred (M5). Matrix from §12A.11 and §12B.11 on staging.
++- **7D. Admin UI:** a separate private app with login, shop search, grant, extend, revoke, and replace forms with confirmation, and an audit view. Payment entry is deferred (M5). Browser smoke test on staging.
++- **7E. Shop read-only status:** owner web view with the minimal fields in decision D. Android is undecided (decision 19). No enforcement.
++- **7F. Enforcement (printing only, decision A):** gates on approve, retry, claim, and `mark_printing` (§12B.4). Order intake is not gated. Separate approval gate. The refund and claim fix and the duplicate-print fix are separate gates (§12B.4). The 7-day hold rule (M1) is a separate gate (§12B.6).
+ - Gateway payments (Stripe, Razorpay) come later. They depend on §9 decision 9 and on the external access checks in §4.
+ - Each stage needs explicit approval before it starts. No commit, push, merge, or deploy without it.
+ 
+-### 12A.13 New owner decisions (all PENDING OWNER APPROVAL)
++### 12A.13 New owner decisions (all PENDING OWNER APPROVAL, except where §12B.3 records a status)
+ 
+ 13. **Admin accounts (PENDING OWNER APPROVAL):** one owner account only (recommended), or additional super-admins? Each extra admin needs an owner-run SQL row.
+ 14. **MFA (PENDING OWNER APPROVAL):** require `aal2` (TOTP) for all admin RPCs (recommended)? The owner confirms whether MFA is enabled on the Supabase account and the admin user.
+@@ -577,8 +582,244 @@
+ 
+ > UPI MDR from 15 Oct 2026 is 0.4% on P2M UPI transactions above ₹2,000 (cap ₹300), per the MoF DFS FAQ dated 15 Sep 2026 (accessed 2026-10-29). Razorpay's 2% platform fee plus GST is a separate gateway charge (Razorpay pricing page, accessed 2026-10-29). Whether Razorpay passes MDR on to QRquick is unverified.
+ 
++## 12B. Stage 7 decision record (2026-10-29)
++
++**Scope.** This section records the owner's answers to decisions A–L and M1–M8, the state-machine corrections, and the R1–R19 findings. It is documentation only. Approval here sets the planning direction. It does **not** authorise local setup, Docker, the Supabase CLI, `supabase init`, containers, database resets, tests, migration 0011, implementation of 7B–7F, any commit, push, merge, deployment, live configuration change, production inspection, production data change, or APK rebuild. The email sign-in and sign-up decisions in §2 are unchanged. The protected main checkout, its three modified files, and `stash@{0}` (b559dce) are untouched.
++
++### 12B.1 Status key
++
++- **APPROVED:** owner direction for design and planning. Implementation still needs its own gate.
++- **APPROVED, CONDITIONAL:** approved subject to the stated condition.
++- **BLOCKED:** cannot proceed until the named condition is met.
++- **REVIEW REQUIRED:** a separate diff or legal review is needed before implementation.
++- **PROPOSAL:** recorded for review. Not approved for implementation.
++- **UNVERIFIED:** needs a staging or primary-source check. No conclusion is drawn.
++
++### 12B.2 Decisions A–L and M1–M8
++
++| ID | Decision (as recorded) | Status | Consequence and condition |
++|---|---|---|---|
++| A | Printing-only enforcement. Customer checkout and order placement are not blocked by licence status. | APPROVED | Replaces the order-insert gate in the earlier chat plan (label U10) and the original 7F wording. Checkout is unchanged. |
++| B | Queued jobs held until the shop is ACTIVE. Jobs already printing may finish. | APPROVED, CONDITIONAL | Held files are kept by the purge rule (0010 lines 795–798) until M1 is implemented (C-1, C-3). |
++| C | Retries blocked while inactive. No requeue or reuse of old job rows. | APPROVED | Each retry is a new row, created only while ACTIVE. Supersedes the earlier chat plan's pre-expiry retry wording (label N3). |
++| D | Minimal owner status: active or inactive; access end or no-expiry; next start when relevant. No payment references, admin notes, audit history, coverage IDs, or revocation reasons. | APPROVED | Owner only. Staff and Android visibility are open (decision 19). |
++| E | Enabling enforcement: preview first, blocked-shop count, digest, typed confirmation, reason, audited server-side change. Not enabled now. | APPROVED for design. ENABLING BLOCKED | Enabling needs a reviewed transition policy for existing shops (owner input: N and the free-period policy, §5B, decision 8). |
++| F | Refuse paid coverage while a lifetime grant is active. | APPROVED. BLOCKED with the paid path (M5) | Verification is refused while a lifetime grant is effective. Payments recorded but not verified need a refund policy (outside the software; lawyer and CA, §9 item 6). |
++| G | Show SCHEDULED when no coverage is active but a valid future coverage exists. | APPROVED | Revoking current coverage does not cancel future coverage (C-8). |
++| H | A payment reversal atomically revokes its linked coverage. Admin and complimentary grants are never revoked by a payment reversal. | APPROVED. BLOCKED with the paid path (M5) | Admin grants carry no payment reference (§12A.5 check), so the link is structural. |
++| I | Pricing and minimum payment. | **BLOCKED** | No price, minimum amount, tax treatment, or published pricing. The paid path stays blocked. The §7 options are not approved. |
++| J | Coverage anchor: exact server verification timestamp taken after the shop lock; Asia/Kolkata calendar arithmetic. | APPROVED. BLOCKED with the paid path (M5) | See C-4 on stacking. |
++| K | Investigate and test two printing fixes. Stop if a fix is broader. | Duplicate-print fix: APPROVED for investigation and tests; REVIEW REQUIRED before implementation. Refund and claim fix: **REVIEW REQUIRED (stopped)** | §12B.4. Nothing implemented. |
++| L | Read-only inspection of the local Auth schema, only after separate local setup approval. Synthetic fixture only after its columns are verified and the approach is reviewed. | **BLOCKED** until local setup is approved separately | Nothing inspected. No user created. |
++| M1 | Jobs held only because the licence is inactive fail after a proposed 7-day limit, with a stated reason. Their files then become eligible under the existing purge rules. Files required by actively printing jobs are never deleted. The effect on paid orders is documented. Tests before implementation. | PROPOSAL. Approved for implementation review and tests only | §12B.6. Conflicts C-1 and C-2 must be resolved first. |
++| M2 | Refuse manual revocation of coverage whose natural end has already passed. Payment reversal stays a separate, audited operation. | APPROVED | Resolves state-machine fix 2 (§12B.5). |
++| M3 | Detailed denial records capped at 20 per user per hour, with rate limiting and aggregate counts for excess attempts. Limitations documented. | APPROVED as design. NOT IMPLEMENTED | §12B.7. |
++| M4 | Paid term: 12 calendar months, Asia/Kolkata arithmetic, from the exact server timestamp after the shop lock. Custom admin dates use the same timezone convention with explicit start and end semantics. A custom grant is not a paid transaction. | Custom-grant convention APPROVED. Paid term APPROVED, BLOCKED with the paid path (M5) | Custom grant: start inclusive at 00:00 IST, end exclusive at 00:00 IST. Stacking question: C-4. |
++| M5 | The paid-coverage implementation is left out of 7C and 7D until pricing, minimum amount, tax treatment, and the payment-recording policy are reviewed and approved. No invented price. No unconfigured payment path grants access. Complimentary admin grants stay independently available. | APPROVED (blocking condition) | `paid_verified` and `licence_payments` are excluded from 7B (C-5). |
++| M6 | Lifetime may be granted over existing paid coverage. Paid records are preserved and never refunded, deleted, rewritten, or automatically revoked. Lifetime takes precedence while active. If lifetime is later revoked, a still-valid paid period may give access. | APPROVED as policy. State transitions to be tested | Applies only when paid records exist, so it becomes testable with the paid path (M5). Compatible with F (C-7). |
++| M7 | Stop-and-review for the refund and claim fix. The duplicate-print fix needs targeted tests and must not change unrelated printing behaviour. | APPROVED (review requirement confirmed) | No fix implemented. Diff review pending. |
++| M8 | Separate retention: detailed denial records 90 days, subject to review; successful replay records kept until an independently safe replay-prevention mechanism exists; audit records kept separate from denial logs; personal data minimised. No retention job. No deletion. | APPROVED as policy proposal. LEGAL REVIEW REQUIRED | §12B.8. |
++
++### 12B.3 Owner decisions 13–20 (§12A.13): status after 2026-10-29
++
++| Decision | Status |
++|---|---|
++| 13 Admin accounts | PENDING OWNER APPROVAL. One owner account is assumed until answered. |
++| 14 MFA (`aal2`) | PENDING. The owner must confirm MFA status. Admin RPCs cannot run without aal2 if it is required. |
++| 15 Admin UI hosting | PENDING. |
++| 16 Grant limits | PARTLY APPROVED: custom-date convention (M4). PENDING: backdating, maximum custom length, lifetime owner-only. |
++| 17 Revoking paid periods | PARTLY APPROVED through H and M2 (reversal; refusal after end). Standalone revocation of an active paid period is PENDING and deferred with M5. |
++| 18 Expiry and grace | PARTLY: B and C block printing in every non-ACTIVE state, so no grace is implied. PENDING: any grace days, and the wording for NONE. |
++| 19 Shop-facing view | PARTLY APPROVED: fields as in D. PENDING: Android, and whether an admin grant may show a label. D shows active or inactive only. |
++| 20 Manual payments and audit | PARTLY APPROVED: denial logging (M3) and retention split (M8). PENDING: accepted methods, reference rules, GST invoice handling (CA), DPDP treatment of audit data (lawyer). |
++
++### 12B.4 Printing safety fixes (K, M7): findings and state rules
++
++**Duplicate-print fix (investigated, not implemented).**
++- Current code: `retry_print_job` (0010 lines 515–547) checks the source status (`failed` or `needs_check`, line 522). It refuses only when a sibling job for the same `order_item_id` is `queued`, `claimed`, or `printing` (lines 534–539). It does not check for a `sent` sibling, and it does not require the source to be the highest attempt.
++- Gap: attempt 1 fails and attempt 2 is sent. A retry of attempt 1 still passes and creates attempt 3, which prints a second copy. *Confirmed by reading the code. Not reproduced on any database.*
++- Proposed rule: refuse if any job for the item has status `sent`. Refuse unless the source attempt is the highest attempt for the item. Keep the `needs_check` confirmation unchanged.
++- Changes: the body of `retry_print_job` only. No schema change. No change to claim, finish, or approve.
++- Status: APPROVED for investigation and targeted tests. Implementation needs a separate diff review (M7).
++
++**Refund and claim fix (stopped; REVIEW REQUIRED).**
++- Refund path: `set_order_payment`, action `refund` (0006 lines 213–219), sets `payment_status = 'refunded'`, `refunded_at`, and `refund_paise`. It does not change the order status or any `print_jobs` row.
++- Claim path: `agent_claim_next_job` (0010 lines 646–656) selects queued jobs for the shop whose file is not deleted. It checks neither payment status nor order status.
++- Order transitions: 0001 lines 153–155 allow `printing` → `ready` or `completed`. The 0008 guard checks payment only on those transitions. An order that is `ready` or `completed` can still have queued jobs.
++- Schema constraint: the `print_jobs` status check (0010 line 59) allows only `queued`, `claimed`, `printing`, `sent`, `failed`, and `needs_check`. No terminal state exists for jobs of ineligible orders.
++- Options for review (none implemented):
++  - **R-a:** in the refund path and in the ready or completed transition, mark the order's queued jobs `failed` with a specific reason code. Uses existing states. Changes the bodies of `set_order_payment` (0006) and the order status update path. Touches the customer payment ledger.
++  - **R-b:** add a `cancelled` job status and cancel jobs in the same paths. Schema change, plus the same body changes.
++  - **R-c:** claim-side eligibility only (order `printing` and `paid`). Ineligible jobs stay `queued`, so they pin their files indefinitely (0010 lines 795–798). **Not acceptable without a retention decision (C-1).**
++- Recommendation for review: R-a, with the state transitions shown in the diff and a test that a refunded order's files are not claimed. The exact diff must be presented before any implementation.
++- State-transition effects to review under R-a: queued → failed (new reason code) on refund or on the ready or completed transition. Claimed and printing jobs are unchanged in this option. To be confirmed in the diff review.
++
++### 12B.5 State-machine corrections and R1–R19 findings
++
++**State-machine corrections (from the audit report).**
++
++| # | Correction | Status |
++|---|---|---|
++| 1 | Cancel a future period by setting `revoked_at` to now, before its start. Replaces the zero-length representation. The trigger enforces the bounds. | Resolved (design). UNVERIFIED on staging. |
++| 2 | Refuse revocation after the natural end. | APPROVED (M2). |
++| 3 | Payment reversal revokes the linked coverage. The anchor excludes coverages whose payment is reversed. | APPROVED (H). Blocked with the paid path (M5). |
++| 4 | Remove the wording "future-dated revocation". | Resolved (wording). |
++| 5 | Tie-break: if two coverages end at the same instant and one was revoked, the state is REVOKED. | PROPOSAL. Owner confirmation pending. |
++| 6 | Hide `next_start` when there is no expiry. | Resolved under D and F. |
++| 7 | Basis describes current access only. Owners see no basis. | APPROVED (D). |
++| 8 | `access_until` algorithm: start from the end of the covering coverage (lifetime gives no expiry). Repeatedly extend while a valid coverage starts at or before the current end and ends after it. The result can include intervals that start after `t`. | Resolved (design). UNVERIFIED on staging. |
++| 9 | Display the exclusive end, e.g. "until 1 Jan 2028, 00:00 IST", not "until 31 Dec". | Resolved under D. Wording to confirm. |
++| 10 | Anchor and term arithmetic in Asia/Kolkata: `((anchor at time zone 'Asia/Kolkata') + interval '12 months') at time zone 'Asia/Kolkata'`. Replaces the garbled expression in the earlier chat plan. | APPROVED (J, M4). Blocked with the paid path (M5). |
++| 11 | The literal and truncated anchor forms agree only if `verified_at` is read after the shop lock and revocations are no later than it. | Resolved (test precondition). |
++
++**R1–R19 (from the 7B review).** Nothing here has been run. Items marked UNVERIFIED need staging, after separate approvals.
++
++| ID | Finding and resolution | Status |
++|---|---|---|
++| R1 | Meta row creation: no trigger on `shops`. Created lazily by `licence_lock_shop`. | Resolved (design). Verify the upsert on staging. |
++| R2 | Versioning: one increment per RPC request, inside the RPC. Triggers only enforce immutability. | Resolved (design). The versioning test in §12B.11 reflects this. |
++| R3 | Denials: an admin denial returns a committed result. Print refusals may raise. The rate-limit counter follows the same rule. | Resolved (design). |
++| R4 | Atomic success: one function, with no exception after the audit insert. | Resolved (design). Enforce by test. |
++| R5 | Idempotency: same `request_id` and payload hash returns the stored result. Different payload is a conflict. Ledger retention per M8. | Resolved (design). Retention: §12B.8. |
++| R6 | Revocation immutability: compare `to_jsonb` with the three revocation keys removed. | Resolved (design). UNVERIFIED on staging. |
++| R7 | `shop_licence_id` columns: the earlier chat plan omitted `shop_id` on coverages and payments. This file already includes it. Composite foreign key added. | Corrected. |
++| R8 | Payment immutability: shop, amount, currency, method, reference, and `received_on` fixed at insert. | Resolved (design). Paid path blocked. |
++| R9 | Privileges: internal helpers revoked from `public`, `anon`, and `authenticated`. Admin RPCs granted to `authenticated` only. REVOKE from `PUBLIC` made explicit, because PostgREST exposes `public` functions. | Resolved (design). UNVERIFIED: Supabase default grants (R17). |
++| R10 | Owner status through a separate RPC. `shop_licence_state` is internal. | Resolved (design). Follows D. |
++| R11 | No self-disable. The last active admin cannot be disabled. | Resolved (design). Added to §12A.8. |
++| R12 | Functions that write are not `STABLE`. Read functions stay pure. | Resolved (design). |
++| R13 | No price rule exists. | **BLOCKED** by I. |
++| R14 | Test fixtures use fixed past dates. `p_at` is used only for reads, because mutations are stamped with the wall clock. | Resolved (test design). |
++| R15 | Synthetic `auth.users` fixture: the required columns for the pinned local Auth schema are unknown. | **BLOCKED** by L. |
++| R16 | Simulating `auth.uid()` and `aal` through request claims. | UNVERIFIED (staging). |
++| R17 | Owner role and Supabase default grants on new `public` tables. | UNVERIFIED (staging). |
++| R18 | Lock order. Print paths: order row, then meta (share). Admin paths: advisory lock, then meta, then payment. No path takes meta before an order. | Resolved (design). Two-session test required. |
++| R19 | Shop deletion. Licence tables use `on delete restrict`, matching `orders.shop_id` (0001 line 53). | Resolved (design). |
++
++### 12B.6 Held-job rule M1 (proposal, not approved for implementation)
++
++- **Scope:** jobs in `queued` status, and `claimed` jobs requeued by recovery, that are held only because the licence is not ACTIVE. Jobs in `printing`, `needs_check`, `sent`, or `failed` are out of scope.
++- **Hold start (C-2):** not decided. Option (a) is the job's `created_at`, which can fail a job a day into a lapse. Option (b) is the time the shop left ACTIVE, which needs a stored marker or a derived value. Neither is chosen.
++- **Limit:** 7 days (M1), measured from the chosen hold start.
++- **Effect:** status `failed`, `error_code` such as `licence_inactive_timeout`, and a clear `error_message`. Retry is allowed after the shop returns to ACTIVE (rule C).
++- **Mechanism (C-2):** no scheduler is confirmed. The timeout could run lazily when an agent calls the claim or heartbeat, or on an owner read. A `pg_cron` job would need separate approval, and the repo does not show one. **UNVERIFIED** whether any scheduler exists. Until one does, timeouts run only when an agent calls.
++- **File effect (C-1):** M1 says the file "becomes eligible for deletion under the existing purge safeguards". **For paid orders still in `printing`, that is not true under the current code.** `expired_customer_file_paths` (0010 lines 795–807) requires that a file's order be `completed`, `cancelled`, or `rejected`, and that it has been so for 30 days. A failed job does not change the order. 0001 does not allow `printing` → `cancelled`. So the file would stay until the order reaches a terminal status that the current workflow may never reach for that order. A decision is needed before implementation.
++- **Printing jobs:** M1 never deletes their files. The purge excludes `printing` and `needs_check` jobs (0010 line 797).
++- **Effect on paid customer orders:** the customer receives no printed output. The order stays `printing` with `payment_status = 'paid'`, because no transition to a terminal status exists. The owner may refund through `set_order_payment`, which does not touch the job. Consumer-refund obligations have not been researched (§4). **Lawyer review required before implementation.**
++- **Tests before implementation:** listed in §12B.11.
++- **Status:** PROPOSAL for implementation review and tests. No schema or code change now.
++
++### 12B.7 Denial logging design (M3)
++
++- **Detailed records:** the first 20 denied calls per authenticated user per hour are written to a `licence_denials` table (proposed). Fields: actor UUID, function name, time, `request_id` if supplied, and the denial code.
++- **Excess attempts:** counted in an hourly aggregate per user, using the rate-limit mechanism (`consume_rate_limit`, key `licence:denied:<uid>`). The aggregate records only a count.
++- **Response:** the same `forbidden` code for every denial, so a caller cannot tell whether the cap was reached.
++- **Commit rule:** the counter and the detailed row are committed, as R3 requires.
++- **Limitations (documented, not solved):**
++  - Anonymous calls are rejected at the grant level before the function runs (§12A.4 grants to `authenticated` only). Those attempts are not logged.
++  - A caller with many accounts gets a separate cap for each account.
++  - Above the cap, the details of a burst are lost. Only counts remain (C-12).
++  - `purge_old_rate_limits` exists (0010), but its schedule is **UNVERIFIED**.
++  - `consume_rate_limit` is granted to `service_role` only (0010 line 868). Calling it from a licence function needs a staging check before use.
++- **Status:** APPROVED as design. NOT IMPLEMENTED.
++
++### 12B.8 Retention (M8)
++
++| Record | Proposed retention | Status |
++|---|---|---|
++| Detailed denial records (`licence_denials`) | 90 days | Subject to security and legal review. No deletion job. |
++| Denial aggregate counters | Expire with their rate-limit window. Purge schedule UNVERIFIED. | UNVERIFIED |
++| Replay records (`licence_requests`) for consequential mutations | Kept until an independently safe replay-prevention mechanism exists. Store the request ID, action, payload hash, and a non-personal result summary. Not deleted at 90 days. | Policy proposal. Period to be set in review. |
++| Consequential audit log (`licence_audit_log`) | Kept as needed for administrative and financial records. Personal data minimised. | Lawyer review (decision 20, DPDP). |
++| Customer files and print jobs | The existing 30-day rule, **not deployed** (§5C). M1 would add a licence-driven failure path. | Separate decision (C-1). |
++
++`licence_requests` stores `actor_user_id`, which is personal data. Store the user ID only where replay prevention needs it.
++
++### 12B.9 Contradictions, open conditions, and security weaknesses
++
++**Contradictions and open conditions**
++- **C-1 (M1 vs the purge rule).** M1 assumes a failed job makes the file eligible. The purge rule does not, for orders that remain `printing` (§12B.6). Options: a new terminal order status, which changes the 0001 transitions and is out of scope so far; or a licence-specific file-release rule. **Not decided.**
++- **C-2 (M1 mechanics).** The hold-start clock and the scheduler are unresolved (§12B.6).
++- **C-3 (B vs retention).** Until M1 is implemented, held jobs keep customer files indefinitely. Decide whether to accept this as an interim, or to hold enforcement back until M1 is built.
++- **C-4 (M4 vs J stacking).** M4 says the term is calculated from "the exact server-side verification timestamp". J and the anchor rule start a new paid term at the end of an existing paid term when that end is later. The two differ while a paid term is still running. Recommended: keep stacking, so there is no overlap. **Owner confirmation needed.** Applies only when the paid path is approved.
++- **C-5 (M5 and 7B).** Whether `paid_verified` and `licence_payments` are excluded from migration 0011. Proposed: excluded. **Owner confirmation needed.**
++- **C-6 (decisions 13–15).** Admin accounts, MFA, and hosting are unanswered. 7A cannot finish without the Auth user UUID and the MFA answer. Blocks 7B–7D.
++- **C-7 (F and M6 with H).** Consistent: F refuses a new paid period during a lifetime grant, and M6 allows a lifetime over existing paid coverage. **Confirm** that revoking a lifetime grant while a paid period is still valid leaves access through the paid period, as M6 states.
++- **C-8 (G with revocation).** G shows SCHEDULED after revocation of current coverage when a future coverage exists. **Confirm** that revocation does not cancel future coverage.
++- **C-9 (§9 item 7 and §12A.10 wording).** "In-flight paid orders finish" and "no new customer orders" are superseded by A and B. Those passages are annotated. Other original text in §9 item 7 remains.
++- **C-10 (trials).** §9 item 5 and §12A.5–12A.6 mention trials. Trials are deferred out of Stage 7 under the earlier direction (chat-plan labels N2 and A7; those directions are not reproduced in this file). The trial item in §9 remains open for product and pricing decisions. **Owner confirmation needed** that trials are deferred, not removed.
++- **C-11 (refunds).** The refund policy (§9 item 6) is open. M1's effect on paid orders depends on it. Lawyer review required.
++- **C-12 (denial design).** M3 accepts counts-only records above the cap. **Owner must accept** that detail is lost above the cap.
++- **C-13 (blocked item I).** The paid path and pricing are blocked, so Stage 7 cannot sell paid licences after 7C and 7D. This is expected under M5. No paid licence can be offered until I is approved.
++- **C-14 (E).** Enabling enforcement needs the existing-shop policy. **BLOCKED.**
++- **C-15 (email and authentication).** The email sign-in and sign-up decisions in §2 are not changed. Admin login relies on Supabase Auth, and therefore on the MFA answer (C-6).
++
++**Security weaknesses (each needs a staging test before implementation)**
++- **S-1.** A missed REVOKE from `PUBLIC` would leave a function callable by `anon`. The checks would still deny the call, but it would reveal that the function exists (R9). **UNVERIFIED** against Supabase default grants (R17).
++- **S-2.** Supabase may grant default table privileges to `anon` and `authenticated` on new `public` tables. RLS with no policies blocks reads only while RLS stays enabled. **UNVERIFIED** (R17).
++- **S-3.** Admin RPCs depend on the `aal` claim. How hosted and local Supabase expose that claim, and how the check reads it, is **UNVERIFIED** (R16).
++- **S-4.** A signed file link issued at claim time stays valid for 180 seconds (`supabase/functions/print-agent/index.ts` line 23). A modified agent could print with a link issued before a lapse, without calling `mark_printing`. The residual window is at most 3 minutes. Accept or document before 7F.
++- **S-5.** How `agent/src/worker.mjs` handles a `mark_printing` refusal is **UNVERIFIED**. Required before 7F.
++- **S-6.** The denial and replay ledgers hold user IDs. Retention is set in §12B.8.
++- **S-7.** The duplicate-print gap (§12B.4) exists in the current printing code. It is a printing defect, not a licence defect.
++- **S-8.** The refund-without-claim-stop gap (§12B.4) exists in the current printing code.
++
++### 12B.10 Corrections to my earlier planning text
++
++- The earlier chat plan listed no `shop_id` on coverage or payment rows. This file already has `shop_id` on both. The correction is the composite foreign key (R7).
++- The earlier chat plan's 12-month end expression was garbled. Replaced by the Asia/Kolkata formula in fix 10.
++- The earlier chat plan gated `orders` inserts (U10). Withdrawn under decision A.
++- The earlier checksum named `order_payments`, which does not exist in any migration. Corrected in §12A.11.
++
++### 12B.11 Required tests (updated; none run; staging only)
++
++- **States:** NONE; ACTIVE by admin grant; SCHEDULED; EXPIRED; REVOKED. Boundaries: start inclusive, end and revocation exclusive. A future period cancelled before its start is dropped. Revocation after the natural end is refused (M2). `access_until` covers contiguous blocks. Lifetime precedence, and its revocation. SCHEDULED after revocation (G). Tie-break (fix 5).
++- **Admin RPCs:** a non-admin is denied, with a committed denial row and counter. aal2 is required. A stale state version is rejected. A reason is required. A replay returns the stored result. A conflicting payload is rejected. No self-disable. The last admin is protected. Custom grant boundaries at 00:00 IST. One-month and one-year grants start at the time of the grant.
++- **Privileges:** admin RPCs are callable only by an authenticated admin with aal2. Internal helpers are denied to `public`, `anon`, and `authenticated`. No default grants on licence tables (staging inspection).
++- **Triggers:** the revocation whitelist. One revocation only. DELETE and TRUNCATE blocked on coverage and audit tables. Denial and audit rows are append-only.
++- **Versioning:** exactly one increment per RPC request. No increment on reads.
++- **Denial cap:** 20 detailed rows, then aggregates. Identical response. The counter persists after a denial.
++- **Concurrency:** a two-session test. The second writer waits on the shop lock.
++- **Orders unchanged:** checksum over the `orders` payment columns and the `order_events` row count, before and after licence actions.
++- **Checkout unaffected (A):** `place_order` (both overloads) succeeds while the licence is inactive, with enforcement on.
++- **Printing gate (7F, after approval):** approve and retry are refused, with no rows and no order status change. Claim returns nothing. `mark_printing` refuses. Finish works for a printing job. Queued jobs resume when the shop is ACTIVE.
++- **Duplicate-print fix:** retry refused when a sibling is `sent`. Retry refused for a source that is not the latest attempt. Retry still works for `failed` and confirmed `needs_check`. Existing printing tests unchanged.
++- **Refund and claim fix:** defined after diff review. Must include a check that a refunded order's files are not claimed.
++- **Held-job limit (M1, not approved for implementation):** 7-day failure. Reason code. File eligibility per the rule chosen under C-1. Printing jobs' files never deleted. No effect on other orders.
++- **Owner status:** enforcement off returns no fields. Enforcement on returns only the D fields. Staff denied.
++- **Timezone:** 29 February plus 12 months gives 28 February.
++- **Regression:** 0011 changes no existing function, trigger, policy, or grant. Checked statically and at runtime.
++
++### 12B.12 Next gates (none authorised by this document)
++
++1. Owner answers to C-1, C-2, C-3, C-4, C-5, C-6, C-10, and the pending items in §12B.3.
++2. Separate approval for local setup (Option A), with the steps in the earlier setup plan.
++3. Separate approval to inspect the local Auth schema (L).
++4. Separate approval to create migration 0011 to the corrected 7B spec (§12B.5, §12B.11).
++5. Separate approval for the duplicate-print fix (K), after diff review.
++6. Separate approval for the refund and claim fix (M7), after diff review.
++7. Separate approval for each of 7C, 7D, 7E, and 7F. The M1 rule has its own review (§12B.6).
++
+ ## 13. Revision log
+ 
++### Stage 7 decision record (2026-10-29)
++
++| Item | Change | Where applied |
++|---|---|---|
++| A–L and M1–M8 | Recorded with status | §12B.2 |
++| Decisions 13–20 | Status recorded | §12B.3; §12A.13 heading |
++| Printing fixes (K, M7) | Investigated. Stop-and-review recorded. Nothing implemented | §12B.4 |
++| State-machine corrections 1–11 | Recorded. Applied to §12A.5, §12A.6, §12A.10 | §12B.5 |
++| R1–R19 | Recorded with status. Unverified items marked | §12B.5; §12A.4; §12A.5; §12A.8; §12A.11 |
++| Held-job rule (M1) | Recorded as a proposal, with conflicts | §12B.6; §12B.9; §12A.10 |
++| Denial logging (M3) and retention (M8) | Recorded as design and policy proposals | §12B.7; §12B.8; §12A.9 |
++| Pricing and paid path | Kept blocked (I, M5) | §7 notice; §12A.5; §12A.7; §12A.12 |
++| Expiry wording | Superseded in part by A, B, C | §9 item 7; §12A.10 |
++| Trial | Deferred under the earlier direction (chat-plan labels N2 and A7). §9 item 5 still open | §9 item 5; §12A.5; §12A.6; §12A.11; C-10 |
++| Checksum name | Corrected: `order_payments` does not exist | §12A.11 |
++| Auth decisions, protected checkout, stash | Unchanged | §2; §12B preamble |
++| Status and cross-references | Updated | Header; §7; §12; §12A intro; §12A.4 |
++
+ ### Admin-grant and manual licence design (2026-10-29)
+ 
+ | Item | Change | Where applied |

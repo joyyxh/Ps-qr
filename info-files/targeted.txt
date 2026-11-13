@@ -1,0 +1,172 @@
+TAP version 13
+# Subtest: run sends the saved token and printer list to the saved address, stops at once on 401, and prints nothing
+ok 1 - run sends the saved token and printer list to the saved address, stops at once on 401, and prints nothing
+  ---
+  duration_ms: 110.686166
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer is refused before the saved config is read, so nothing starts
+ok 2 - run --simulated-printer is refused before the saved config is read, so nothing starts
+  ---
+  duration_ms: 8.987566
+  type: 'test'
+  ...
+# Subtest: a fixture with one unpaid job refuses the whole file, so nothing is simulated
+ok 3 - a fixture with one unpaid job refuses the whole file, so nothing is simulated
+  ---
+  duration_ms: 15.504295
+  type: 'test'
+  ...
+# Subtest: only a literal approved and paid order can be simulated
+ok 4 - only a literal approved and paid order can be simulated
+  ---
+  duration_ms: 6.473256
+  type: 'test'
+  ...
+# Subtest: a file outside the fixture folder is refused
+ok 5 - a file outside the fixture folder is refused
+  ---
+  duration_ms: 5.231834
+  type: 'test'
+  ...
+# Subtest: job ids, states and attempt numbers are checked, and a repeated job id is refused
+ok 6 - job ids, states and attempt numbers are checked, and a repeated job id is refused
+  ---
+  duration_ms: 3.932908
+  type: 'test'
+  ...
+# Subtest: a link inside the fixture folder that points outside it is refused before anything runs
+ok 7 - a link inside the fixture folder that points outside it is refused before anything runs
+  ---
+  duration_ms: 7.106401
+  type: 'test'
+  ...
+# Subtest: simulate refuses a fixture whose link leaves the folder, and starts nothing
+ok 8 - simulate refuses a fixture whose link leaves the folder, and starts nothing
+  ---
+  duration_ms: 9.863751
+  type: 'test'
+  ...
+# Subtest: a link that stays inside the fixture folder is still simulated
+ok 9 - a link that stays inside the fixture folder is still simulated
+  ---
+  duration_ms: 29.060606
+  type: 'test'
+  ...
+# Subtest: a file replaced by a link to outside after the check is refused when it is read
+ok 10 - a file replaced by a link to outside after the check is refused when it is read
+  ---
+  duration_ms: 15.225612
+  type: 'test'
+  ...
+# Subtest: a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+ok 11 - a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+  ---
+  duration_ms: 21.015389
+  type: 'test'
+  ...
+# Subtest: the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+ok 12 - the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+  ---
+  duration_ms: 31.977878
+  type: 'test'
+  ...
+# Subtest: printing and needs-check jobs are never claimed or printed again
+ok 13 - printing and needs-check jobs are never claimed or printed again
+  ---
+  duration_ms: 15.939238
+  type: 'test'
+  ...
+# Subtest: settings the simulated printer cannot do are refused before anything is simulated
+ok 14 - settings the simulated printer cannot do are refused before anything is simulated
+  ---
+  duration_ms: 8.133062
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is simulated
+ok 15 - an unknown file type is refused and nothing is simulated
+  ---
+  duration_ms: 6.423603
+  type: 'test'
+  ...
+# Subtest: a picture is wrapped in a PDF and then simulated
+ok 16 - a picture is wrapped in a PDF and then simulated
+  ---
+  duration_ms: 21.73657
+  type: 'test'
+  ...
+# Subtest: a file whose size does not match what was ordered is refused
+ok 17 - a file whose size does not match what was ordered is refused
+  ---
+  duration_ms: 6.466319
+  type: 'test'
+  ...
+# Subtest: a missing file is reported as a failed download, and nothing is simulated
+ok 18 - a missing file is reported as a failed download, and nothing is simulated
+  ---
+  duration_ms: 5.136497
+  type: 'test'
+  ...
+# Subtest: the in-memory server refuses a result that would skip the printing step
+ok 19 - the in-memory server refuses a result that would skip the printing step
+  ---
+  duration_ms: 1.437703
+  type: 'test'
+  ...
+# Subtest: the in-memory server keeps the job rules that migration 0010 states
+ok 20 - the in-memory server keeps the job rules that migration 0010 states
+  ---
+  duration_ms: 1.217888
+  type: 'test'
+  ...
+# Subtest: a server that never runs out of jobs stops at the safety limit instead of hanging
+ok 21 - a server that never runs out of jobs stops at the safety limit instead of hanging
+  ---
+  duration_ms: 10.244893
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer is refused before any request, even against a localhost server
+ok 22 - run --simulated-printer is refused before any request, even against a localhost server
+  ---
+  duration_ms: 4.655632
+  type: 'test'
+  ...
+# Subtest: run refuses an unknown option before any request
+ok 23 - run refuses an unknown option before any request
+  ---
+  duration_ms: 4.090409
+  type: 'test'
+  ...
+# Subtest: simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+ok 24 - simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+  ---
+  duration_ms: 16.483636
+  type: 'test'
+  ...
+# Subtest: simulate with a fixture file runs it offline and prints a summary
+ok 25 - simulate with a fixture file runs it offline and prints a summary
+  ---
+  duration_ms: 17.482785
+  type: 'test'
+  ...
+# Subtest: simulate with an unpaid job in the file stops before anything starts
+ok 26 - simulate with an unpaid job in the file stops before anything starts
+  ---
+  duration_ms: 8.75979
+  type: 'test'
+  ...
+# Subtest: simulate refuses extra arguments and a file that does not exist
+ok 27 - simulate refuses extra arguments and a file that does not exist
+  ---
+  duration_ms: 3.023092
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 715.33297

@@ -1,0 +1,1 @@
+[["calls.push(`finish:${outcome}`);", "calls.push(`finish:${outcome}`); await fetch(\"http://127.0.0.1:9/finish\").catch(() => {});"]]

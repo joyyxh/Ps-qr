@@ -1,0 +1,19 @@
+Stage 7: add draft decision register and owner decision sheet (docs only)
+
+Adds two untracked documentation files for Stage 7 planning:
+
+- STAGE7_DECISIONS.md: draft decision record, register, gates and
+  verdict. Status: READY FOR FINAL OWNER REVIEW; NOT APPROVED.
+- OWNER_DECISION_SHEET.md: owner-facing decision sheet derived from
+  STAGE7_DECISIONS.md.
+
+Records five owner instructions of 2026-10-31: item 2 deferred; enforcement
+activation not a closure requirement; items 11 and 26 not general closure
+requirements; trials deferred, not removed; item 23 approval limited to
+diff review before targeted local tests.
+
+Documentation only. No code, migrations, tests, deployments, production
+changes or approvals of any gate.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DxRqmb5mEMWYPJvm5FH5tt

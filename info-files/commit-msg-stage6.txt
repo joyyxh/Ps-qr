@@ -1,0 +1,26 @@
+Stage 6: offline simulated printing for the local print agent
+
+Adds a `simulate` command that runs the order-to-print steps with no network,
+no saved configuration, no real job claims and no printer. It uses the
+agent's own worker steps, with an in-memory server that follows four of the
+job rules in migration 0010 (claim, printing, finish). Its messages say
+SIMULATED and that no paper came out.
+
+Safety changes:
+- `run --simulated-printer` is refused before any saved setting is read.
+- `run` refuses unknown options, so a typo cannot start real printing.
+- Fixture files that link outside the fixture folder are refused, both
+  before the simulation starts and again when the file is read.
+
+Real printing: worker.mjs gains a comment on lost "printing" replies (no
+runtime change) and a log line that says SIMULATED only for the simulated
+adapter. Real printer adapters are unchanged.
+
+Tests: `npm test` in agent/ runs 102 unit tests, all passing. The run
+wiring test covers the 401 path only.
+
+Not validated: real printers, Windows or CUPS, and the live Supabase project
+or migration 0010. Those remain open.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DxRqmb5mEMWYPJvm5FH5tt

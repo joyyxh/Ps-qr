@@ -1,0 +1,23 @@
+Serving HTTP on 127.0.0.1 port 5173 (http://127.0.0.1:5173/) ...
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /styles.css HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /config.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /icons/qrquick-mark.png HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/api.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/auth.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/owner-api.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/owner.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/session.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/logic.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/owner-stats.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/http.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/qr.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /src/vendor/qrcode/qrcode.js HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:31] "GET /icons/icon-192.png HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:32] "GET /icons/icon-192.png HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:33] "GET /icons/icon-192.png HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:34] "GET /icons/icon-192.png HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:34] "GET /icons/icon-192.png HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:34] "GET /icons/icon-192.png HTTP/1.1" 200 -
+127.0.0.1 - - [26/Oct/2026 08:03:34] "GET /icons/icon-192.png HTTP/1.1" 200 -

@@ -1,0 +1,47 @@
+== order1: P2 P3 U6 P4
+applied P2_7B_7C_database.patch
+applied P3_7D_admin.patch
+applied U6_browser_smoke_and_layout.patch
+applied P4_7E_web.patch
+== order2: P2 P3 P4 U6
+applied P2_7B_7C_database.patch
+applied P3_7D_admin.patch
+applied P4_7E_web.patch
+applied U6_browser_smoke_and_layout.patch
+== tree order1 vs order2
+identical trees (order does not matter)
+== U6 files vs stage7 worktree (expect identical)
+same web/tests/browser/owner-smoke.cjs
+same web/tests/browser/qr-smoke.cjs
+same web/tests/browser/features-smoke.cjs
+same web/tests/browser/stats-smoke.cjs
+== styles.css: combined vs stage7 (expect only P4 appended rules) 
+290a291,294
+> /* Licence status screen (Stage 7E, read only) */
+> .licence-badge { display:inline-block; margin:0 0 8px; font-weight:750; }.licence-badge.ok { color:var(--ok); }.licence-badge.warn { color:var(--warn-ink); }.licence-badge.error { color:var(--err); }.licence-badge.muted { color:var(--muted); }
+> .licence-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }.licence-foot p { margin:0; max-width:46ch; }
+> @media (max-width:430px) { .licence-foot { flex-direction:column; align-items:stretch; }.licence-foot button { width:100%; } }
+== styles.css: combined vs 7E (expect only U6 hunks)
+100c100
+< .grid { display: grid; gap: 12px; }
+---
+> .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+285c285
+< .order-shell { display:grid; gap:16px; }.order-stepper { display:flex; align-items:center; gap:10px; color:#9aa6bb; font-size:.85rem; font-weight:700; }.order-stepper span { display:inline-flex; gap:7px; align-items:center; white-space:nowrap; }.order-stepper b { display:grid; place-items:center; width:25px; height:25px; border-radius:50%; background:#e8edf5; font-size:.75rem; }.order-stepper .active { color:var(--accent); }.order-stepper .active b { color:#fff; background:var(--accent); }.order-stepper i { height:1px; min-width:30px; flex:1; background:var(--line); }.order-card { padding:clamp(20px,4vw,38px); }.upload-dropzone { min-height:135px; place-items:center; align-content:center; text-align:center; border:1.5px dashed #a9bce7; border-radius:16px; background:#f8faff; cursor:pointer; }.upload-dropzone input { width:auto; }.upload-icon { display:grid; place-items:center; width:35px; height:35px; margin-bottom:6px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:1.4rem; }.choice-grid { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:10px; }.choice-card { display:flex; align-items:center; gap:11px; padding:14px; border:1px solid var(--line); border-radius:13px; background:#fff; }.choice-card span { display:grid; gap:4px; }.choice-card small { color:var(--muted); }.choice-card:has(input:checked) { border-color:var(--accent); background:var(--accent-soft); }.choice-card input { accent-color:var(--accent); }.cart-count { padding:6px 10px; border-radius:99px; color:var(--accent); background:var(--accent-soft); font-size:.8rem; font-weight:800; }
+---
+> .order-shell { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }.order-stepper { display:flex; align-items:center; gap:10px; color:#9aa6bb; font-size:.85rem; font-weight:700; }.order-stepper span { display:inline-flex; gap:7px; align-items:center; white-space:nowrap; }.order-stepper b { display:grid; place-items:center; width:25px; height:25px; border-radius:50%; background:#e8edf5; font-size:.75rem; }.order-stepper .active { color:var(--accent); }.order-stepper .active b { color:#fff; background:var(--accent); }.order-stepper i { height:1px; min-width:30px; flex:1; background:var(--line); }.order-card { padding:clamp(20px,4vw,38px); }.upload-dropzone { min-height:135px; place-items:center; align-content:center; text-align:center; border:1.5px dashed #a9bce7; border-radius:16px; background:#f8faff; cursor:pointer; }.upload-dropzone input { width:auto; }.upload-icon { display:grid; place-items:center; width:35px; height:35px; margin-bottom:6px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:1.4rem; }.choice-grid { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:10px; }.choice-card { display:flex; align-items:center; gap:11px; padding:14px; border:1px solid var(--line); border-radius:13px; background:#fff; }.choice-card span { display:grid; gap:4px; }.choice-card small { color:var(--muted); }.choice-card:has(input:checked) { border-color:var(--accent); background:var(--accent-soft); }.choice-card input { accent-color:var(--accent); }.cart-count { padding:6px 10px; border-radius:99px; color:var(--accent); background:var(--accent-soft); font-size:.8rem; font-weight:800; }
+== P4 files vs 7E worktree (styles.css expected to differ)
+same docs/STAGE7E_LICENCE_STATUS.md
+same web/package.json
+same web/src/licence-status.js
+same web/src/owner-api.js
+same web/src/owner-licence.js
+same web/src/owner.js
+DIFF web/styles.css
+same web/tests/browser/README.md
+same web/tests/browser/licence-smoke.cjs
+same web/tests/fixtures/licence-status-rpc.json
+same web/tests/licence-status.test.js
+same web/tests/owner-api.test.js
+web exit=0
+admin exit=0

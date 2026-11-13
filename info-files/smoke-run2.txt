@@ -1,0 +1,44 @@
+PASS  unconfigured: shows the not-configured view
+PASS  unconfigured: sign-in view hidden
+PASS  unconfigured: no request leaves localhost  (127.0.0.1:44301)
+PASS  unconfigured: no console or page errors
+PASS  unknown 375px: sign-in view shown
+PASS  unknown 375px: MFA step shown before the dashboard
+PASS  unknown 375px: dashboard shown after aal2
+PASS  unknown 375px: signed-in email shown
+PASS  unknown 375px: blocked section present, no shop search input
+PASS  unknown 375px: review step shows the reason before sending
+PASS  unknown 375px: a dropped request is reported as unknown, not as done
+PASS  unknown 375px: retry returns the stored result (replay), no double write
+PASS  unknown 375px: both sends carry the same request ID  (2 calls)
+PASS  unknown 375px: both sends carry an identical payload
+PASS  unknown 375px: payload has only the grant keys and no hash or user field  (shop_id,expected_state_version,confirm,reason,grant_kind,start,end,backdate_confirm)
+PASS  unknown 375px: no horizontal page scroll  (overflow 0px)
+INFO  screenshot written to /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/admin-dashboard-375.png
+PASS  unknown 375px: sign-out returns to sign-in and hides the dashboard
+PASS  unknown 375px: all requests went to localhost or the stub only  (127.0.0.1:44301,smoke-stub.supabase.co)
+INFO  unknown 375px: expected deliberate-abort log (1)
+PASS  unknown 375px: no unexpected console or page errors
+PASS  rejection: sign-in view shown
+PASS  rejection: MFA step shown before the dashboard
+PASS  rejection: dashboard shown after aal2
+PASS  rejection: signed-in email shown
+PASS  rejection: blocked section present, no shop search input
+PASS  rejection: review step shows the reason before sending
+PASS  rejection: a committed rejection shows its plain message
+PASS  rejection: rejection shows the server code
+PASS  rejection: sign-out returns to sign-in and hides the dashboard
+PASS  rejection: all requests went to localhost or the stub only  (127.0.0.1:44301,smoke-stub.supabase.co)
+PASS  rejection: no unexpected console or page errors
+PASS  enrol: sign-in view shown
+PASS  enrol: enrolment shows an SVG data image
+PASS  enrol: enrolment shows the manual key as text
+PASS  enrol: dashboard shown after aal2
+PASS  enrol: signed-in email shown
+PASS  enrol: blocked section present, no shop search input
+PASS  enrol: review step shows the reason before sending
+PASS  enrol: a committed rejection shows its plain message
+PASS  enrol: rejection shows the server code
+PASS  enrol: sign-out returns to sign-in and hides the dashboard
+PASS  enrol: all requests went to localhost or the stub only  (127.0.0.1:44301,smoke-stub.supabase.co)
+PASS  enrol: no unexpected console or page errors

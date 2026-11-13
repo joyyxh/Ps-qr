@@ -1,0 +1,7 @@
+PASS BW-01 a backdate of 31 days minus one hour (inside the window) is accepted 
+PASS BW-02 a backdate of 31 days plus one hour (outside the window) is backdate_window_exceeded 
+PASS BW-03 replace is held to the same window 
+PASS BW-04 the window is read from licence_config: 2 days refuses a 3-day backdate 
+PASS BW-05 with no row (production state, OPEN) every backdate fails closed: a 31-day-plus-one-hour backdate is backdate_window_exceeded 
+PASS BW-06 a non-positive configured window raises (fails closed) 
+TARGETED SUMMARY: 6 passed, 0 failed

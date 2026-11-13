@@ -1,0 +1,79 @@
+--- precleanup/STAGE7_DECISIONS.md
++++ cleaned/STAGE7_DECISIONS.md
+@@ -1,7 +1,7 @@
+ # Stage 7 decisions: draft for owner review
+ 
+ **Status:** DRAFT PROPOSAL. This file is not an approval of any business, legal, tax, pricing, or technical decision.
+-**Date:** 2026-10-29. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
++**Date:** 2026-10-30 (last updated). Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
+ **Worktree:** `/home/claude/joyyxh/ps-qr-stage7`, branch `stage7-payments`, base `origin/main` at `717717b`
+ **Committed:** No. Untracked draft.
+ 
+@@ -603,9 +603,9 @@
+ 
+ | ID | Decision (as recorded) | Status | Consequence and condition |
+ |---|---|---|---|
+-| A | Printing-only enforcement. Customer checkout and order placement are not blocked by licence status. | APPROVED | Replaces the order-insert gate in the earlier chat plan (label U10) and the original 7F wording. Checkout is unchanged. |
++| A | Printing-only enforcement. Customer checkout and order placement are not blocked by licence status. | APPROVED | Replaces the order-insert gate in the earlier chat plan and the original 7F wording. Checkout is unchanged. |
+ | B | Queued jobs held until the shop is ACTIVE. Jobs already printing may finish. | APPROVED, CONDITIONAL | Held files are kept by the purge rule (0010 lines 795–798) until M1 is implemented (C-1, C-3). |
+-| C | Retries blocked while inactive. No requeue or reuse of old job rows. | APPROVED | Each retry is a new row, created only while ACTIVE. Supersedes the earlier chat plan's pre-expiry retry wording (label N3). |
++| C | Retries blocked while inactive. No requeue or reuse of old job rows. | APPROVED | Each retry is a new row, created only while ACTIVE. Supersedes the earlier chat plan's pre-expiry retry wording. |
+ | D | Minimal owner status: active or inactive; access end or no-expiry; next start when relevant. No payment references, admin notes, audit history, coverage IDs, or revocation reasons. | APPROVED | Owner only. Staff and Android visibility are open (decision 19). |
+ | E | Enabling enforcement: preview first, blocked-shop count, digest, typed confirmation, reason, audited server-side change. Not enabled now. | APPROVED for design. ENABLING BLOCKED | Enabling needs a reviewed transition policy for existing shops (owner input: N and the free-period policy, §5B, decision 8). |
+ | F | Refuse paid coverage while a lifetime grant is active. | APPROVED. BLOCKED with the paid path (M5) | Verification is refused while a lifetime grant is effective. Payments recorded but not verified need a refund policy (outside the software; lawyer and CA, §9 item 6). |
+@@ -751,7 +751,7 @@
+ - **C-7 (F and M6 with H).** Consistent: F refuses a new paid period during a lifetime grant, and M6 allows a lifetime over existing paid coverage. **Confirm** that revoking a lifetime grant while a paid period is still valid leaves access through the paid period, as M6 states.
+ - **C-8 (G with revocation).** G shows SCHEDULED after revocation of current coverage when a future coverage exists. **Confirm** that revocation does not cancel future coverage.
+ - **C-9 (§9 item 7 and §12A.10 wording).** "In-flight paid orders finish" and "no new customer orders" are superseded by A and B. Those passages are annotated. Other original text in §9 item 7 remains.
+-- **C-10 (trials).** §9 item 5 and §12A.5–12A.6 mention trials. Trials are deferred out of Stage 7 under the earlier direction (chat-plan labels N2 and A7; those directions are not reproduced in this file). The trial item in §9 remains open for product and pricing decisions. **Owner confirmation needed** that trials are deferred, not removed.
++- **C-10 (trials).** §9 item 5 and §12A.5–12A.6 mention trials. Trials are deferred out of Stage 7 under the 2026-10-29 direction (the earlier chat plan is not reproduced in this file). The trial item in §9 remains open for product and pricing decisions. **Owner confirmation needed** that trials are deferred, not removed.
+ - **C-11 (refunds).** The refund policy (§9 item 6) is open. M1's effect on paid orders depends on it. Lawyer review required.
+ - **C-12 (denial design).** M3 accepts counts-only records above the cap. **Owner must accept** that detail is lost above the cap.
+ - **C-13 (blocked item I).** The paid path and pricing are blocked, so Stage 7 cannot sell paid licences after 7C and 7D. This is expected under M5. No paid licence can be offered until I is approved.
+@@ -770,9 +770,11 @@
+ 
+ ### 12B.10 Corrections to my earlier planning text
+ 
++The earlier chat plan is not reproduced in this file. The items below record its errors and their corrections.
++
+ - The earlier chat plan listed no `shop_id` on coverage or payment rows. This file already has `shop_id` on both. The correction is the composite foreign key (R7).
+ - The earlier chat plan's 12-month end expression was garbled. Replaced by the Asia/Kolkata formula in fix 10.
+-- The earlier chat plan gated `orders` inserts (U10). Withdrawn under decision A.
++- The earlier chat plan gated `orders` inserts. Withdrawn under decision A.
+ - The earlier checksum named `order_payments`, which does not exist in any migration. Corrected in §12A.11.
+ 
+ ### 12B.11 Required tests (updated; none run; staging only)
+@@ -797,7 +799,7 @@
+ ### 12B.12 Next gates (none authorised by this document)
+ 
+ 1. Owner answers to C-1, C-2, C-3, C-4, C-5, C-6, C-10, and the pending items in §12B.3.
+-2. Separate approval for local setup (Option A), The setup steps are not reproduced in this file and must be written out and reviewed before that approval is requested.
++2. Separate approval for local setup (Option A). The setup steps are not reproduced in this file and must be written out and reviewed before that approval is requested.
+ 3. Separate approval to inspect the local Auth schema (L).
+ 4. Separate approval to create migration 0011 to the corrected 7B spec (§12B.5, §12B.11).
+ 5. Separate approval for the duplicate-print fix (K), after diff review.
+@@ -806,6 +808,15 @@
+ 
+ ## 13. Revision log
+ 
++### Final cleanup (2026-10-30)
++
++| Item | Change | Where applied |
++|---|---|---|
++| Chat-plan labels U10, N3, N2 and A7 | Removed as labels. Meaning kept. The earlier chat plan is described as not reproduced in this file. No decision changed | §12B.2 (rows A and C); §12B.9 C-10; §12B.10; §13 (Stage 7 decision record, Trial row) |
++| §12B.12 item 2 | Comma splice corrected to a full stop | §12B.12 |
++| Last-updated date | Header date set to 2026-10-30. Historical revision dates unchanged | Header (line 4) |
++| Not changed | §6 item 5 formatting; §3 Razorpay MDR row; all approval and pending statuses; the "decision date 2026-10-29 (owner to confirm)" item in the review entry below | — |
++
+ ### Review corrections (2026-10-30)
+ 
+ | Item | Change | Where applied |
+@@ -829,7 +840,7 @@
+ | Denial logging (M3) and retention (M8) | Recorded as design and policy proposals | §12B.7; §12B.8; §12A.9 |
+ | Pricing and paid path | Kept blocked (I, M5) | §7 notice; §12A.5; §12A.7; §12A.12 |
+ | Expiry wording | Superseded in part by A, B, C | §9 item 7; §12A.10 |
+-| Trial | Deferred under the earlier direction (chat-plan labels N2 and A7). §9 item 5 still open | §9 item 5; §12A.5; §12A.6; §12A.11; C-10 |
++| Trial | Deferred under the 2026-10-29 direction (earlier chat plan, not reproduced in this file). §9 item 5 still open | §9 item 5; §12A.5; §12A.6; §12A.11; C-10 |
+ | Checksum name | Corrected: `order_payments` does not exist | §12A.11 |
+ | Auth decisions, protected checkout, stash | Unchanged | §2; §12B preamble |
+ | Status and cross-references | Updated | Header; §7; §12; §12A intro; §12A.4 |

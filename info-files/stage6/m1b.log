@@ -1,0 +1,134 @@
+TAP version 13
+# Subtest: the simulated printer is clearly named, marked simulated, and is the default
+ok 1 - the simulated printer is clearly named, marked simulated, and is the default
+  ---
+  duration_ms: 0.842017
+  type: 'test'
+  ...
+# Subtest: simulated results are deterministic: each accepted job gets the next simulated id
+ok 2 - simulated results are deterministic: each accepted job gets the next simulated id
+  ---
+  duration_ms: 6.515452
+  type: 'test'
+  ...
+# Subtest: the simulated spooler refuses a non-PDF file or a printer it does not have
+ok 3 - the simulated spooler refuses a non-PDF file or a printer it does not have
+  ---
+  duration_ms: 3.458378
+  type: 'test'
+  ...
+# Subtest: a simulated run records "printing" before the print, then reports sent and says SIMULATED
+ok 4 - a simulated run records "printing" before the print, then reports sent and says SIMULATED
+  ---
+  duration_ms: 11.530637
+  type: 'test'
+  ...
+# Subtest: a picture is wrapped in a PDF first, so the simulated spooler receives a PDF
+ok 5 - a picture is wrapped in a PDF first, so the simulated spooler receives a PDF
+  ---
+  duration_ms: 6.416745
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is simulated
+ok 6 - an unknown file type is refused and nothing is simulated
+  ---
+  duration_ms: 4.570854
+  type: 'test'
+  ...
+# Subtest: a file the server cannot give us is reported once as failed and nothing is simulated
+ok 7 - a file the server cannot give us is reported once as failed and nothing is simulated
+  ---
+  duration_ms: 1.637408
+  type: 'test'
+  ...
+# Subtest: a job the server has already moved on from is not simulated again
+ok 8 - a job the server has already moved on from is not simulated again
+  ---
+  duration_ms: 12.277761
+  type: 'test'
+  ...
+# Subtest: no answer to "printing" means nothing is simulated and nothing is reported as failed
+ok 9 - no answer to "printing" means nothing is simulated and nothing is reported as failed
+  ---
+  duration_ms: 6.274423
+  type: 'test'
+  ...
+# Subtest: a result that could not be sent is kept and sent later, without a second simulated print
+ok 10 - a result that could not be sent is kept and sent later, without a second simulated print
+  ---
+  duration_ms: 13.853275
+  type: 'test'
+  ...
+# Subtest: a simulated printer that is turned off fails the job before anything is simulated
+ok 11 - a simulated printer that is turned off fails the job before anything is simulated
+  ---
+  duration_ms: 1.448988
+  type: 'test'
+  ...
+# Subtest: a black-and-white simulated printer refuses a colour order before anything is simulated
+ok 12 - a black-and-white simulated printer refuses a colour order before anything is simulated
+  ---
+  duration_ms: 1.199024
+  type: 'test'
+  ...
+# Subtest: an order for a printer this computer does not have fails as printer_not_found
+ok 13 - an order for a printer this computer does not have fails as printer_not_found
+  ---
+  duration_ms: 1.133335
+  type: 'test'
+  ...
+# Subtest: simulation only ever runs against this computer: localhost or 127.0.0.1
+ok 14 - simulation only ever runs against this computer: localhost or 127.0.0.1
+  ---
+  duration_ms: 0.247844
+  type: 'test'
+  ...
+# Subtest: the simulated module never imports the command runner or a real printer adapter
+ok 15 - the simulated module never imports the command runner or a real printer adapter
+  ---
+  duration_ms: 0.481283
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer refuses the live server and starts nothing
+not ok 16 - run --simulated-printer refuses the live server and starts nothing
+  ---
+  duration_ms: 24.375997
+  type: 'test'
+  location: '/home/claude/joyyxh/ps-qr-stage6/agent/test/simulated.test.mjs:286:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/claude/joyyxh/ps-qr-stage6/agent/test/simulated.test.mjs:297:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: run refuses unknown options, so a typo cannot start real printing by accident
+ok 17 - run refuses unknown options, so a typo cannot start real printing by accident
+  ---
+  duration_ms: 4.116364
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer on a local test server processes a job, says SIMULATED, and never calls a real printer
+ok 18 - run --simulated-printer on a local test server processes a job, says SIMULATED, and never calls a real printer
+  ---
+  duration_ms: 26.535089
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 17
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 187.184421

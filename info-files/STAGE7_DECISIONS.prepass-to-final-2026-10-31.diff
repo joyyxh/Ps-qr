@@ -1,0 +1,609 @@
+--- STAGE7_DECISIONS.md (pre-pass 2026-10-30 snapshot)
++++ STAGE7_DECISIONS.md (final, 2026-10-31)
+@@ -1,7 +1,7 @@
+ # Stage 7 decisions: draft for owner review
+ 
+ **Status:** DRAFT PROPOSAL. This file is not an approval of any business, legal, tax, pricing, or technical decision.
+-**Date:** 2026-10-30 (last updated). Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
++**Date:** 2026-10-31 (last updated). Final documentation pass 2026-10-30, register and checks 2026-10-31: corrections are in §13, the decision register in §14, the roadmap in §15 and the exit checklist and verdict in §16. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
+ **Worktree:** `/home/claude/joyyxh/ps-qr-stage7`, branch `stage7-payments`, base `origin/main` at `717717b`
+ **Committed:** No. Untracked draft.
+ 
+@@ -16,6 +16,8 @@
+ - **Unverified:** not checked. No conclusion is drawn.
+ - **Provisional:** depends on an Unverified or Assumed input. Do not rely on it.
+ - **[OWNER TO PROVIDE]:** information not known. Nothing has been assumed.
++- **README statement:** a claim made in `README.md` or another repository document. It was not checked against the live project and is not treated as verified.
++- **Register status:** §14 gives each numbered item (1–35), each group (A–E) and each open ID exactly one of five statuses: DECIDED, RECOMMENDED, DEFERRED, EXTERNAL BLOCKER, IMPLEMENTATION GATE.
+ 
+ ---
+ 
+@@ -38,13 +40,19 @@
+ 
+ ## 2. Repository facts
+ 
+-- Migrations `0001` to `0010` contain no plan, billing, licence, or entitlement column. (Searched 2026-10-28 and 2026-10-29 in earlier work. Not re-run in the correction pass.)
+-- No Stripe or Razorpay code or dependency exists in `web/`, `mobile/`, `agent/`, or `supabase/`. Stripe appears in the worktree only in `README.md`, `CLAUDE.md`, and this draft. Razorpay appears only in this draft (grep, 2026-10-29).
++- Migrations `0001` to `0010` contain no plan, billing, licence, or entitlement column. (Searched 2026-10-28 and 2026-10-29 in earlier work. Searched again 2026-10-30: no match for `plan`, `billing`, `licence` or `entitle`.)
++- No Stripe or Razorpay code or dependency exists in `web/`, `mobile/`, `agent/`, or `supabase/`. Stripe appears in the worktree only in `README.md`, `CLAUDE.md`, and this draft. Razorpay appears only in this draft (grep, 2026-10-29 and again 2026-10-30).
+ - **"Stripe is installed" appears in `README.md`.** Lines 22 and 35 read "Stripe is installed but not connected" and "Stripe (installed, not connected)". This is a README statement, not evidence of an installed package. The bare word "installed" also appears in unrelated code and docs: `agent/src/cli.mjs`, `agent/src/printers/linux.mjs`, `agent/src/printers/windows.mjs`, `agent/test/printers.test.mjs`, and `TODO.md` line 38. The tracked-file search was capped at ten lines, so this list is not exhaustive. The Stripe claim rests on `README.md` lines 22 and 35.
+-- **Resend.** No direct Resend or SMTP API call exists in `web/`, `agent/`, or `supabase/` (grep, 2026-10-29). The "Resend code" button in `web/src/owner.js` (lines 327–350) calls `resendSignupCode` in `web/src/auth.js` (lines 207–208), which requests Supabase Auth's `/auth/v1/resend` endpoint (test at `web/tests/owner-registration.test.js` line 344). Sign-up codes are therefore sent through Supabase Auth. QRquick is not integrated with Resend. Whether Supabase Auth uses custom SMTP, and through which provider, is not shown in the repo. The Supabase dashboard was not checked.
++- **Resend.** No direct Resend or SMTP API call exists in `web/`, `agent/`, or `supabase/` (grep, 2026-10-29). The "Resend code" button is rendered at `web/src/owner.js` line 327 and bound at line 332. Its countdown runs at lines 337–350. The `resendSignupCode` call sites are `web/src/owner.js` lines 259 and 358 (`onResendCode`, which starts at line 353). `resendSignupCode` is defined in `web/src/auth.js` (lines 207–208) and requests Supabase Auth's `/auth/v1/resend` endpoint (test at `web/tests/owner-registration.test.js` line 344). Re-checked 2026-10-30. Sign-up codes are therefore sent through Supabase Auth. QRquick is not integrated with Resend. Whether Supabase Auth uses custom SMTP, and through which provider, is not shown in the repo. The Supabase dashboard was not checked.
+ - Next free migration number: `0011`.
+ - Worktree: `stage7-payments` at `717717b`. Untracked: `CLAUDE.md`, and this file.
+ - Main checkout: three pre-existing modified files (`agent/README.md`, `agent/src/worker.mjs`, `agent/test/worker.test.mjs`) and stash `b559dce`. Not touched.
++- **Stage 6 branch (checked 2026-10-30).** `stage6-simulated-printer` at `885d28b` ("Stage 6: offline simulated printing for the local print agent") exists locally and as `origin/stage6-simulated-printer`. It is not an ancestor of `origin/main` (717717b). The base print agent is already on `origin/main`: `agent/src/worker.mjs`, `supabase/functions/print-agent/index.ts` and `supabase/migrations/0010_print_agents.sql`.
++- **`place_order`, two signatures (checked 2026-10-30).** The three-argument version, `place_order(text, jsonb, text)`, is created in 0001 (line 397) and re-created in 0003 (line 186). Its grants are in 0001 (lines 490 and 496) and 0003 (lines 277–278). 0003 grants `execute` to `anon` and `authenticated`. The four-argument version, `place_order(text, jsonb, text, text)`, is created in 0008 (line 55) and 0009 (line 33). It calls the three-argument version (0008 line 75; 0009 line 62). Its grants are in 0008 (lines 114–115) and 0009 (lines 80–81), to `anon` and `authenticated`. No migration drops the three-argument version. **Live state UNVERIFIED.**
++- **Cleanup function and schedule (checked 2026-10-30).** `supabase/functions/cleanup-files/index.ts` exists. `.github/workflows/cleanup-files.yml` runs it on cron `30 20 * * *` (UTC), which is 02:00 IST, and needs repository secrets `QRQUICK_CLEANUP_URL` and `CLEANUP_SECRET`. `docs/PRINTING_STATUS.md` line 24 says "Built, not deployed". **Deployment and secrets UNVERIFIED.**
++- **Live-state claims in the README (not checked against the live project).** The README says the project is in `ap-south-1` (Mumbai) on the free plan (lines 32–33). It says migrations `0003` and `0006` are applied to the live project (lines 16 and 18), and that migrations `0004` and `0005` are not re-checked there (line 279). It says both edge functions are deployed, with `owner-file-link` having JWT checks on (lines 215–217). It says the consolidated migration "mirrors the migrations applied to the live project" (line 308) without naming 0010. `docs/PRINTING_STATUS.md` line 54 says migration 0010 "is not applied anywhere yet". The live state of 0007 to 0010 is therefore **UNKNOWN**.
++- **No `supabase/config.toml` exists** (checked 2026-10-30). Verify-JWT and other function settings are not recorded in the repository.
++- **Repository drift (checked 2026-10-30; not fixed here).** README line 22 says Stage 7 is "Not started (Stripe is installed but not connected)". README line 23 says Stage 8 is "Not started" and that uploaded files are kept "until someone removes them by hand", although the cleanup function is already in the repository. README line 21 says Stage 6 is "Not started"; `CLAUDE.md` says the base print agent is on main. Fixing README or `CLAUDE.md` needs approval.
+ 
+ ---
+ 
+@@ -94,7 +102,11 @@
+ - **Consumer protection and refunds:** not researched. No legal conclusion is drawn here.
+ - **DPDP applicability and obligations (new):** not analysed. Whether and when DPDP obligations apply to QRquick, and what they require for customer files, needs qualified Indian legal review. Penalties are not in the source read. **Lawyer review required.**
+ - **RBI e-mandate:** whether manual annual payments fall under the e-mandate rules. Not decided here. Based on a secondary summary.
+-- **Supabase data location:** project region not in repo. `ap-south-1` availability for new projects unconfirmed.
++- **Supabase data location:** README lines 32–33 state `ap-south-1` (Mumbai). This is a README statement, not checked against the live project. Availability of `ap-south-1` for new projects is unconfirmed.
++- **Supabase plan:** §5 uses Supabase Pro (₹2,375 a month) as the cost base. README lines 32–33 say the live project is on the free plan. The live plan is **UNVERIFIED**. The Pro figure is a forward assumption.
++- **Live Auth settings:** README next steps item 6 lists leaked-password protection and the Site URL as open. SMTP and MFA settings are not recorded anywhere in the repository. **UNVERIFIED.**
++- **Live migration state (0007 to 0010):** unknown (§2). **Production-owner check** (§14, item 26).
++- **Cleanup deployment and secrets:** unverified (§2, §5C). **Production-owner check** (§14, item 27).
+ - **Hosting (GitHub Pages):** the ₹0 assumption is **PROVISIONAL**. Official documentation (re-fetched 2026-10-29 in an earlier revision) says Pages on private repositories needs a paid GitHub plan, and that a GitHub Free account must use a public repository. Repository visibility and the owning account's plan are **not verified**. The tool refused to fetch the repository URL because that URL had not appeared in the conversation's provenance set. The refusal is not evidence of visibility either way. The price of any paid GitHub plan is not in this draft and was not retrieved.
+ - **Email-volume tier, E (new):** undecided. Not in the repo. Results that change with E are shown for both Free and Pro (§5A). **PENDING OWNER APPROVAL.**
+ - **Resend tiers above Pro (new):** the price and email limit of any tier above Pro (50,000 emails/month) were not retrieved. The 10,000-shop net is **PROVISIONAL**.
+@@ -126,7 +138,7 @@
+ | Orders per shop | 20/month | Assumed |
+ | File size | 2 MB average | Assumed |
+ | Emails per order | E. Undecided (§5A). | Assumed |
+-| File retention | 30 days after finish, per `docs/PRINTING_STATUS.md` | **NOT DEPLOYED.** That file says "Built, not deployed" (line 24). Deployment not verified. See §5C. |
++| File retention (two rules, §5C) | Unclaimed files: expire one day after upload (`customer_files.expires_at`, 0003 line 41). Claimed files: removed only after the order has been completed, cancelled or rejected for 30 days, and only when no queued, claimed, printing or needs-check job uses the file (0010 lines 794–807). | **Code in repo. Live deployment UNVERIFIED.** `docs/PRINTING_STATUS.md` line 24 says "Built, not deployed". See §5C. |
+ | Payment pattern | Yearly, all shops pay, no churn. The base tables do not model trials, free periods, or churn (see §5B). | Assumed |
+ | Payment channel | A working processor or other payment channel exists | **Unverified.** Revenue projections are conditional on it (§8, §9 item 9, §10 item 2). |
+ | Unpriced | Founder and support time, compute upgrades, database overage, paid GitHub plan if needed, CA and lawyer fees | Excluded. See §8 and §8A. |
+@@ -212,8 +224,8 @@
+ 
+ ### §5C Storage, retention, and egress (10,000-shop scenario)
+ 
+-- **Retention status: NOT DEPLOYED.** `docs/PRINTING_STATUS.md` line 24 reads "Built, not deployed." Deployment was not verified (no Supabase or GitHub Actions access was used). **The 10,000-shop storage overage in §8 assumes this unimplemented retention.**
+-- Storage with 30-day retention (steady state): GB = shops × 20 orders × 2 MB ÷ 1,000 = 10,000 × 20 × 2 ÷ 1,000 = **400 GB**
++- **Retention status: CODE IN REPO; LIVE DEPLOYMENT UNVERIFIED.** The purge function `expired_customer_file_paths` (0010 lines 785–810) and its daily caller (`supabase/functions/cleanup-files/index.ts`, run by `.github/workflows/cleanup-files.yml` at cron `30 20 * * *` UTC, which is 02:00 IST) exist in the repository. `docs/PRINTING_STATUS.md` line 24 says "Built, not deployed", and line 54 says migration 0010 "is not applied anywhere yet". The function's deployment, the workflow's secrets (`QRQUICK_CLEANUP_URL`, `CLEANUP_SECRET`) and the migration state were not checked. No Supabase or GitHub Actions access was used. **The 10,000-shop storage overage in §8 assumes that retention runs.**
++- Storage with 30-day retention (steady state): GB = shops × 20 orders × 2 MB ÷ 1,000 = 10,000 × 20 × 2 ÷ 1,000 = **400 GB**. This is an upper bound. It keeps every file for 30 days, but unclaimed files expire after one day (0003 line 41).
+ - Without retention, storage grows every month: 400 GB × months. After 12 months: 4,800 GB. Overage: (4,800 − 100) × $0.0213 = $100.11 ≈ ₹9,510 per month. **Storage only; egress excluded. Illustration only. Not in any table.**
+ - Overage at 10,000 shops, with retention (Assumed):
+   - Storage: (400 − 100) GB × $0.0213 = $6.39 ≈ ₹607.05
+@@ -221,6 +233,7 @@
+   - Total: $19.89 ≈ ₹1,889.55, shown as ₹1,890.
+ - **Database overage: unmodelled.** Supabase bills $0.125/GB beyond 8 GB (§3). No database size estimate exists, so no figure in this draft includes it. **PROVISIONAL.**
+ - Compute tier upgrades: unmodelled.
++- **Purge capacity (checked 2026-10-30).** `cleanup-files` deletes at most 2,000 files per run (`BATCH_SIZE` 100 × `MAX_BATCHES` 20; `index.ts` lines 19–20). At 20 orders a month per shop and one file per order (both Assumed), the steady-state need is about 0.67 files per shop per day. The cap is reached at about 3,000 shops (2,000 ÷ 0.667). At 10,000 shops the daily need is about 6,667 files. Changing the cap is a code change that needs separate approval (§14, item 27).
+ 
+ ---
+ 
+@@ -242,7 +255,7 @@
+ 10. **FX.** ₹95 is an estimate. Each ±₹5 moves Supabase by **±₹125 per month** at any shop count. **When Resend Pro applies** (shops above 150 ÷ E, §5A), Resend Pro moves by a further ±₹100, for a total of **±₹225 per month**. At 10,000 shops the USD overage ($19.89) adds ±₹99.45. The indirect ₹94.6 reading (§3) would lower Supabase by about ₹10 per month.
+ 11. **Scope.** The 10,000-shop row excludes compute tier upgrades, database overage (§5C), the Resend tier above Pro (§5A), support, and founder time. The flat ₹3,000 accounting figure probably understates cost at volume; no source exists.
+ 12. **Email (new).** Pro does not cover 10,000 shops at any E above 0.25 (§5A). The 100-shop result depends on E: **₹4,816 per month if Free applies (E ≤ 1.5), ₹2,916 if Pro applies (E > 1.5)**. E is undecided. **PENDING OWNER APPROVAL.**
+-13. **Retention (new).** Retention is not deployed (§5C). The 10,000-shop storage overage in §8 assumes it is.
++13. **Retention (new).** The retention code is in the repository. Live deployment is unverified (§5C). The 10,000-shop storage overage in §8 assumes the purge runs, and is an upper bound.
+ 14. **Timing and forgone revenue (new).** Decision 8 does not say whether the free period extends the paid term. Without an extension, year-one licence revenue is forgone. With one, it would be deferred (§5B). The illustrations assume no extension. Trials delay the first payment by 30 days. The base tables assume every shop pays from month one.
+ 15. **Accrual and cash bases (new).** The "month 43" and "month 26" figures are accrual results. Cash turns positive in month 13 under annual receipts (§5B). Neither is a forecast.
+ 16. **Input tax credit (new).** Not modelled (§4). The GST-charged net is conservative on this side if QRquick can claim credit. **CA review required.**
+@@ -329,15 +342,15 @@
+ Each item is a proposal, not a decision. Decisions 13–20 (manual licence management and admin grants) are in §12A. They are PENDING OWNER APPROVAL, except where §12B.3 records a partial status.
+ 
+ 1. **Licence unit.** Proposal: per shop. Options: per owner; per printer computer. **PENDING OWNER APPROVAL.**
+-2. **Term.** Proposal: 12 months; the owner pays again each year; no automatic renewal. Options: yearly manual renewal; one-time (not recommended, since recurring costs need recurring income). **PENDING OWNER APPROVAL.**
++2. **Term.** The 12-month paid term is approved as policy (M4). The paid path stays blocked (M5). Renewal: the owner pays again each year, with no automatic renewal (RECOMMENDED; owner confirmation pending). Options: yearly manual renewal; one-time (not recommended, since recurring costs need recurring income). Stacking of an early payment: C-4 (§12B.9). See §14, items 3 and 16.
+ 3. **Price.** Proposal: Option B, ₹1,499 incl. GST, as the starting point. Options: A (₹499 pilot); C (₹2,999); other. **PENDING OWNER APPROVAL.**
+ 4. **GST route.** No option chosen. Options: (a) stay unregistered and charge no GST, only if a CA confirms the exemption applies; (b) register and charge GST on an inclusive price. Input credit: whether a registered shop can claim input credit on the licence depends on QRquick issuing valid GST invoices. This claim is **unsourced** in this draft. Whether QRquick can claim input credit on its own costs, and the reverse-charge treatment of foreign services, are **not modelled**. **PENDING OWNER APPROVAL. CA review required.**
+ 5. **Trial.** **Deferred out of Stage 7 (2026-10-29 direction, §12B, conflict C-10).** Proposal: 30 days, no card, one per owner account. Options: none; 14 days. A trial delays first payment and is not modelled as lost revenue (§5B). **PENDING OWNER APPROVAL.**
+ 6. **Refunds.** Proposal: full refund within 7 days. After that, only for duplicate charges or a QRquick outage. QRquick absorbs the processor fee: ₹35.38 per year on a ₹1,499 card payment at 2.36%, or ₹29.98 at the derived 2.00%. Each Stripe dispute costs ₹1,000 (§3, Stripe pricing row). That is Stripe's dispute fee. Pausing the licence during a dispute does not itself cost ₹1,000. **PENDING OWNER APPROVAL. Lawyer review required.**
+-7. **Expiry behaviour.** *Partly superseded 2026-10-29 (§12B): decision A (printing only, no order blocking), B (queued jobs held), C (no retries while inactive).* Original proposal: no new customer orders. In-flight paid orders finish. The print agent claims no new jobs. Owners keep read and CSV export. **Licence expiry does not itself delete data.** Order files follow the retention schedule: 30 days after finish, which is **not deployed** (§5C). Whether licence expiry should also change the deletion schedule is a separate decision. **PENDING OWNER APPROVAL.**
++7. **Expiry behaviour.** *Partly superseded 2026-10-29 (§12B): decision A (printing only, no order blocking), B (queued jobs held), C (no retries while inactive).* Original proposal: no new customer orders. In-flight paid orders finish. The print agent claims no new jobs. Owners keep read and CSV export. **Licence expiry does not itself delete data.** Order files follow the two retention rules in §5C. Unclaimed files expire one day after upload. Claimed files are removed 30 days after the order is completed, cancelled or rejected, subject to the purge exclusions. The purge code is in the repository. Its live deployment is **unverified** (§5C). Whether licence expiry should also change the deletion schedule is a separate decision. **PENDING OWNER APPROVAL.**
+ 8. **Existing shops.** Proposal: free for 12 months from launch, with 30 days' written notice before the first charge. Effect as drafted: no licence revenue from these shops in year one. Decision 8 does not say whether the paid term is extended. The illustrations assume it is not, so that revenue is **forgone**, not deferred (§5B). Existing-shop count (N): [OWNER TO PROVIDE]. Illustration at N = 100 (arithmetic only): year-one net −₹65,700 on Free (E ≤ 1.5) or −₹88,500 on Pro (E > 1.5), against +₹57,796 or +₹34,996 if all pay from month one. Accrual break-even month 26 (Free) or 43 (Pro). Cash turns positive in month 13 under annual receipts. **PENDING OWNER APPROVAL.**
+ 9. **Processor.** Options: Stripe, only if an active account or invite exists; Razorpay, only after its India signup is verified; defer. Neither is confirmed available. Every revenue projection in §8 assumes a working channel. **PENDING OWNER APPROVAL.**
+-10. **Stage 6 merge order.** Proposal: owner reviews and merges Stage 6 before Stage 7 is rebased. Not merged by me. **PENDING OWNER APPROVAL.**
++10. **Stage 6 merge order.** The item is named precisely: branch `stage6-simulated-printer`, commit `885d28b` ("Stage 6: offline simulated printing for the local print agent"). It exists locally and as `origin/stage6-simulated-printer`. It is not an ancestor of `origin/main` (717717b). The base print agent, migration 0010 and the print-agent function are already on `origin/main` and are not part of this item. Proposal: the owner decides whether this branch is merged before Stage 7 is rebased. Not merged by me. **RECOMMENDED; owner decision pending** (§14, item 20).
+ 11. **Advisers.** Proposal: engage an Indian CA and lawyer before any payment launch. Scope includes GST route, input credit, reverse charge, TDS, DPDP, refunds, and consumer protection. **PENDING OWNER APPROVAL.**
+ 12. **Premium features.** Proposal: none for now. Options: name the features to build first. **PENDING OWNER APPROVAL.**
+ 
+@@ -352,7 +365,7 @@
+ 5. **Phase 2 dependencies:** the following owner decisions drive Phase 2 code where they apply. **Decision 4** (GST route) affects invoicing and tax fields. **Decision 7** (expiry) affects licence gates and deletion. **Decision 9** (processor) affects the integration design. **Decision 12** (premium features) affects any tier logic. **PENDING OWNER APPROVAL** for each.
+ 6. **Legal terms, refunds, and DPDP obligations:** a lawyer must review them. DPDP applicability to customer files is not analysed (§4).
+ 7. **Settlement account:** processors require a bank account in the entity's name. Unknown.
+-8. **Data location:** the Supabase project region is not in the repo. `ap-south-1` availability is unconfirmed.
++8. **Data location:** README lines 32–33 state `ap-south-1`. This is not checked against the live project. Availability of `ap-south-1` for new projects is unconfirmed.
+ 9. **TDS on business payments:** unverified.
+ 10. **Email provider:** whether Supabase Auth uses custom SMTP, and which provider, is not decided. The built-in limit is 2 emails per hour (§3). **PENDING OWNER APPROVAL.**
+ 11. **Email-volume tier (E):** undecided. Results that depend on it are shown for both Free and Pro (§5A). **PENDING OWNER APPROVAL.**
+@@ -391,6 +404,8 @@
+ - Printo: document printing service, https://printo.in/p/document-printing-service-in-india (undated)
+ - Ekantipur: exchange rate, 22 Oct 2026, https://ekantipur.com/business/2026/10/22/en/october-22-2026-whats-the-exchange-rate.html (secondary, indirect)
+ 
++**Repository evidence (read-only, checked 2026-10-30, worktree `stage7-payments` at 717717b).** `supabase/migrations/0001_stage1_foundation.sql`, `0003_customer_files.sql`, `0006_payments_and_statistics.sql`, `0008_payment_intents.sql`, `0009_cash_policy_and_payment_hardening.sql` and `0010_print_agents.sql`; `supabase/functions/cleanup-files/index.ts`, `owner-file-link/index.ts` and `print-agent/index.ts`; `.github/workflows/cleanup-files.yml` and `pages.yml`; `agent/src/worker.mjs`; `web/src/owner.js`, `web/src/auth.js` and `web/tests/owner-registration.test.js`; `docs/PRINTING_STATUS.md`; `README.md`; `CLAUDE.md`. Git was read with `rev-parse`, `branch --contains`, `ls-tree origin/main` and `stash list` only.
++
+ ---
+ 
+ ## 12. Status
+@@ -404,7 +419,9 @@
+ - Phase 2 has not started. No implementation has begun.
+ - Admin-grant and manual licence design added (§12A). Design only: no code, migration, Edge Function, UI, or enforcement.
+ - Stage 7 decision record added 2026-10-29 (§12B). Documentation only. No implementation, setup, tests, migration, or commit.
+-- **Waiting for owner review.**
++- Final documentation pass 2026-10-30. Corrections are in §13. The decision register is §14, the roadmap is §15 and the exit checklist and verdict are §16.
++- No commit, push, merge, deployment, migration, test, Docker, Supabase, production or live-setting action was taken. The protected main checkout, its three modified files and `stash@{0}` (b559dce) are untouched.
++- **Ready for final owner review. Not approved.** §16 gives the verdict and its reasons.
+ 
+ ---
+ 
+@@ -424,7 +441,7 @@
+ 
+ - No admin, role, platform-admin, or licence concept exists in migrations 0001–0010 or in `web/`, `mobile/`, `agent/`, or `supabase/functions/`. Searches for `is_admin`, `super_admin`, `platform_admin`, `app_metadata`, and `user_role` found no matches. This design is new.
+ - Shop access uses `shop_memberships (shop_id, user_id, role in owner|staff)` and `is_shop_owner()`. `shops` has no licence columns.
+-- Edge Functions read `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) from their environment. `owner-file-link` is deployed with JWT verification (`verify_jwt = true`, per its header comment).
++- Edge Functions read `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) from their environment. `owner-file-link` is documented with JWT verification on. Its source header says "Deployed with verify_jwt = true" (`supabase/functions/owner-file-link/index.ts` lines 4–5), and README setup step 7 deploys it without `--no-verify-jwt`. README lines 215–217 say it is deployed to the live project. **Verified against repository sources on 2026-10-30. The live setting and the live deployment were not checked, and no `supabase/config.toml` exists to record them.**
+ - Browser config holds only the publishable key (`web/config.js`).
+ 
+ ### 12A.3 Super-admin identity and bootstrap
+@@ -520,7 +537,7 @@
+ - Expiry is computed at read time from `ends_at`. Access needs no cron job. A notice job is a later stage.
+ - *Corrected 2026-10-29 (decisions A, B, C; §12B.2):* once enforcement exists, it applies to printing only. For SCHEDULED, EXPIRED, REVOKED, and NONE shops: no new print jobs, no retries, queued jobs held until ACTIVE, jobs already printing finish, the agent receives no claims, and `mark_printing` refuses. Customer checkout and order placement are not blocked. Owners keep read and CSV export. Enforcement is not started and needs its own approval (7F).
+ - Revocation takes effect at `revoked_at`. It does not alter orders, customer files, or statistics. Its only effect on printing is through the 7F gate.
+-- Licence expiry or revocation does not itself delete any data. The 30-day file retention schedule (not deployed, §5C) is separate. *Proposal M1 (§12B.6), not approved for implementation:* a job held only because the licence is inactive fails after 7 days. Whether its file then becomes purgeable is an open conflict (§12B.9 C-1).
++- Licence expiry or revocation does not itself delete any data. The file retention rules in §5C are separate. Their live deployment is unverified. *Proposal M1 (§12B.6), not approved for implementation:* a job held only because the licence is inactive fails after 7 days. Whether its file then becomes purgeable is an open conflict (§12B.9 C-1).
+ - Grace period: decision 18.
+ 
+ ### 12A.11 Required tests (before any stage is approved to ship)
+@@ -547,7 +564,7 @@
+ ### 12A.12 Implementation stages (proposed; none started or approved)
+ 
+ - **7A. Owner inputs:** decisions 13–20; the Auth user UUID; MFA confirmation; admin UI hosting. No code.
+-- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, and `shop_licence_meta`. Excludes `paid_verified`, `trial`, and `licence_payments` (M5; conflict C-5). Built to the corrections in §12B.5 and the tests in §12B.11. SQL tests on staging only, after separate approvals for local setup and for migration creation.
++- **7B. Schema:** migration (next free number, 0011 or later), tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, and `shop_licence_meta`. Proposed to exclude `paid_verified`, `trial`, and `licence_payments` (M5; C-5, RECOMMENDED, owner confirmation pending). Built to the corrections in §12B.5 and the tests in §12B.11. SQL tests on staging only, after separate approvals for local setup and for migration creation.
+ - **7C. Admin RPCs and the read RPC:** grant, extend, revoke (with the M2 rule), and replace; `shop_licence_status` (owner read RPC); denial logging (M3, M8). Manual payment record, verify, and reverse are deferred (M5). Matrix from §12A.11 and §12B.11 on staging.
+ - **7D. Admin UI:** a separate private app with login, shop search, grant, extend, revoke, and replace forms with confirmation, and an audit view. Payment entry is deferred (M5). Browser smoke test on staging.
+ - **7E. Shop read-only status:** owner web view with the minimal fields in decision D. Android is undecided (decision 19). No enforcement.
+@@ -603,7 +620,7 @@
+ 
+ | ID | Decision (as recorded) | Status | Consequence and condition |
+ |---|---|---|---|
+-| A | Printing-only enforcement. Customer checkout and order placement are not blocked by licence status. | APPROVED | Replaces the order-insert gate in the earlier chat plan and the original 7F wording. Checkout is unchanged. |
++| A | Printing-only enforcement. Customer checkout and order placement are not blocked by licence status. | APPROVED | Replaces the order-insert gate in the earlier chat plan and the original 7F wording. Checkout is unchanged. Both `place_order` signatures stay granted to `anon` and `authenticated` in the migration chain (§2; §12B.11). |
+ | B | Queued jobs held until the shop is ACTIVE. Jobs already printing may finish. | APPROVED, CONDITIONAL | Held files are kept by the purge rule (0010 lines 795–798) until M1 is implemented (C-1, C-3). |
+ | C | Retries blocked while inactive. No requeue or reuse of old job rows. | APPROVED | Each retry is a new row, created only while ACTIVE. Supersedes the earlier chat plan's pre-expiry retry wording. |
+ | D | Minimal owner status: active or inactive; access end or no-expiry; next start when relevant. No payment references, admin notes, audit history, coverage IDs, or revocation reasons. | APPROVED | Owner only. Staff and Android visibility are open (decision 19). |
+@@ -628,7 +645,7 @@
+ 
+ | Decision | Status |
+ |---|---|
+-| 13 Admin accounts | PENDING OWNER APPROVAL. One owner account is assumed until answered. |
++| 13 Admin accounts | PENDING OWNER APPROVAL. Recommended default: one owner account. Not approved. |
+ | 14 MFA (`aal2`) | PENDING. The owner must confirm MFA status. Admin RPCs cannot run without aal2 if it is required. |
+ | 15 Admin UI hosting | PENDING. |
+ | 16 Grant limits | PARTLY APPROVED: custom-date convention (M4). PENDING: backdating, maximum custom length, lifetime owner-only. |
+@@ -640,7 +657,7 @@
+ ### 12B.4 Printing safety fixes (K, M7): findings and state rules
+ 
+ **Duplicate-print fix (investigated, not implemented).**
+-- Current code: `retry_print_job` (0010 lines 502–547) checks the source status (`failed` or `needs_check`, line 522). It refuses only when a sibling job for the same `order_item_id` is `queued`, `claimed`, or `printing` (lines 534–539). It does not check for a `sent` sibling, and it does not require the source to be the highest attempt.
++- Current code: `retry_print_job` (0010 lines 502–549; the `return` is at line 547) locks the source job (line 515) and checks its status (`failed` or `needs_check`, line 522). It then requires the order to be `printing` and `paid`, read without a row lock (lines 530–533). It refuses only when a sibling job for the same `order_item_id` is `queued`, `claimed`, or `printing` (lines 534–539). It does not check for a `sent` sibling, and it does not require the source to be the highest attempt.
+ - Gap: attempt 1 fails and attempt 2 is sent. A retry of attempt 1 still passes and creates attempt 3, which prints a second copy. *Confirmed by reading the code. Not reproduced on any database.*
+ - Proposed rule: refuse if any job for the item has status `sent`. Refuse unless the source attempt is the highest attempt for the item. Keep the `needs_check` confirmation unchanged.
+ - Changes: the body of `retry_print_job` only. No schema change. No change to claim, finish, or approve.
+@@ -649,7 +666,7 @@
+ **Refund and claim fix (stopped; REVIEW REQUIRED).**
+ - Refund path: `set_order_payment`, action `refund` (0006 lines 213–219), sets `payment_status = 'refunded'`, `refunded_at`, and `refund_paise`. It does not change the order status or any `print_jobs` row.
+ - Claim path: `agent_claim_next_job` (0010 lines 646–656) selects queued jobs for the shop whose file is not deleted. It checks neither payment status nor order status.
+-- Order transitions: 0001 lines 153–155 allow `printing` → `ready` or `completed`. The 0008 guard checks payment only on those transitions. An order that is `ready` or `completed` can still have queued jobs.
++- Order transitions: 0001 lines 153–155 allow `printing` → `ready` or `completed`. The 0008 guard (lines 39–43) requires `payment_status = 'paid'` when the order status changes into `printing`, `ready` or `completed`. It does not re-check payment when a paid order is later refunded, because a refund changes only the payment fields. The only order update in 0010 is at line 493, in `approve_order_for_print`. No migration found changes a `print_jobs` row when an order's status or payment changes, and 0006 does not touch `print_jobs`. So an order that is `printing`, `ready` or `completed` can still have queued jobs.
+ - Schema constraint: the `print_jobs` status check (0010 line 59) allows only `queued`, `claimed`, `printing`, `sent`, `failed`, and `needs_check`. No terminal state exists for jobs of ineligible orders.
+ - Options for review (none implemented):
+   - **R-a:** in the refund path and in the ready or completed transition, mark the order's queued jobs `failed` with a specific reason code. Uses existing states. Changes the bodies of `set_order_payment` (0006) and the order status update path. Touches the customer payment ledger.
+@@ -686,7 +703,7 @@
+ | R4 | Atomic success: one function, with no exception after the audit insert. | Design resolved; not tested. Enforce by test. |
+ | R5 | Idempotency: same `request_id` and payload hash returns the stored result. Different payload is a conflict. Ledger retention per M8. | Design resolved; not tested. Retention: §12B.8. |
+ | R6 | Revocation immutability: compare `to_jsonb` with the three revocation keys removed. | Design resolved; not tested. UNVERIFIED on staging. |
+-| R7 | `shop_licence_id` columns: the earlier chat plan omitted `shop_id` on coverages and payments. This file already includes it. Composite foreign key added. | Corrected. |
++| R7 | `shop_licence_id` columns: the earlier chat plan omitted `shop_id` on coverages and payments. This file already includes it. Composite foreign key added. | Design corrected. The key applies only if `licence_payments` is approved (M5). |
+ | R8 | Payment immutability: shop, amount, currency, method, reference, and `received_on` fixed at insert. | Design resolved; not tested. Paid path blocked. |
+ | R9 | Privileges: internal helpers revoked from `public`, `anon`, and `authenticated`. Admin RPCs granted to `authenticated` only. REVOKE from `PUBLIC` made explicit, because PostgREST exposes `public` functions. | Design resolved; not tested. UNVERIFIED: Supabase default grants (R17). |
+ | R10 | Owner status through a separate RPC. `shop_licence_state` is internal. | Design resolved; not tested. Follows D. |
+@@ -697,7 +714,7 @@
+ | R15 | Synthetic `auth.users` fixture: the required columns for the pinned local Auth schema are unknown. | **BLOCKED** by L. |
+ | R16 | Simulating `auth.uid()` and `aal` through request claims. | UNVERIFIED (staging). |
+ | R17 | Owner role and Supabase default grants on new `public` tables. | UNVERIFIED (staging). |
+-| R18 | Lock order. Print paths: order row, then meta (share). Admin paths: advisory lock, then meta, then payment. No path takes meta before an order. | Design resolved; not tested. Two-session test required. |
++| R18 | Lock order, per RPC, as the existing code does it (checked 2026-10-30). `approve_order_for_print` locks the order row (0010 line 451). `retry_print_job` locks the source job row (line 515), then reads the order and the sibling jobs without a lock (lines 530–539). `consume_print_pairing` locks the pairing row (line 576). `agent_claim_next_job` selects one queued job with `for update skip locked` (line 655). Its recovery step, `recover_expired_print_jobs`, updates rows without an explicit lock. `agent_mark_printing` locks the job row (line 699). `agent_finish_job` locks the job row (line 736). `set_order_payment` takes no row lock (0006). No advisory lock exists in migrations 0001 to 0010. **Designed, not built:** print paths take the order row, then the shop meta row (share). Admin paths take an advisory lock, then the meta row, then the payment. These are design statements only. The two-session test is **outstanding** (staging, separate approval). | Existing code: verified by reading only. Designed order: UNVERIFIED. Two-session test: outstanding. |
+ | R19 | Shop deletion. Licence tables use `on delete restrict`, matching `orders.shop_id` (0001 line 53). | Design resolved; not tested. |
+ 
+ ### 12B.6 Held-job rule M1 (proposal, not approved for implementation)
+@@ -706,8 +723,8 @@
+ - **Hold start (C-2):** not decided. Option (a) is the job's `created_at`, which can fail a job a day into a lapse. Option (b) is the time the shop left ACTIVE, which needs a stored marker or a derived value. Neither is chosen.
+ - **Limit:** 7 days (M1), measured from the chosen hold start.
+ - **Effect:** status `failed`, `error_code` such as `licence_inactive_timeout`, and a clear `error_message`. Retry is allowed after the shop returns to ACTIVE (rule C).
+-- **Mechanism (C-2):** no scheduler is confirmed. The timeout could run lazily when an agent calls the claim or heartbeat, or on an owner read. A `pg_cron` job would need separate approval, and the repo does not show one. **UNVERIFIED** whether any scheduler exists. Until one does, timeouts run only when an agent calls.
+-- **File effect (C-1):** M1 says the file "becomes eligible for deletion under the existing purge safeguards". **For paid orders still in `printing`, that is not true under the current code.** `expired_customer_file_paths` (0010 lines 795–807) requires that a file's order be `completed`, `cancelled`, or `rejected`, and that it has been so for 30 days. A failed job does not change the order. 0001 does not allow `printing` → `cancelled`. So the file would stay until the order reaches a terminal status that the current workflow may never reach for that order. A decision is needed before implementation.
++- **Mechanism (C-2, corrected 2026-10-30):** a daily scheduler exists for the file purge: the GitHub Actions workflow `cleanup-files.yml` (cron `30 20 * * *` UTC, which is 02:00 IST). Its deployment and secrets are **UNVERIFIED** (§5C). **No scheduler exists for held-job timeouts.** The only job-recovery step, `recover_expired_print_jobs`, runs inside `agent_claim_next_job` (0010 line 644). It handles leases, not licence holds. A timeout for held queued jobs would be new code, run either lazily at agent claim or by a new scheduled job. A new scheduled job needs separate approval. None is approved.
++- **File effect (C-1):** M1 says the file "becomes eligible for deletion under the existing purge safeguards". **For paid orders still in `printing`, that is not true under the current code.** `expired_customer_file_paths` (0010 lines 785–810) purges a claimed file only when its order is `completed`, `cancelled` or `rejected`, and that status is at least 30 days old (lines 799–807). It also requires that no queued, claimed, printing or needs-check job uses the file (lines 795–798). An unclaimed file is purged after its one-day expiry (0003 line 41). A failed job does not change the order. 0001 does not allow `printing` → `cancelled`. So the file would stay until the order reaches a terminal status that the current workflow may never reach for that order. A decision is needed before implementation.
+ - **Printing jobs:** M1 never deletes their files. The purge excludes `printing` and `needs_check` jobs (0010 line 797).
+ - **Effect on paid customer orders:** the customer receives no printed output. The order stays `printing` with `payment_status = 'paid'`, because no transition to a terminal status exists. The owner may refund through `set_order_payment`, which does not touch the job. Consumer-refund obligations have not been researched (§4). **Lawyer review required before implementation.**
+ - **Tests before implementation:** listed in §12B.11.
+@@ -723,7 +740,7 @@
+   - Anonymous calls are rejected at the grant level before the function runs (§12A.4 grants to `authenticated` only). Those attempts are not logged.
+   - A caller with many accounts gets a separate cap for each account.
+   - Above the cap, the details of a burst are lost. Only counts remain (C-12).
+-  - `purge_old_rate_limits` exists (0010), but its schedule is **UNVERIFIED**.
++  - `purge_old_rate_limits` exists (0010). `cleanup-files` calls it (`index.ts` line 81), and that daily workflow's live deployment is **UNVERIFIED** (§5C).
+   - `consume_rate_limit` is granted to `service_role` only (0010 line 868). Calling it from a licence function needs a staging check before use.
+ - **Status:** APPROVED as design. NOT IMPLEMENTED.
+ 
+@@ -732,10 +749,10 @@
+ | Record | Proposed retention | Status |
+ |---|---|---|
+ | Detailed denial records (`licence_denials`) | 90 days | Subject to security and legal review. No deletion job. |
+-| Denial aggregate counters | Expire with their rate-limit window. Purge schedule UNVERIFIED. | UNVERIFIED |
++| Denial aggregate counters | Expire with their rate-limit window. `purge_old_rate_limits` runs from `cleanup-files` (`index.ts` line 81), which the daily workflow calls. Live deployment UNVERIFIED. | UNVERIFIED |
+ | Replay records (`licence_requests`) for consequential mutations | Kept until an independently safe replay-prevention mechanism exists. Store the request ID, action, payload hash, and a non-personal result summary. Not deleted at 90 days. | Policy proposal. Period to be set in review. |
+ | Consequential audit log (`licence_audit_log`) | Kept as needed for administrative and financial records. Personal data minimised. | Lawyer review (decision 20, DPDP). |
+-| Customer files and print jobs | The existing 30-day rule, **not deployed** (§5C). M1 would add a licence-driven failure path. | Separate decision (C-1). |
++| Customer files and print jobs | Unclaimed: one day after upload (0003 line 41). Claimed: 30 days after the order is completed, cancelled or rejected, with purge exclusions (0010 lines 785–810). **Code in repo; live deployment UNVERIFIED** (§5C). M1 would add a licence-driven failure path. | Separate decision (C-1). |
+ 
+ `licence_requests` stores `actor_user_id`, which is personal data. Store the user ID only where replay prevention needs it.
+ 
+@@ -743,7 +760,7 @@
+ 
+ **Contradictions and open conditions**
+ - **C-1 (M1 vs the purge rule).** M1 assumes a failed job makes the file eligible. The purge rule does not, for orders that remain `printing` (§12B.6). Options: a new terminal order status, which changes the 0001 transitions and is out of scope so far; or a licence-specific file-release rule. **Not decided.**
+-- **C-2 (M1 mechanics).** The hold-start clock and the scheduler are unresolved (§12B.6).
++- **C-2 (M1 mechanics).** The hold-start clock is unresolved. A purge scheduler exists in the repository (`cleanup-files.yml`; deployment UNVERIFIED). No scheduler exists for held-job timeouts (§12B.6). The owner must choose the hold start (option a or b), and any scheduled job needs separate approval.
+ - **C-3 (B vs retention).** Until M1 is implemented, held jobs keep customer files indefinitely. Decide whether to accept this as an interim, or to hold enforcement back until M1 is built.
+ - **C-4 (M4 vs J stacking).** M4 says the term is calculated from "the exact server-side verification timestamp". J and the anchor rule start a new paid term at the end of an existing paid term when that end is later. The two differ while a paid term is still running. Recommended: keep stacking, so there is no overlap. **Owner confirmation needed.** Applies only when the paid path is approved.
+ - **C-5 (M5 and 7B).** Whether `paid_verified` and `licence_payments` are excluded from migration 0011. Proposed: excluded. **Owner confirmation needed.**
+@@ -763,7 +780,7 @@
+ - **S-2.** Supabase may grant default table privileges to `anon` and `authenticated` on new `public` tables. RLS with no policies blocks reads only while RLS stays enabled. **UNVERIFIED** (R17).
+ - **S-3.** Admin RPCs depend on the `aal` claim. How hosted and local Supabase expose that claim, and how the check reads it, is **UNVERIFIED** (R16).
+ - **S-4.** A signed file link issued at claim time stays valid for 180 seconds (`supabase/functions/print-agent/index.ts` line 23). A modified agent could print with a link issued before a lapse, without calling `mark_printing`. The residual window is at most 3 minutes. Accept or document before 7F.
+-- **S-5.** How `agent/src/worker.mjs` handles a `mark_printing` refusal is **UNVERIFIED**. Required before 7F.
++- **S-5.** Static code, verified 2026-10-30 in the committed worktree version of `agent/src/worker.mjs` (lines 258–264). When `markPrinting` throws, the agent clears its journal and returns. It does not print and does not report a failure. **Runtime behaviour is still UNVERIFIED.** A local test is required before 7F. No test was run.
+ - **S-6.** The denial and replay ledgers hold user IDs. Retention is set in §12B.8.
+ - **S-7.** The duplicate-print gap (§12B.4) exists in the current printing code. It is a printing defect, not a licence defect.
+ - **S-8.** The refund-without-claim-stop gap (§12B.4) exists in the current printing code.
+@@ -787,7 +804,7 @@
+ - **Denial cap:** 20 detailed rows, then aggregates. Identical response. The counter persists after a denial.
+ - **Concurrency:** a two-session test. The second writer waits on the shop lock.
+ - **Orders unchanged:** checksum over the `orders` payment columns and the `order_events` row count, before and after licence actions.
+-- **Checkout unaffected (A):** `place_order` succeeds while the licence is inactive, with enforcement on. Migrations define two signatures (three arguments in 0001 and 0003; four arguments in 0008 and 0009). No migration drops either. Which overloads exist on a live database is UNVERIFIED. Test every overload that exists.
++- **Checkout unaffected (A):** `place_order` succeeds while the licence is inactive, with enforcement on. Migrations define two signatures (three arguments in 0001 and 0003; four arguments in 0008 and 0009). No migration drops either. Which overloads exist on a live database is UNVERIFIED. Test every overload that exists. The three-argument version is granted to `anon` and `authenticated` (0003 lines 277–278). The four-argument version is granted to both as well (0008 line 115; 0009 line 81), and it calls the three-argument version (0008 line 75; 0009 line 62). Test both signatures as an anonymous caller and as an authenticated caller.
+ - **Printing gate (7F, after approval):** approve and retry are refused, with no rows and no order status change. Claim returns nothing. `mark_printing` refuses. Finish works for a printing job. Queued jobs resume when the shop is ACTIVE.
+ - **Duplicate-print fix:** retry refused when a sibling is `sent`. Retry refused for a source that is not the latest attempt. Retry still works for `failed` and confirmed `needs_check`. Existing printing tests unchanged.
+ - **Refund and claim fix:** defined after diff review. Must include a check that a refunded order's files are not claimed.
+@@ -808,6 +825,48 @@
+ 
+ ## 13. Revision log
+ 
++### Register and checks (2026-10-31)
++
++| Item | Change | Where applied |
++|---|---|---|
++| Register rebuilt | §14 gives one status to each numbered item 1–35. The earlier sub-letter split (for example 4a and 5b) is removed, so no numbered item carries two statuses. Group statuses A–E added. The status rule is stated | §14.0; §14.2 |
++| Open IDs given statuses | C-1 to C-15, decisions A–L and 1–20, M1–M8, S-1 to S-8 and R1–R19 each have one status, in tables | §14.1; §14.3 to §14.7 |
++| Closure review numbering | Items, group letters and the 35 numbered items follow the 2026-10-30 closure review (its §2 and §7). That review is not in the repository | §14 |
++| Roadmap and checklist rebuilt | §15 and §16 use the new item numbers. Separate gates include the held-job marker or scheduler (item 2). Verdict: READY FOR FINAL OWNER REVIEW; NOT APPROVED | §15; §16 |
++| Reference fixes | "item 27a" and "item 27b" changed to item 27. §9 item 2 now refers to items 3 and 16 | §4; §5C; §9 item 2 |
++| place_order grants | Both signatures and their grants noted in §12B.2 row A (closure correction 8) | §12B.2 |
++| Resend call sites | Checked against `web/src/owner.js` on 2026-10-31. Call sites are lines 259 and 358 only. Line 327 is the button and line 345 is the countdown text. §2 was already correct and is unchanged | §2 |
++| Privacy and terms search | Worktree search on 2026-10-31 found no privacy policy, terms, consent, grievance, takedown or DPDP text. Item 29 unchanged | §14.2 item 29 |
++| Header | Date set to 2026-10-31 (last updated). Register status label updated | Header |
++
++### Final documentation pass (2026-10-30)
++
++| Item | Change | Where applied |
++|---|---|---|
++| Header and labels | Date updated. README-statement and register-status labels added | Header; labels |
++| Repository re-check (read-only) | Line references re-checked in migrations 0001, 0003, 0006, 0008, 0009 and 0010; the edge functions and workflows; `agent/src/worker.mjs`, `web/src/owner.js`, `web/src/auth.js`; and the README. Each claim now shows its source | §2; §4; §5; §5C; §11; §12A.2; §12B.4 to §12B.9 |
++| C-2 scheduler | Corrected. The daily purge scheduler exists in the repository (`cleanup-files.yml`). No scheduler exists for held-job timeouts. Deployment unverified | §2; §5C; §12B.6; §12B.9 C-2 |
++| File retention | Two rules documented: unclaimed files expire one day after upload (0003 line 41); claimed files are removed 30 days after the order is completed, cancelled or rejected, with purge exclusions (0010 lines 794–807). "30 days after finish" replaced in §5, §9 item 7, §12A.10 and §12B.8 | §5; §5C; §9 item 7; §12A.10; §12B.6; §12B.8 |
++| Migration 0010 and deployment | Documented as not applied to any database (`docs/PRINTING_STATUS.md` line 54). Code and workflow in the repository. Live deployment unverified | §2; §4; §5C |
++| S-5 | Static finding recorded: `worker.mjs` lines 258–264 return without printing or reporting failure. Runtime test still required | §12B.9 S-5 |
++| R18 | Replaced with the per-RPC lock map of the existing code, with line numbers. The designed order is marked as design only. Two-session test outstanding | §12B.5 R18 |
++| R7 | Status clarified: the composite key applies only if `licence_payments` is approved | §12B.5 R7 |
++| §9 item 2 and M4 | 12-month paid term approved as policy (M4); paid path blocked (M5). Renewal and stacking remain recommendations | §9 item 2; §14 items 3, 16 |
++| Stage 6 | Named precisely: branch `stage6-simulated-printer`, commit 885d28b, not an ancestor of origin/main. Base print agent already on origin/main | §2; §9 item 10; §14 item 20 |
++| `place_order` | Both signatures and their grants documented. The three-argument version is granted to `anon` and `authenticated` (0003 lines 277–278) and is called by the four-argument version. Live state unverified | §2; §12B.11 |
++| `owner.js` | Resend references corrected: button line 327, binding line 332, countdown lines 337–350, call sites lines 259 and 358 | §2 |
++| README drift | Recorded, not changed: region and plan statements; 0006 applied; Stage 6, 7 and 8 wording; cleanup in the repository against README Stage 8 | §2; §4 |
++| `owner-file-link` `verify_jwt` | Kept only as a source and README statement. Live setting unverified; no `config.toml` | §12A.2 |
++| Retry body | Range corrected to 502–549. Order status and payment check (lines 530–533) added. 0008 guard at lines 39–43 | §12B.4 |
++| Purge ranges | Expiry check at line 794; exclusions 795–798; retention 799–807; function 785–810 | §5C; §12B.6 |
++| Purge capacity | Added: 2,000 files per run, reached near 3,000 shops, with the assumptions stated | §5C |
++| Rate-limit purge | `purge_old_rate_limits` is called by `cleanup-files` (`index.ts` line 81) | §12B.7; §12B.8 |
++| Decision 13 | "Assumed" replaced with a recommended default, not an approval | §12B.3 |
++| Paid tables in 7B | Exclusion of `paid_verified`, `trial` and `licence_payments` marked as proposed (C-5) | §12A.12 |
++| Register, roadmap and checklist | Added §14 (decisions A–L; items 1–35 with statuses; mapping of C-1 to C-15, S-1 to S-8, M1 to M8 and decisions 1–20), §15 (categories, gates and separate gates) and §16 (checklist, closure criteria, verdict) | §14; §15; §16 |
++| Status | "Waiting for owner review" replaced with the final-pass status | §12 |
++| Not changed | §6 item 5 formatting; §3 Razorpay MDR row; §12A.16 proposed replacement (still pending approval); every approval and pending status; decisions A–L and M1–M8 | — |
++
+ ### Final cleanup (2026-10-30)
+ 
+ | Item | Change | Where applied |
+@@ -908,4 +967,277 @@
+ | 17 | GST threshold scope limited to services | §3 s.22 row; §6 item 6 |
+ | 18 | Source titles aligned; accounting share at one decimal | §3; §11; §6 item 2 |
+ 
++## 14. Consolidated decision register (added 2026-10-30; rebuilt 2026-10-31)
++
++This register gives one status to each numbered item of the 2026-10-30 closure review (items 1 to 35), to each group A to E, and to each open ID in this file: decisions A to L, decisions 1 to 20, C-1 to C-15, S-1 to S-8, M1 to M8 and R1 to R19. The closure review is not reproduced in this file. Its item numbers and group letters are used as recorded there. Nothing in this register approves a gate, setup, migration, test, deployment, live change or production access.
++
++### 14.0 Status key and rules
++
++- **DECIDED:** approved by the owner in this file (§12B.2 or §12B.3). Any implementation still needs its own gate.
++- **RECOMMENDED:** a proposed default that the owner can confirm or change by written answer.
++- **DEFERRED:** postponed on purpose. The trigger for reopening is given.
++- **EXTERNAL BLOCKER:** the next step needs an outside party: a CA, a lawyer, a processor, the production owner, or evidence from a live system.
++- **IMPLEMENTATION GATE:** the next step is technical work (design, local or staging tests, or diff review) that needs its own approval.
++
++Where an item has several open parts, its status is the status of the first step that must happen before the item can close. Approved parts are noted in the row. They do not give the item a second status.
++
++**Groups.** The closure review (its §7) sorts items into groups A to E. A group status describes how the group closes. Each item keeps its own status in §14.2, and the item status governs.
++
++| Group | Meaning in the closure review | Group status | Items in the group |
++|---|---|---|---|
++| A | Owner can decide now | RECOMMENDED | 3, 4, 5, 6, 7, 8, 9, 13, 14, 15, 16, 17, 19, 20, 21 |
++| B | Technical evidence first | IMPLEMENTATION GATE | 2, 5, 6, 11, 12, 15, 24, 25, 26, 27, 31, 32, 33, 34 |
++| C | CA or lawyer | EXTERNAL BLOCKER | 4, 10, 11, 14, 17, 18, 28, 29, 30 |
++| D | Safe to defer | DEFERRED | 2, 4, 8, 9, 13, 14, 17, 21, 22, 34, 35 |
++| E | Blocks Stage 7 implementation | IMPLEMENTATION GATE | 4, 5, 15, 25, 26, 31, 32, 33, 35 |
++
++Items 1 and 23 are not listed in any group in the closure review.
++
++### 14.1 Decisions A to L (§12B.2)
++
++| ID | Recorded in §12B.2 | Register status | Note |
++|---|---|---|---|
++| A | APPROVED | DECIDED | Printing-only enforcement. The build is gate 7F. |
++| B | APPROVED, CONDITIONAL on C-1 and C-3 | DECIDED | The condition is open: item 1. |
++| C | APPROVED | DECIDED | Retries blocked while inactive. The build is gate 7F. |
++| D | APPROVED | DECIDED | Minimal owner status. The build is gates 7C and 7E. |
++| E | APPROVED for design; ENABLING BLOCKED | DECIDED | Design only. Enabling is open under item 11. |
++| F | APPROVED; BLOCKED with the paid path (M5) | DECIDED | Paid parts follow M5. |
++| G | APPROVED | DECIDED | SCHEDULED state. |
++| H | APPROVED; BLOCKED with the paid path (M5) | DECIDED | Paid parts follow M5. |
++| I | BLOCKED | EXTERNAL BLOCKER | Pricing and minimum payment. Item 4: CA and processor answers first. |
++| J | APPROVED; BLOCKED with the paid path (M5) | DECIDED | Paid parts follow M5. |
++| K | Investigation approved; fixes REVIEW REQUIRED | IMPLEMENTATION GATE | Items 23 and 24. |
++| L | BLOCKED until local setup is approved separately | IMPLEMENTATION GATE | Local setup gate, then the R15 fixture check. |
++
++### 14.2 Numbered items 1 to 35 (closure review)
++
++Count: 10 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 4 DEFERRED, 0 DECIDED. Total 35. Each item has exactly one status. Parts with other statuses are named in the row, and do not change its status.
++
++| No. | Item and references | Status | Group | Open parts and who acts | Blocks |
++|---|---|---|---|---|---|
++| 1 | Held-job file retention; C-1, C-3; M1 file effect (§12B.6, §12B.9) | EXTERNAL BLOCKER | none listed | A held paid order that stays in `printing` never reaches a terminal status, so its file is not purged (0010 lines 795–798). A lawyer reviews when such a file may be released. The owner then chooses the C-1 option and decides C-3 (accept held files as an interim, or hold enforcement back). | M1; held-job enforcement in 7F. Not 7B. |
++| 2 | Hold start and scheduler; C-2 (§12B.6) | RECOMMENDED | B, D | The owner chooses the hold start. Option (b), the time the shop left ACTIVE with a stored marker, is recommended. The purge scheduler exists (§5C), but it does not time out held jobs. A marker, timeout code or new scheduled job needs its own gate (§15.3). | M1 only. |
++| 3 | Paid-term stacking; C-4 (M4, J) | RECOMMENDED | A | The owner confirms stacking, so paid terms do not overlap. | Paid path only (M5). |
++| 4 | Pricing, minimum payment, tax treatment, paid path and the 0011 paid-table scope; I, M5, C-5, C-13 (§7, §12B.2) | EXTERNAL BLOCKER | A, C, D, E | Price, minimum and tax treatment cannot be set until the CA answers (item 18) and the processor position is known (item 17). The exclusion of `paid_verified` and `licence_payments` from 0011 (C-5) is recommended, and 7B needs it decided. | Paid coverage and any published price. |
++| 5 | Admin identity, MFA and the Auth UUID (decisions 13, 14; C-6, C-15; §10 items 12–13; §12A.3) | EXTERNAL BLOCKER | A, B, E | The production owner supplies the owner's Auth user UUID from their own account. It is never inferred. The production owner also records the MFA status on the Supabase account. One owner admin (decision 13) and `aal2` for admin RPCs (decision 14) are recommended. `aal2` behaviour needs staging evidence (S-3). | 7A; the bootstrap row; 7C to 7D. |
++| 6 | Admin UI hosting: a separate private deployment outside `web/` (decision 15) | RECOMMENDED | A, B | The owner confirms a separate private deployment, not linked from the shop app. `pages.yml` publishes `web/` publicly on pushes to `main` that change `web/**` or the workflow. The repository visibility and plan (§3, GitHub Pages row) are a production-owner check. The check affects the hosting cost, not the recommendation. | 7D. |
++| 7 | Lifetime, complimentary and grant limits (M4, M5, M6, F, H; C-7; decision 16) | RECOMMENDED | A | Approved: the custom-date convention, complimentary-grant independence, M6 as policy, and F and H (paid parts blocked by M5). Open: the owner confirms that backdating needs explicit confirmation and that lifetime is owner-only, and confirms C-7 (access continues through a valid paid period after a lifetime revocation). The maximum custom length is DEFERRED until the owner sets it. No default is invented. | 7C grant validation; paid transition tests. |
++| 8 | Revocation and future coverage (C-8, G; fixes 5 and 9; decision 17) | RECOMMENDED | A, D | The owner confirms that revoking current coverage does not cancel future coverage (C-8), that a same-instant tie gives REVOKED (fix 5), and that the exclusive end is displayed (fix 9). Approved: refusal after the natural end (M2) and reversal (H). Standalone revocation of an active paid period is DEFERRED with the paid path (decision 17). | 7B state tests; 7E wording. |
++| 9 | Trial policy (decision 5; C-10) | DEFERRED | A, D | Deferred out of Stage 7 under the 2026-10-29 direction. Deferred means postponed, not deleted. Reopen only by a new owner decision. | Nothing while deferred. |
++| 10 | Refund policy (§9 item 6; C-11) | EXTERNAL BLOCKER | C | A lawyer reviews first, then the owner decides. The processor and dispute fees in §9 item 6 are facts, not policy. | Paid path; refund tests; the M1 effect on paid orders. |
++| 11 | Existing shops: count N, free period and notice (decision 8; C-14; §5B) | EXTERNAL BLOCKER | B, C | The production owner counts N, excluding test rows (README lines 395–405; item 34). A lawyer reviews the 30-day notice, which is only a proposal. The free-period and term policy stays open: there is no free-year promise and no term extension until N is known. The §5B figures are arithmetic only. | Enabling enforcement; any published existing-shop terms. |
++| 12 | Email-volume tier E (§5A; §10 item 11) | RECOMMENDED | B | The owner estimates emails per order from real data. Both the Free and Pro scenarios stay until then. | Projections only. Not Stage 7 code. |
++| 13 | Expiry, grace and the shop-facing view (decisions 7, 18, 19) | RECOMMENDED | A, D | Approved: printing-only enforcement, held queued jobs and no retries while inactive (A, B, C). The "no new customer orders" wording is superseded (C-9). Open: the owner confirms no grace period (decision 18) and the Active or Inactive labels with no admin-grant label (decision 19). The Android view is DEFERRED. The deletion-schedule question under decision 7 sits in item 1. | 7E wording. |
++| 14 | Manual payments, verification and audit (decision 20; §12A.7; §12B.8) | EXTERNAL BLOCKER | A, C, D | The payment-method list is recommended (UPI direct, bank transfer, cash, cheque, other), but it is DEFERRED with the paid path (M5). A CA advises on GST invoices for manual receipts. A lawyer advises on personal data in audit rows and their retention. | Paid path (M5); audit retention; 7C. |
++| 15 | Denial and replay retention; denial growth (M3, M8; C-12; decision 20) | EXTERNAL BLOCKER | A, B, E | Approved: detailed denial records capped at 20 per user per hour, with count-only records above the cap (M3, design only). A lawyer reviews the retention periods (90 days for denial records; replay records kept until a safe mechanism exists; M8). Staging measures row growth. The owner accepts the global ceiling (no value is proposed here) and the count-only limitation (C-12). | 7C denial logging; retention in 7C. |
++| 16 | Licence unit and term (decisions 1, 2; §9 items 1–2) | RECOMMENDED | A | Unit: per shop, which matches the `shop_id` model. A per-owner or per-computer unit would change the 7B data model. Term: 12 months, approved as policy (M4). Renewal: manual, with no automatic renewal, recommended. §9 item 2 is updated to match M4. | 7B data model; paid path. |
++| 17 | Processor and gateway (decision 9; §3; §4) | DEFERRED | A, C, D | The gateway is deferred and the manual route comes first. Stripe is invite-only for new Indian businesses (§3, verified). Razorpay India signup is unverified. When the gateway is reopened, processor eligibility evidence and CA advice are needed first. | Gateway work (later stage; §12A.12). |
++| 18 | GST route, exemption, input credit, reverse charge, TDS and invoices (decision 4; §10 item 3) | EXTERNAL BLOCKER | C | The CA decides the registration route, the current status of Notification 10/2017-IT, input credit, reverse charge on foreign services, TDS and invoicing. | Pricing tax treatment (I); invoices; paid path. |
++| 19 | Advisers (decision 11) | RECOMMENDED | A | The owner engages an Indian CA and a lawyer before any paid collection. No engagement is evidenced. The advice itself is an EXTERNAL BLOCKER (items 10, 11, 14, 15, 18, 28, 29, 30). | Paid collection; published terms. |
++| 20 | Stage 6 merge order (decision 10; §9 item 10) | RECOMMENDED | A | The owner decides whether `stage6-simulated-printer` (885d28b) is merged before Stage 7 is rebased. The base print agent is already on `origin/main`. No merge is approved. | Rebase order only. |
++| 21 | Premium features (decision 12) | DEFERRED | A, D | None built. Option C's added value is undefined. A feature list and build plan are needed first. | Option C; any tier logic. |
++| 22 | Email provider and custom SMTP (§10 item 10; §3, Supabase built-in limit of 2 an hour) | DEFERRED | D | Deferred until before production sign-up volume. The production owner sets custom SMTP if it is chosen. Not Stage 7 code. | Production sign-up growth. |
++| 23 | Duplicate-print defect (K, M7; S-7; §12B.4) | IMPLEMENTATION GATE | none listed | Confirmed from code, not reproduced. Next: targeted tests for a `sent` sibling, the latest-attempt rule, and failed or confirmed `needs_check` jobs remaining retryable. Then diff review (M7) and a separate implementation approval. | Printing change only. Not 7B. |
++| 24 | Refund-and-claim defect (K, M7; S-8; §12B.4) | IMPLEMENTATION GATE | B | Confirmed from code, not reproduced. Next: diff review. Only then does the owner choose R-a, R-b or R-c. R-a is recommended, and it touches the customer payment ledger. | Printing change; 7F sign-off. |
++| 25 | Second `place_order` signature (§2; §12B.11) | EXTERNAL BLOCKER | B, E | The production owner lists the live function signatures and grants, read-only. Both signatures are in the migration chain, and the three-argument version is granted to `anon` and `authenticated` (0003 lines 277–278). Keeping it is the default. Retiring it is a checkout change that needs separate approval. | The "checkout unaffected" test; 7F. |
++| 26 | Live migration state and 0010 sequencing (§2; `docs/PRINTING_STATUS.md` line 54; README) | EXTERNAL BLOCKER | B, E | The production owner lists the applied migrations, read-only. The owner then decides whether 0010 may be applied, after staging evidence. | Staging tests of print paths; the 0011 sequence. |
++| 27 | Purge deployment, secrets and capacity (§5C; `.github/workflows/cleanup-files.yml`) | EXTERNAL BLOCKER | B | The production owner records, read-only, whether `cleanup-files` is deployed, whether `QRQUICK_CLEANUP_URL` and `CLEANUP_SECRET` are set, and its recent runs. Capacity is 2,000 files per run and is reached near 3,000 shops. A capacity change is DEFERRED until growth needs it, and it needs separate approval. | Any claim that the purge runs (§5C; §8); growth beyond about 3,000 shops. |
++| 28 | Google Play payment policy for any in-app licence purchase (§8A; `mobile/`) | EXTERNAL BLOCKER | C | A lawyer checks the current Play policy text. No Android licence payment is approved. | Any Android licence purchase or payment instruction. |
++| 29 | Privacy policy, terms, refund text, intermediary and takedown duties, consent (§4) | EXTERNAL BLOCKER | C | A lawyer drafts and reviews. The owner approves publication. A search of the worktree on 2026-10-31 found no privacy policy, terms, consent, grievance, takedown or DPDP text. | Published terms; paid collection. |
++| 30 | Customer-document sensitivity and retention (§4; README passport-photo layout) | EXTERNAL BLOCKER | C | A lawyer classifies sensitivity and DPDP applicability (§4). Engineering reviews storage and link handling, including the 180-second window (S-4). | Retention rules (item 1); privacy text (item 29). |
++| 31 | Live Auth settings and Supabase configuration (§4; README next steps item 6; `supabase/config.toml`) | EXTERNAL BLOCKER | B, E | The production owner records, read-only, the live leaked-password protection, Site URL, SMTP and MFA settings. Versioning the configuration (`supabase/config.toml`, created by `supabase init`) is DEFERRED until local setup is approved. | MFA decision (item 5); 7D; local setup. |
++| 32 | Rollback and enforcement kill switch (§12A.10; §12B) | IMPLEMENTATION GATE | B, E | No design exists. Engineering designs it, and the owner approves before 7F. Without it, 7F has no designed off switch. 0011 has no production rollback plan. | 7F approval. |
++| 33 | Lock-order contract (R18; §12B.5) | IMPLEMENTATION GATE | B, E | The per-RPC lock map of the existing code is in §12B.5. The designed order is not built. Two-session tests on staging need separate approval. | 7C and 7F. |
++| 34 | Test data and demo seed on live (README lines 397 and 463; `supabase/seed/demo_seed.sql`) | EXTERNAL BLOCKER | B, D | The production owner confirms whether `demo_seed.sql` ever ran on live. Deleting the test rows listed in the README is destructive and needs explicit owner go-ahead. That deletion is DEFERRED. | Shop count N (item 11); the R15 fixture approach. |
++| 35 | Other numbered items: R1 to R19, S-1 to S-8, M1 to M8 (§12B) | EXTERNAL BLOCKER | D, E | Each ID has its own status in §14.4 to §14.7. The item takes the status of its first outside step: a lawyer reviews the M8 and S-6 retention periods (item 15). | As listed per ID. |
++
++### 14.3 Conflicts and open conditions C-1 to C-15 (§12B.9)
++
++| ID | Status | Item | Note |
++|---|---|---|---|
++| C-1 | EXTERNAL BLOCKER | 1 | M1 against the purge rule. A lawyer reviews a release rule. The owner chooses an option. |
++| C-2 | RECOMMENDED | 2 | The hold-start choice. The premise is corrected (§5C): a scheduler exists for the purge, not for held-job timeouts. |
++| C-3 | RECOMMENDED | 1 | The owner decides whether held files are accepted as an interim, or enforcement is held back. |
++| C-4 | RECOMMENDED | 3 | Stacking. Applies only once the paid path is approved. |
++| C-5 | RECOMMENDED | 4 | Exclude `paid_verified` and `licence_payments` from 0011. |
++| C-6 | EXTERNAL BLOCKER | 5 | Admin accounts, MFA and the Auth UUID are unanswered. 7A cannot finish without the UUID and the MFA status. |
++| C-7 | RECOMMENDED | 7 | The owner confirms that a lifetime revocation leaves a valid paid period in force (M6). |
++| C-8 | RECOMMENDED | 8 | The owner confirms that revocation does not cancel future coverage. |
++| C-9 | DECIDED | 13 | "No new customer orders" is superseded by A and B. The superseded passages are annotated in §9 item 7 and §12A.10. |
++| C-10 | DEFERRED | 9 | Trials are deferred, not removed. |
++| C-11 | EXTERNAL BLOCKER | 10 | The refund policy needs a lawyer. |
++| C-12 | RECOMMENDED | 15 | The owner accepts count-only records above the cap. |
++| C-13 | EXTERNAL BLOCKER | 4 | The paid path and pricing are blocked. This is expected under M5. |
++| C-14 | EXTERNAL BLOCKER | 11 | Enabling enforcement needs N and the existing-shop policy. |
++| C-15 | EXTERNAL BLOCKER | 5 | Admin login relies on Supabase Auth, and therefore on the MFA answer. |
++
++### 14.4 Security findings S-1 to S-8 (§12B.9)
++
++| ID | Status | Item | Note |
++|---|---|---|---|
++| S-1 | IMPLEMENTATION GATE | 35 | Staging test that `anon` cannot call internal helpers (R9). |
++| S-2 | IMPLEMENTATION GATE | 35 | Staging inspection of default grants on new public tables (R17). |
++| S-3 | IMPLEMENTATION GATE | 35 | Staging test of the `aal` claim (R16). Depends on item 5. |
++| S-4 | RECOMMENDED | 35 | The owner accepts the residual 180-second file-link window, or it is reduced before 7F. |
++| S-5 | IMPLEMENTATION GATE | 35 | Static finding (`agent/src/worker.mjs` lines 258–264). A local runtime test is needed before 7F. |
++| S-6 | EXTERNAL BLOCKER | 35 | User IDs in ledgers. Retention needs the lawyer (item 15). |
++| S-7 | IMPLEMENTATION GATE | 23 | The duplicate-print defect. |
++| S-8 | IMPLEMENTATION GATE | 24 | The refund-without-claim-stop defect. |
++
++### 14.5 Milestones M1 to M8 (§12B.2)
++
++| ID | Status | Item | Note |
++|---|---|---|---|
++| M1 | IMPLEMENTATION GATE | 1, 2 | A proposal, not approved for implementation. Items 1 and 2 come first, then review and tests (§12B.6). |
++| M2 | DECIDED | none | Revocation is refused after the natural end. |
++| M3 | DECIDED | 15 | Design approved and not implemented. The build is gate 7C. |
++| M4 | DECIDED | 7, 16 | Custom-grant convention approved. Paid term approved and blocked by M5. |
++| M5 | DECIDED | 4 | The paid-path block is approved as a blocking condition. |
++| M6 | DECIDED | 7 | Lifetime over paid coverage, approved as policy. Its tests need the paid path. |
++| M7 | DECIDED | 23, 24 | The review requirement for both fixes is approved. No fix is implemented. |
++| M8 | EXTERNAL BLOCKER | 15 | Policy proposal approved. Legal review is needed before the periods are fixed. |
++
++### 14.6 Decisions 1 to 20 (§9, §12A.13, §12B.3)
++
++| Decision | Topic | Status | Item | Note |
++|---|---|---|---|---|
++| 1 | Licence unit (per shop) | RECOMMENDED | 16 | Owner confirms. |
++| 2 | Term and renewal | RECOMMENDED | 16 | The 12-month term is approved as policy (M4). The renewal rule is recommended. |
++| 3 | Price (Option B proposal) | EXTERNAL BLOCKER | 4 | No price is approved. The CA and processor answers come first. |
++| 4 | GST route | EXTERNAL BLOCKER | 18 | CA. |
++| 5 | Trial | DEFERRED | 9 | Deferred out of Stage 7. |
++| 6 | Refunds | EXTERNAL BLOCKER | 10 | Lawyer, then owner. |
++| 7 | Expiry behaviour | RECOMMENDED | 13 | A, B and C are approved. The deletion-schedule question is open under item 1. |
++| 8 | Existing shops and free period | EXTERNAL BLOCKER | 11 | The production owner counts N. The lawyer reviews notice. |
++| 9 | Processor | DEFERRED | 17 | Gateway deferred. |
++| 10 | Stage 6 merge order | RECOMMENDED | 20 | Owner decides. |
++| 11 | Advisers | RECOMMENDED | 19 | Owner engages. |
++| 12 | Premium features | DEFERRED | 21 | None built. |
++| 13 | Admin accounts (one owner account) | RECOMMENDED | 5 | Owner confirms. The UUID is EXTERNAL (item 5). |
++| 14 | MFA (`aal2`) | EXTERNAL BLOCKER | 5 | The production owner records the MFA status. |
++| 15 | Admin UI hosting | RECOMMENDED | 6 | Owner confirms a separate private deployment. |
++| 16 | Grant limits | RECOMMENDED | 7 | The maximum custom length is DEFERRED until the owner sets it. |
++| 17 | Standalone revocation of paid periods | DEFERRED | 8 | Deferred with the paid path (M5). Reversal (H) and refusal after the natural end (M2) are approved. |
++| 18 | Expiry and grace (no grace) | RECOMMENDED | 13 | Owner confirms. Printing is blocked in every non-ACTIVE state. |
++| 19 | Shop-facing view | RECOMMENDED | 13 | Owner confirms the fields and labels. The Android view is DEFERRED. |
++| 20 | Manual payments and audit | EXTERNAL BLOCKER | 14 | CA for invoices; lawyer for audit personal data and retention. |
++
++### 14.7 Findings R1 to R19 (§12B.5), grouped by status
++
++| Status | IDs | Note |
++|---|---|---|
++| IMPLEMENTATION GATE | R1, R2, R3, R4, R5, R6, R9, R10, R11, R12, R14, R15, R16, R17, R18, R19 | Design resolved and not tested, or blocked by L (R15). Each needs a staging test as §12B.5 says. R5 retention depends on item 15. R18 is item 33. |
++| DEFERRED | R7, R8 | Both belong to the paid path (M5). R7 applies only if `licence_payments` is approved. |
++| EXTERNAL BLOCKER | R13 | No price rule exists. Blocked by I (item 4). |
++| DECIDED | none | No R item has an approval of its own. |
++
++---
++
++## 15. Roadmap and gates (added 2026-10-30; rebuilt 2026-10-31)
++
++Planning approval, if the owner gives it, approves the direction of this file only. It approves no gate, setup, migration, test, deployment, live change or production access. Each gate needs its own approval naming its exact scope. No gate is automatically approved by planning approval.
++
++### 15.1 What each category needs
++
++| Category | Items and IDs (§14) | Who acts | Can start now? |
++|---|---|---|---|
++| Owner confirmation (RECOMMENDED) | Items 2, 3, 6, 7, 8, 12, 13, 16, 19, 20; C-2, C-3, C-4, C-5, C-7, C-8, C-12; S-4; decisions 1, 2, 7, 10, 11, 13, 15, 16, 18, 19 | Owner, by written answer | Yes |
++| Professional advice (EXTERNAL BLOCKER) | Items 1, 4, 10, 14, 15, 18, 28, 29, 30, and the M8 and S-6 parts of 35; C-1, C-11, C-13; decisions 3, 4, 6, 20; the engagement in item 19 | CA or lawyer | No. No engagement is evidenced |
++| Production-owner verification (read-only unless stated) | Items 5, 11, 25, 26, 27, 31, 34; the item 6 visibility check; C-6, C-14, C-15; decisions 8, 14 | Production owner | Yes, read-only. Any change is the owner's decision |
++| Local or staging setup (separate approval each) | Gate 1 (local setup, Docker, CLI, containers, `supabase init`); staging tests for items 15 (growth), 25 and 33; the R and S tests in §14.4 and §14.7; the item 23 and 24 tests; the M1 tests | Owner approves; engineering runs | No |
++| Separate implementation approval (IMPLEMENTATION GATE) | Items 23, 24, 32, 33 (code); gates 7B to 7F; M1 (after items 1 and 2); the held-job scheduler or marker (item 2); the paid path (item 4 and M5); the gateway (item 17); the Android view (item 13); retiring the three-argument `place_order` (item 25); publishing privacy text and terms (item 29) | Owner, per gate | No |
++| Deferred (no action until reopened) | Items 9, 17, 21, 22; the maximum custom length (item 7); standalone paid revocation (item 8); the Android view (item 13); the capacity change (item 27); configuration versioning (item 31); decisions 5, 9, 12, 17; C-10 | Owner, when reopened | No |
++| Outside Stage 7 | §15.4 | None | Not applicable |
++
++### 15.2 Staging options (for setup approval only)
++
++- **Option A: local Supabase stack.** Needs Docker, the Supabase CLI and containers, each of which needs approval. `supabase init` would create `supabase/config.toml` (item 31).
++- **Option B: separate staging Supabase project.** Needs its own project and an owner decision. Nothing from production is supplied to it.
++- Neither option may touch the live project. A test account needs explicit approval. A synthetic Auth fixture needs decision L and the R15 column check. A localhost hostname does not prove a test database (`CLAUDE.md`).
++
++### 15.3 Gates 7A to 7F
++
++| Gate | Scope | Prerequisites | Approval needed | Tests (§12A.11, §12B.11) | Rollback |
++|---|---|---|---|---|---|
++| 7A Owner inputs | Decisions 13 to 16 and 18 to 19; owner confirmations for items 6, 7, 8, 13, 16; the production-owner UUID and MFA answers (item 5) | Owner's written answers; production-owner checks | The owner's written answers | None. No code | None needed |
++| 7B Schema, migration 0011 (staging only) | Licence tables, triggers, RLS deny-all, `is_platform_admin()`, `shop_licence_state()`, `licence_lock_shop()`, `shop_licence_meta`. Paid tables excluded if C-5 is confirmed | Gate 1 or staging setup; migration sequence (item 26); items 8 and 16 confirmed; item 4 scope (C-5); the R15 fixture approach (decision L); the R17 default-privilege check | Separate approval to create the migration, and a separate approval for each staging run | State, trigger, privilege and regression tests | Drop the 0011 objects on staging. No production rollback plan exists (item 32) |
++| 7C Admin RPCs and owner read RPC | Grant, extend, revoke (M2), replace; denial logging (M3); idempotency (R5); owner read (decision D) | 7B on staging; the lock map confirmed by a two-session test (item 33); the global denial ceiling accepted (item 15); the count-only limitation accepted (C-12); item 5 | Separate approval | Admin, privilege, concurrency and denial-cap tests | Revoke `EXECUTE` on the admin RPCs (needs a migration) |
++| 7D Admin UI, separate private deployment | Login, shop search, grant, extend, revoke, replace with confirmation, audit view; MFA enrolment if decision 14 requires it | 7C on staging; the hosting decision (item 6); the visibility check (item 6); item 5 | Separate approval | Browser smoke test on staging; static scan that no service key is in the bundle | Take the deployment down. No database change |
++| 7E Owner read-only status, web | Fields as in decision D; labels (item 13) | 7C; the label decision (item 13) | Separate approval | Enforcement off returns no fields; enforcement on returns only the D fields; staff denied | Remove the UI; revoke the grant |
++| 7F Enforcement, printing only | Gates on approve, retry, claim and `mark_printing` (decisions A, B, C) | 7C and 7E; S-4 accepted (item 35); item 33 lock tests; item 25 tests of both signatures; item 32 kill switch approved; item 1 (C-3 decided); item 11 (existing-shop policy) before enabling | Separate approval to build, and a separate approval to enable | Printing and checkout tests (§12B.11) | A designed kill switch is needed (item 32). None exists yet |
++
++**Separate gates (none authorised):**
++
++| Gate | Scope | Prerequisites | Approval | Tests |
++|---|---|---|---|---|
++| M1 held-job rule | 7-day failure for licence holds | Items 1 and 2 decided; a file-release rule; a hold-start marker | Separate review, then implementation approval | §12B.11 held-job tests |
++| Held-job marker or scheduler (item 2) | A stored marker when the shop leaves ACTIVE; any scheduled timeout job | The owner's hold-start choice; C-2 | Separate | Staging tests of the hold start |
++| Duplicate-print fix (item 23) | Body of `retry_print_job` only | Diff review (M7) | Separate | A `sent` sibling is refused; the latest-attempt rule holds; failed and confirmed `needs_check` jobs stay retryable; existing printing tests unchanged |
++| Refund-and-claim fix (item 24) | Option R-a, R-b or R-c | Diff review, then the owner's choice | Separate | A refunded or ineligible order's files are not claimed |
++| Purge capacity change (item 27) | `cleanup-files` cap or loop | Growth beyond about 3,000 shops; owner priority; the production-owner deployment check | Separate | Staging load test |
++| Retire the three-argument `place_order` (item 25) | Checkout change | Live check (item 25) | Separate checkout approval | Checkout tests under both signatures |
++| Paid path (item 4, M5) | `paid_verified`, `licence_payments`, record, verify, reverse | Items 4, 10, 14, 17 and 18; CA and lawyer advice | Separate | §12A.11 paid tests; F, H, J and M4 stacking |
++| Gateway (item 17) | Processor integration | Processor eligibility evidence; CA advice | Separate | Later |
++
++### 15.4 Explicitly outside Stage 7
++
++- Stage 8 scope. This document does not define it. The README's Stage 8 wording (lines 23 and 467–470) is not adopted here.
++- Gateway integration, and any Stripe or Razorpay call or key (later stage; §12A.12).
++- Android licence payments and the Android licence view (items 13 and 28).
++- Fixes to the printing defects (items 23 and 24), which have their own gates.
++- Changes to the README, `CLAUDE.md` or any file other than this document.
++- Live settings, production data (including deleting the test rows, item 34), deployments and APK builds.
++- Tax registration, GST filing, invoicing and legal drafting (professional advice).
++- Publication of prices (I) and of any terms.
++
++### 15.5 Rules for every gate
++
++- Each gate needs its own written approval, naming the exact files, environment and tests.
++- Setup, staging, production and deployment permissions are separate. Approval for one gives no other.
++- Test results are recorded in this file before a gate closes.
++
++---
++
++## 16. Exit checklist, closure criteria and verdict (added 2026-10-30; rebuilt 2026-10-31)
++
++Answers are as of 2026-10-31. "NO" means the question is not yet satisfied.
++
++| # | Question | Answer | Evidence and what is missing |
++|---|---|---|---|
++| 1 | Is the document ready for owner review? | YES | Corrections in §13 are applied. Repository claims are re-checked with line numbers. Each numbered item, group, and open ID has one status in §14. |
++| 2 | Is the document ready for planning approval? | NO | The owner's answers to the RECOMMENDED items (§15.1) are not given. The production-owner checks for items 5, 11, 25, 26, 27, 31 and 34 are not made. |
++| 3 | Is every open ID given one status? | YES | Items 1 to 35, groups A to E, decisions A to L and 1 to 20, M1 to M8, C-1 to C-15, S-1 to S-8 and R1 to R19 are each in §14. |
++| 4 | Are external blockers identified with their outside party? | YES | The 17 EXTERNAL BLOCKER items in §14.2 name the party. The answers are not in the repository. |
++| 5 | Are factual claims supported by repository evidence? | PARTLY | Repository facts are re-checked with line numbers (§2, §4, §5C, §12A.2, §12B.4 to §12B.9). Live state, README statements and external sources are labelled and not verified. |
++| 6 | Is the implementation scope frozen? | NO | 7B waits on items 4 (C-5), 8, 16 and 26. 7F waits on items 1, 2, 11, 25, 32, 33 and S-4. |
++| 7 | Are setup, staging, production and deployment permissions still separate? | YES | §15.2, §15.3 and §15.5. No approval exists for any of them. The main checkout and `stash@{0}` are untouched. |
++| 8 | Are the Stage 7 closure criteria met? | NO | See §16.1. |
++
++### 16.1 Stage 7 closure criteria (RECOMMENDED; owner to confirm)
++
++a. The owner's written planning approval of this file, with the RECOMMENDED items answered and the EXTERNAL BLOCKER items answered or formally deferred.
++b. Every numbered item in §14.2 is DECIDED or DEFERRED, or its outside input has been received, or its gate is approved and run.
++c. The production-owner checks are recorded: items 5, 11, 25, 26, 27, 31 and 34. For the admin stages, also the item 6 visibility and plan check.
++d. Each gate that is run has its test results recorded in this file and accepted by the owner.
++e. Items 1, 2, 23 and 24 are closed (the M1, duplicate-print and refund-and-claim decisions).
++
++**Transition rule:** Stage 8 cannot begin until Stage 7's planning approval and criteria (a) to (e) are satisfied. This document does not define Stage 8 scope.
++
++### 16.2 Verdict
++
++**READY FOR FINAL OWNER REVIEW. NOT APPROVED.**
++
++Reasons it is ready for review:
++1. The corrections in §13 are applied. Closure corrections 1 to 11 are answered in §13. Closure correction 9 was checked against `web/src/owner.js`: the resend call sites are lines 259 and 358. Lines 327 and 345 are the button and the countdown text, not call sites.
++2. Each numbered item 1 to 35, and each group A to E, has exactly one status in §14.
++3. Each open item names its owner, outside party or evidence (§14, §15).
++
++Reasons it is not ready for planning approval:
++1. The owner's answers to the RECOMMENDED items in §15.1 have not been given.
++2. The production-owner checks (items 5, 11, 25, 26, 27, 31 and 34) have not been made, so the facts they would settle remain unverified.
++3. Items 1, 23, 24 and 33 remain open. Item 1 needs lawyer review. Items 23, 24 and 33 need diff review and staging.
++
++---
++
+ **Figures still provisional:** the 10,000-shop net and Resend tier cost (§5A, §8); the email tier E (§5A, undecided); the 100-shop result (Free or Pro depending on E); the grandfathering illustrations, which depend on N (not provided), on E, and on the accrual or cash basis (§5B); hosting cost (§4); database overage (§5C); FX rate (§6 item 10); retention cost (§5C).

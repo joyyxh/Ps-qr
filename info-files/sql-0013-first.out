@@ -1,0 +1,44 @@
+== rebuilding qrquick_scratch on /var/run/postgresql:5432 (server address: socket)
+== stubs (Supabase auth/storage/roles stand-ins)
+   applied 0001_stage1_foundation.sql
+   applied 0002_services_public_policy_fix.sql
+   applied 0003_customer_files.sql
+   applied 0004_shop_features_payment_qr.sql
+   applied 0005_shop_assets_policy_fix.sql
+   applied 0006_payments_and_statistics.sql
+   applied 0007_security_hardening.sql
+   applied 0008_payment_intents.sql
+psql:/home/claude/joyyxh/ps-qr/supabase/migrations/0009_cash_policy_and_payment_hardening.sql:27: NOTICE:  trigger "orders_qrquick_minimum_order" for relation "public.orders" does not exist, skipping
+   applied 0009_cash_policy_and_payment_hardening.sql
+   applied 0010_print_agents.sql
+   applied 0011_service_options.sql
+psql:/home/claude/joyyxh/ps-qr/supabase/migrations/0012_print_eligibility.sql:90: NOTICE:  trigger "orders_cancel_unprintable_jobs" for relation "public.orders" does not exist, skipping
+   applied 0012_print_eligibility.sql
+   applied 0013_order_workflow.sql
+   seed applied (development data only)
+== suites (requires-migration header is checked against 0013)
+   ERROR paper_sizes_tests
+psql:/home/claude/joyyxh/ps-qr/supabase/tests/paper_sizes_tests.sql:440: ERROR:  accept the order before taking a payment
+CONTEXT:  PL/pgSQL function set_order_payment(uuid,text,text) line 21 at RAISE
+SQL statement "SELECT public.set_order_payment(v_order, 'set_paid', 'cash')"
+PL/pgSQL function inline_code_block line 233 at PERFORM
+   ERROR print_eligibility_tests
+psql:/home/claude/joyyxh/ps-qr/supabase/tests/print_eligibility_tests.sql:320: ERROR:  accept the order before taking a payment
+CONTEXT:  PL/pgSQL function set_order_payment(uuid,text,text) line 21 at RAISE
+SQL statement "SELECT public.set_order_payment(o1, 'set_paid', 'cash')"
+PL/pgSQL function inline_code_block line 30 at PERFORM
+   PASS  service_pricing_tests: 36 of 36 checks
+   PASS  stage1_isolation_tests: 30 of 30 checks
+   PASS  stage3_owner_tests: 30 of 30 checks
+   PASS  stage4_files_tests: 23 of 23 checks
+   PASS  stage5_orders_tests: 23 of 23 checks
+   PASS  stage6_features_tests: 42 of 42 checks
+      FAIL A08 owner A marks a pending online payment on b1 -- 22023: accept the order before taking a payment
+      FAIL A11 a pending payment can be cleared back to unpaid -- 22023: only a pending payment can be cleared
+   FAIL  stage7_stats_tests: 2 of 54 checks failed
+   ERROR stage8_print_tests
+psql:/home/claude/joyyxh/ps-qr/supabase/tests/stage8_print_tests.sql:415: ERROR:  accept the order before taking a payment
+CONTEXT:  PL/pgSQL function set_order_payment(uuid,text,text) line 21 at RAISE
+SQL statement "SELECT public.set_order_payment(o_paid, 'set_paid', 'cash')"
+PL/pgSQL function inline_code_block line 36 at PERFORM
+== 7 suites run, 0 skipped, 238 checks, 5 failing

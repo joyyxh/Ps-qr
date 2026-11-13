@@ -1,0 +1,40 @@
+BEGIN
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+DO
+                                        name                                        | ok |                                                                                                                                                                                                                                                                                                                                                                                                                 detail                                                                                                                                                                                                                                                                                                                                                                                                                  
+------------------------------------------------------------------------------------+----+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ T01 per_side total = 12 pages x 2 copies x 200 paise = 4800                        | t  | {"items": [{"colour": false, "copies": 2, "duplex": true, "file_id": "aaeb82a5-662a-46fd-bd49-906391c800c4", "file_name": "fixture.pdf", "page_count": 12, "service_id": "cccccccc-0000-0000-0000-000000000001", "amount_paise": 4800, "pricing_unit": "per_side", "service_name": "Document printing", "billable_units": 24, "unit_price_paise": 200}], "status": "pending", "shop_name": "Demo Xerox Centre", "total_paise": 4800, "tracking_code": "ASFCVGQS"}
+ T02 per_sheet: duplex = 6x2x150 = 1800; simplex = 12x2x150 = 3600                  | t  | {"items": [{"colour": false, "copies": 2, "duplex": true, "file_id": "00a171e7-dfb8-4192-93b1-2fa9479fe587", "file_name": "fixture.pdf", "page_count": 12, "service_id": "cccccccc-0000-0000-0000-000000000005", "amount_paise": 1800, "pricing_unit": "per_sheet", "service_name": "Assignment print (per sheet)", "billable_units": 12, "unit_price_paise": 150}, {"colour": false, "copies": 2, "duplex": false, "file_id": "a8f2b6de-2a87-4b30-ac1a-fd29ca36d9b3", "file_name": "fixture.pdf", "page_count": 12, "service_id": "cccccccc-0000-0000-0000-000000000005", "amount_paise": 3600, "pricing_unit": "per_sheet", "service_name": "Assignment print (per sheet)", "billable_units": 24, "unit_price_paise": 150}], "status": "pending", "shop_name": "Demo Xerox Centre", "total_paise": 5400, "tracking_code": "W3G5YWJR"}
+ T03 per_copy colour: 3 x 3000 = 9000                                               | t  | {"items": [{"colour": true, "copies": 3, "duplex": false, "file_id": "88b97c1c-e0e1-4425-9c6f-5d055f692288", "file_name": "fixture.pdf", "page_count": 1, "service_id": "cccccccc-0000-0000-0000-000000000002", "amount_paise": 9000, "pricing_unit": "per_copy", "service_name": "Passport photo sheet", "billable_units": 3, "unit_price_paise": 3000}], "status": "pending", "shop_name": "Demo Xerox Centre", "total_paise": 9000, "tracking_code": "XH3C4HDW"}
+ T04 injected prices and page_count ignored; total still 4800 from the 12-page file | t  | {"items": [{"colour": false, "copies": 2, "duplex": true, "file_id": "ce1d0b73-f5c3-49ac-8c07-8875596f0f49", "file_name": "fixture.pdf", "page_count": 12, "service_id": "cccccccc-0000-0000-0000-000000000001", "amount_paise": 4800, "pricing_unit": "per_side", "service_name": "Document printing", "billable_units": 24, "unit_price_paise": 200}], "status": "pending", "shop_name": "Demo Xerox Centre", "total_paise": 4800, "tracking_code": "NNUGBQMU"}
+ T05 colour not offered is rejected                                                 | t  | this service is not offered in the requested colour mode
+ T06 inactive service is rejected                                                   | t  | service is not available at this shop
+ T07 other shop service is rejected                                                 | t  | service is not available at this shop
+ T08 a file with 0 pages cannot be stored                                           | t  | 23514: new row for relation "customer_files" violates check constraint "customer_files_page_count_check"
+ T09 closed shop rejects orders                                                     | t  | shop is closed
+ T09b a file from another shop is rejected                                          | t  | P0002: file not found or no longer available
+ T10 anon cannot read orders table                                                  | t  | permission denied for table orders
+ T11 anon cannot read order_items                                                   | t  | permission denied for table order_items
+ T12 owner A sees own orders only                                                   | t  | own=4 other=0
+ T13 owner A cannot read shop B items                                               | t  | visible=0
+ T14 owner A cannot update shop B order                                             | t  | rows=0
+ T15 owner A approves own order                                                     | t  | rows=1
+ T16 invalid status transition rejected                                             | t  | invalid order status change from approved to pending
+ T17 owner cannot change order total                                                | t  | permission denied for table orders
+ T18 price snapshot cannot be edited                                                | t  | permission denied for table order_items
+ T19a owner A cannot edit shop B service                                            | t  | rows=0
+ T19b owner A cannot add service to shop B                                          | t  | new row violates row-level security policy for table "services"
+ T20 owner A cannot see shop B memberships                                          | t  | visible=0
+ T21 owner A cannot rename shop B                                                   | t  | rows=0
+ T22 create_shop makes creator the owner                                            | t  | memberships=1
+ T23 owner B sees own orders only                                                   | t  | own=1 other=0
+ T24 owner B cannot rename shop A                                                   | t  | rows=0
+ T25 tracking by code (case-insensitive) returns status without customer note       | t  | {"status": "approved", "shop_name": "Demo Xerox Centre", "created_at": "2026-10-22T08:03:32.848356+00:00", "total_paise": 4800, "tracking_code": "ASFCVGQS", "payment_method": "cash", "payment_status": "unpaid", "cash_payment_timing": "counter", "payment_rejection_reason": null}
+ T26 unknown tracking code returns nothing                                          | t  | null
+ T27 tracking code format is 8 unambiguous characters                               | t  | ASFCVGQS
+ T28 reserved slug rejected                                                         | t  | new row for relation "shops" violates check constraint "shops_slug_reserved"
+(30 rows)
+
+ROLLBACK

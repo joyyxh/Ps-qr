@@ -1,0 +1,21 @@
+ M supabase/functions/owner-file-link/index.ts
+ M supabase/functions/upload-file/index.ts
+ M supabase/tests/stage1_isolation_tests.sql
+ M supabase/tests/stage4_files_tests.sql
+ M supabase/tests/stage5_orders_tests.sql
+ M supabase/tests/stage6_features_tests.sql
+ M web/package.json
+ M web/src/logic.js
+ M web/src/owner-api.js
+ M web/src/owner.js
+ M web/styles.css
+ M web/tests/orders.test.js
+?? .github/workflows/cleanup-files.yml
+?? agent/
+?? docs/
+?? supabase/functions/cleanup-files/
+?? supabase/functions/print-agent/
+?? supabase/migrations/0010_print_agents.sql
+?? supabase/tests/print_agent_api_checks.test.js
+?? supabase/tests/stage8_print_tests.sql
+?? web/tests/print-logic.test.js

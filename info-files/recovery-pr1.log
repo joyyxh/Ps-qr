@@ -1,0 +1,56 @@
+
+== F1 new address, save fails, reload
+PASS F1 save fails after a correct code: owner stays signed out with a message
+PASS   the address is confirmed and the registration password is already the account password
+PASS F1 after a reload the registration password signs in: no lockout
+PASS   no page errors
+
+== F2 pre-registered address, save fails, reload, recovery
+PASS F2 save fails after a correct code on a pre-registered address: owner stays signed out
+PASS   the earlier password is still on the account (A1)
+PASS F2 after a reload the owner's own password is refused (the owner is not signed in)
+NOTE F2 window: the earlier password opens the account from another device before recovery: true
+PASS F2 recovery saves the new password with the reset link token
+PASS   after recovery the earlier password is refused
+PASS   the owner signs in with the new password
+NOTE OPEN the mock does not revoke sessions issued before the reset; whether Supabase does is not verified
+PASS   no page errors
+
+== F3 expired session on save (401)
+PASS F3 an expired session on save ends at Forgot password, with a message, signed out
+NOTE F3 notice shown: "Your email is confirmed, but the password could not be saved in time. Use Forgot password to choose one."
+PASS   the account is already confirmed at this point (the code was accepted)
+PASS   the reset link leads to a working password
+PASS   no page errors
+
+== F4 confirmation link, leave password step
+PASS F4 the confirmation link opens the password step with no session
+PASS   the token is removed from the address
+PASS   leaving the password step leaves no session
+PASS   after a reload the password step is gone (no pending state kept)
+NOTE F4 the account is confirmed, so the earlier password opens it if the step is left unfinished: true
+PASS   no page errors
+
+== F5 existing verified owner
+PASS F5 an existing verified owner signs in with the password, with no code step
+PASS   no page errors
+PASS F5 registering a verified address shows the code screen (A2), but no code is sent
+PASS   a code that was never sent is refused, and no session is stored
+PASS   the existing password is unchanged and nothing was saved
+PASS   the new registration password does not sign in
+PASS   the existing owner signs in again with the original password
+PASS   no page errors
+
+== F6 unverified account, no bypass
+PASS F6 a wrong password on an unverified account gives no code screen and no session
+PASS   the right password only leads to the code screen
+PASS   a wrong code is refused and the account stays unverified
+PASS   no page errors
+
+== F7 expired confirmation link
+PASS F7 an expired link says so and offers a way back to sign-in
+PASS   signing in after the expired link gives a new code, then the password step
+PASS   the owner then finishes and the account opens
+PASS   no page errors
+
+36 of 36 checks passed

@@ -1,0 +1,313 @@
+--- test_grant_success
+PASS G-01 one_month grant from now succeeds with exactly one version step 
+PASS G-01 coverage is admin_grant starting now, IST calendar end 
+PASS G-01 one audit row for the grant, carrying this request_id 
+PASS G-02 one_year grant with no start succeeds (starts now) 
+PASS G-02 one_year starts now and ends one calendar year later (IST) 
+PASS G-03 custom date-only grant succeeds 
+PASS G-03 date-only start is 00:00 IST and the end is exclusive 00:00 IST 
+PASS G-04 lifetime grant succeeds with no end 
+PASS G-04 lifetime coverage has no end 
+PASS G-12 backdate inside the staging window with confirmation succeeds 
+PASS G-12 the backdated one_month starts at the given instant and ends one IST calendar month later 
+PASS G-20 future custom start is accepted as scheduled coverage 
+PASS G-20 scheduled coverage is SCHEDULED, not ACTIVE 
+--- test_grant_rejections
+PASS G-05 empty reason after trimming is invalid_reason 
+PASS G-05 missing reason is invalid_reason 
+PASS G-07 reason of 501 code points is invalid_reason 
+PASS G-08 confirm false is not_confirmed 
+PASS G-09 unknown field is rejected, not ignored 
+PASS G-09 request_id inside the payload is an unknown field 
+PASS G-09 a client-supplied caller UID is an unknown field 
+PASS G-10 custom without end is end_required 
+PASS G-10 custom without start is start_required 
+PASS G-10 custom with end equal to start is custom_range_invalid 
+PASS G-11 one_month with an end is end_not_allowed 
+PASS G-11 lifetime with an end is end_not_allowed 
+PASS G-12 backdate without confirmation is backdate_not_confirmed 
+PASS G-13 unknown grant kind is invalid_grant_kind 
+PASS G-19 timestamp without an offset is invalid_timestamp 
+PASS G-19 seven fractional digits is invalid_timestamp 
+PASS G-14 stale expected_state_version is stale_state_version 
+PASS G-14 expected_state_version written as 5.0 is invalid_request 
+PASS G-15 unknown shop is shop_not_found 
+--- test_grant_overlap
+PASS O-0 first one_month grant 
+PASS O-1 overlapping same-kind admin grant is overlap 
+PASS O-2 touching admin grant (starts at the existing end) is allowed 
+PASS O-3 first lifetime grant succeeds 
+PASS O-3 a second non-revoked lifetime grant is overlap 
+PASS O-4 an admin grant over a lifetime grant is allowed (different kind) 
+PASS O-5 a revoked coverage does not block a new same-kind grant 
+--- test_extend
+PASS X-01 extend month succeeds 
+PASS X-01 extension starts exactly at the old end (no gap, no overlap) 
+PASS X-01 extension end is one calendar month after its start (IST) 
+PASS X-02 extend with no coverage succeeds 
+PASS X-02 extension with no coverage starts now, one calendar year 
+PASS X-04 an active lifetime grant rejects extend 
+PASS X-05 a scheduled (future) lifetime grant also rejects extend 
+PASS X-06 extend is allowed once every non-revoked lifetime grant is revoked 
+PASS X-07 unsupported unit (day) is invalid_extension_unit 
+PASS X-07 unsupported unit (week) is invalid_extension_unit 
+PASS X-07 unsupported unit (six months) is invalid_extension_unit 
+PASS X-07 unsupported unit (two years) is invalid_extension_unit 
+PASS X-07 unsupported unit (empty) is invalid_extension_unit 
+PASS X-07 unsupported unit (wrong case) is invalid_extension_unit 
+PASS X-08 a start field is an unknown field for extend 
+PASS X-09 missing reason is invalid_reason for extend 
+PASS X-10 stale expected version is stale_state_version for extend 
+--- test_revoke
+PASS R-01 revoke an active coverage succeeds 
+PASS R-01 the target is revoked now, with the revoker and reason recorded 
+PASS R-01 one audit row of action revoke, pointing at the target 
+PASS R-01 the ledger row for this request carries the target coverage id 
+PASS R-01 state is REVOKED after revoking the only period 
+PASS R-02 revoking an already revoked coverage is coverage_already_revoked 
+PASS R-03 revoking at or after the natural end is natural_end_passed (M2) 
+PASS R-04 cancelling a future period is allowed 
+PASS R-04 the cancelled period has no effect: state is NONE 
+PASS R-05 a target in another shop is coverage_not_found 
+PASS R-05 the other shop's coverage is untouched 
+PASS R-06 an unknown target is coverage_not_found 
+PASS R-08 missing reason for revoke is invalid_reason 
+PASS R-07 revoking a lifetime grant succeeds 
+--- test_replace
+PASS P-01 replace succeeds with one version step 
+PASS P-01 the target is revoked and the new coverage starts now with a one-year end 
+PASS P-01 two audit rows of action replace share one request_id 
+PASS P-01 the ledger target is the revoked coverage 
+PASS P-02 replace with a target in another shop is coverage_not_found 
+PASS P-02 the other shop's coverage is untouched 
+PASS P-03 replace of a naturally ended coverage is natural_end_passed 
+PASS P-04 replacement overlapping another same-kind coverage is overlap 
+PASS P-04 a rejected replace leaves the target active (atomic) 
+PASS P-06 replacement custom without a start is start_required 
+PASS P-06 the target stays active after the rejected replace 
+PASS P-07 a backdated replacement overlapping the revoked target's past is accepted 
+PASS P-07 the target is revoked and the replacement starts two days back 
+PASS P-05 replacing a lifetime grant with a one-month grant succeeds 
+--- test_authorisation
+PASS A-00 aal2 admin success path 
+PASS A-01 admin with no aal claim is forbidden 
+PASS A-01 no coverage, audit or ledger row was written for the denied call 
+PASS A-02 aal1 is insufficient and forbidden 
+PASS A-03 aal is compared exactly (AAL2 in capitals is forbidden) 
+PASS A-09 denied extend writes nothing 
+PASS A-05 a signed-in user who is not a platform admin is forbidden 
+PASS A-06 a disabled admin is forbidden 
+PASS A-04 unreadable claims are forbidden, global counter only, nothing written 
+PASS A-08 no claims at all (no caller UID) is forbidden with the global counter only 
+PASS A-07 anon has no EXECUTE, so the call is refused by privilege, not by a row 
+--- test_replay_and_conflicts
+PASS RP-00 original grant commits 
+PASS RP-01 same request_id and same hash replays the stored result 
+PASS RP-02 same request_id with a different reason is request_conflict 
+PASS RP-04 same request_id with a different expected version is request_conflict 
+PASS RP-05 same request_id with a different grant kind is request_conflict 
+PASS RP-06 same request_id with a different end is request_conflict 
+PASS RP-06 same request_id with a different start is request_conflict 
+PASS RP-07 adding backdate_confirm changes the hash, so request_conflict 
+PASS RP-08 the same request_id from another admin is request_conflict (UID is hashed) 
+PASS RP-03 the same request_id on another shop is request_conflict 
+PASS RP-12 date-only and offset forms of the same instant replay (same hash) 
+PASS RP-11 trailing spaces in the reason are trimmed before hashing, so it replays 
+PASS RP-11 original with NFC reason commits 
+PASS RP-11 the NFD form with trailing spaces replays the NFC original 
+PASS RP-09 revoke commits 
+PASS RP-09 revoke replay returns the target id and no coverage id 
+PASS RP-10 replace commits 
+PASS RP-10 replace replay returns the new coverage and the target 
+PASS RP-13 setup: the first grant moves the version from 0 to 1 
+PASS RP-13 a NEW request_id that quotes the old version 0 is stale_state_version, not a replay 
+--- test_hash_fields
+PASS H-00 extend commits with unit month 
+PASS H-01 same request_id with a different extension unit is request_conflict 
+PASS H-02 revoke of the future period commits 
+PASS H-02 same request_id with a different target is request_conflict 
+PASS H-03 replace commits as one_month 
+PASS H-03 same request_id with a different grant kind is request_conflict 
+PASS H-03 same request_id with a different reason is request_conflict 
+--- test_privileges
+PASS PR-01 authenticated EXECUTE on licence_admin_grant(uuid,jsonb) is True 
+PASS PR-01 authenticated EXECUTE on licence_admin_extend(uuid,jsonb) is True 
+PASS PR-01 authenticated EXECUTE on licence_admin_revoke(uuid,jsonb) is True 
+PASS PR-01 authenticated EXECUTE on licence_admin_replace(uuid,jsonb) is True 
+PASS PR-01 anon EXECUTE on licence_admin_grant(uuid,jsonb) is False 
+PASS PR-01 service_role EXECUTE on licence_admin_grant(uuid,jsonb) is False 
+PASS PR-01 authenticated EXECUTE on licence_admin_core(text,uuid,jsonb) is False 
+PASS PR-01 authenticated EXECUTE on licence_admin_deny(text,text,uuid,uuid) is False 
+PASS PR-01 authenticated EXECUTE on licence_admin_canonical_bytes(text,uuid,uuid,bigint,boolean,text,text,text,uuid,timestamptz,timestamptz,boolean) is False 
+PASS PR-01 authenticated EXECUTE on licence_lock_shop(uuid,text) is False 
+PASS PR-01 service_role EXECUTE on licence_admin_core(text,uuid,jsonb) is False 
+PASS PR-01 anon EXECUTE on licence_admin_core(text,uuid,jsonb) is False 
+PASS PR-02 authenticated cannot read the replay ledger (permission denied, or zero rows) 
+--- test_concurrency
+PASS CC-01 second writer waits on the shop lock, then is refused as stale 
+PASS CC-02 the same request_id on two shops: the loser gets request_conflict via re-read, never a raw error 
+--- test_backdate_window
+PASS BW-01 a backdate of 31 days minus one hour (inside the window) is accepted 
+PASS BW-02 a backdate of 31 days plus one hour (outside the window) is backdate_window_exceeded 
+PASS BW-03 replace is held to the same window 
+PASS BW-04 the window is read from licence_config: 2 days refuses a 3-day backdate 
+PASS BW-05 with no row (production state, OPEN) every backdate fails closed: a 31-day-plus-one-hour backdate is backdate_window_exceeded 
+PASS BW-06 a non-positive configured window raises (fails closed) 
+--- test_config_and_inputs_cannot_set_window
+PASS CFG-01 authenticated cannot read licence_config 
+PASS CFG-01 authenticated cannot write licence_config 
+PASS CFG-01 anon cannot read licence_config 
+PASS CFG-01 anon cannot write licence_config 
+PASS CFG-01 service_role cannot read licence_config 
+PASS CFG-01 service_role cannot write licence_config 
+PASS CFG-02 a window field in the payload is an unknown field 
+PASS CFG-03 a client-settable GUC does not widen the window (40-day backdate is still refused) 
+--- test_future_calendar_grants
+PASS GF-01 grant one_month with a future start is future_start_not_allowed 
+PASS GF-02 grant one_year with a future start is future_start_not_allowed 
+PASS GF-03 replace to one_month with a future start is future_start_not_allowed 
+PASS GF-03 replace to one_year with a future start is future_start_not_allowed 
+PASS GF-03 the target stays active after the refused replacements 
+PASS GF-04 lifetime with a future start is accepted (future scheduling approved for lifetime) 
+PASS GF-04 the scheduled lifetime period is SCHEDULED 
+PASS GF-05 replace to custom with a future start is accepted (future scheduling approved for custom) 
+--- test_enumerated_tokens_exact
+PASS S1-01 grant_kind space-padded is refused (exact token after NFC, no trim) 
+PASS S1-01 grant_kind trailing tab is refused (exact token after NFC, no trim) 
+PASS S1-01 grant_kind NBSP-padded is refused (exact token after NFC, no trim) 
+PASS S1-01 grant_kind wrong case is refused (exact token after NFC, no trim) 
+PASS S1-01 grant_kind empty is refused (exact token after NFC, no trim) 
+PASS S1-02 extension_unit space-padded is refused 
+PASS S1-02 extension_unit NBSP-padded is refused 
+PASS S1-02 extension_unit wrong case is refused 
+PASS S1-03 a padded grant_kind on replace is refused 
+--- test_numeric_notation
+PASS L1-01 expected_state_version written 1e3 is read as 1000: integer, accepted, stale against 0 
+PASS L1-02 expected_state_version written 5.0 is invalid_request 
+--- test_invalid_json_types
+PASS IJ-01 shop_id as a number is invalid_request 
+PASS IJ-01 shop_id not a UUID is invalid_request 
+PASS IJ-01 expected_state_version as a string is invalid_request 
+PASS IJ-01 expected_state_version negative is invalid_request 
+PASS IJ-01 confirm as the string true is invalid_request 
+PASS IJ-01 confirm null is invalid_request 
+PASS IJ-01 reason as a number is invalid_reason 
+PASS IJ-01 reason null is invalid_reason 
+PASS IJ-01 grant_kind as a number is invalid_grant_kind 
+PASS IJ-01 backdate_confirm as a string is invalid_request 
+PASS IJ-01 start as a number is invalid_timestamp 
+PASS IJ-02 a payload that is a JSON array is invalid_request 
+PASS IJ-02 a payload that is JSON null is invalid_request 
+PASS IJ-03 start written as JSON null is treated as not supplied (starts now) 
+PASS IJ-04 a null request_id is invalid_request 
+--- test_reason_length_boundaries
+PASS RB-01 reason of one character is accepted 
+PASS RB-01 reason of 500 code points after trimming is accepted 
+PASS RB-01 reason of 300 letters given as NFD (600 code points) is accepted: length is counted after NFC 
+PASS RB-01 reason of 501 letters given as NFD is refused: 501 after NFC 
+--- test_half_open_boundaries
+PASS HB-01 at the exact end the period is no longer active (EXPIRED) 
+PASS HB-01 one microsecond before the end it is still ACTIVE 
+PASS HB-02 at the exact start it is ACTIVE 
+PASS HB-02 one microsecond before the start it is SCHEDULED 
+PASS HB-03 a custom grant starting exactly at the existing end is accepted 
+PASS HB-03 a custom grant ending exactly at the existing start is accepted 
+PASS HB-04 revoke succeeds 
+PASS HB-04 at the exact revocation instant the period is REVOKED, not active 
+PASS HB-04 one microsecond before the revocation the period was still ACTIVE 
+PASS HB-05 revoking one hour before the natural end is accepted 
+PASS HB-05 revoking one microsecond after the natural end is natural_end_passed 
+--- test_calendar_and_extend
+PASS EX-01 an ended admin grant with nothing later is EXPIRED 
+PASS X-03 extend after natural expiry is accepted 
+PASS X-03 the extension starts now (within five minutes), not in the past, and ends one IST month later 
+PASS MC-01 licence_calendar_end(2027-01-31T15:00:00+05:30, month) is 2027-02-28T15:00:00+05:30 
+PASS MC-01 licence_calendar_end(2028-01-31T15:00:00+05:30, month) is 2028-02-29T15:00:00+05:30 
+PASS MC-01 licence_calendar_end(2028-02-29T10:00:00+05:30, year) is 2029-02-28T10:00:00+05:30 
+PASS MC-01 licence_calendar_end(2027-03-31T00:00:00+05:30, month) is 2027-04-30T00:00:00+05:30 
+PASS MC-01 licence_calendar_end(2027-01-31T23:00:00Z, month) is 2027-02-28T23:00:00Z 
+--- test_revoked_overlap
+PASS RC-01 setup: revoke the long period 
+PASS RC-01 a same-kind custom grant overlapping the revoked period's stored dates is accepted 
+PASS RC-02 setup: revoke the first coverage 
+PASS RC-02 a non-revoked same-kind coverage still blocks an overlapping grant 
+--- test_replace_atomicity
+PASS RA-01 an injected failure after the revoke step raises 
+PASS RA-01 the target is still active 
+PASS RA-01 no version step, ledger, audit or coverage row was written 
+PASS RA-02 replace succeeds 
+PASS RA-02 exactly two audit rows, both action 'replace': the revocation (before and after) and the new coverage 
+--- test_conflict_reread_empty
+PASS CR-01 when the insert reports no row and the re-read finds none, the call raises and writes nothing 
+--- test_shop_licence_status
+PASS SL-01 owner gets active, an access end and no next start 
+PASS SL-02 the response has exactly the decision D keys 
+PASS SL-03 staff are denied with no fields 
+PASS SL-04 a non-member is denied 
+PASS SL-04 a non-member asking about an unknown shop is denied 
+PASS SL-05 anon has no EXECUTE on shop_licence_status 
+PASS SL-05 service_role has no EXECUTE on shop_licence_status 
+PASS SL-06 lifetime: active, no expiry, no access end 
+PASS SL-07 SCHEDULED: inactive, next start shown, no access end 
+PASS SL-08 EXPIRED: the inactive shape with no next start 
+PASS SL-08 the state is EXPIRED 
+PASS SL-09 setup: revoke the period 
+PASS SL-09 REVOKED has the same shape as EXPIRED (the two are not distinguished) 
+PASS SL-09 the state is REVOKED 
+PASS PR-03 anon has no EXECUTE on licence_admin_grant(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_grant(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on licence_admin_extend(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_extend(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on licence_admin_revoke(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_revoke(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on licence_admin_replace(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_replace(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on shop_licence_status(uuid) 
+PASS PR-03 service_role has no EXECUTE on shop_licence_status(uuid) 
+PASS PR-03 authenticated has EXECUTE on shop_licence_status 
+--- test_execute_denied_by_privilege
+PASS PR-04 anon calling public.licence_admin_grant is refused by privilege 
+PASS PR-04 anon calling public.licence_admin_replace is refused by privilege 
+PASS PR-04 anon calling public.licence_admin_extend is refused by privilege 
+PASS PR-04 anon calling public.licence_admin_revoke is refused by privilege 
+PASS PR-04 anon calling public.shop_licence_status is refused by privilege 
+PASS PR-04 service_role calling public.licence_admin_grant is refused by privilege 
+PASS PR-04 service_role calling public.licence_admin_replace is refused by privilege 
+PASS PR-04 service_role calling public.licence_admin_extend is refused by privilege 
+PASS PR-04 service_role calling public.licence_admin_revoke is refused by privilege 
+PASS PR-04 service_role calling public.shop_licence_status is refused by privilege 
+--- test_guard_protections
+PASS GD-01 a coverage start cannot be changed 
+PASS GD-02 a coverage cannot be deleted 
+PASS GD-03 a coverage cannot be inserted already revoked 
+PASS GD-04 a revocation at or after the natural end is refused by the guard 
+PASS GD-05 the state version must increase by exactly one 
+PASS GD-06 the meta row cannot be deleted 
+PASS GD-07 the meta shop_id cannot change 
+PASS GD setup: a lifetime grant writes one ledger row and one audit row 
+PASS GD setup: one denial writes a detail row 
+PASS GD-08 ledger rows cannot be updated 
+PASS GD-08 ledger rows cannot be deleted 
+PASS GD-09 audit rows cannot be updated 
+PASS GD-09 audit rows cannot be deleted 
+PASS GD-10 denial detail rows cannot be deleted 
+PASS GD-11 denial counts cannot decrease 
+PASS GD-12 the audit log cannot be truncated (rolled back if refused) 
+--- test_concurrent_denial_counters
+PASS CD-01 two concurrent denials for one actor both count: actor denial +2, detail +2, global +2 
+--- test_confirm_before_replay
+PASS H1-00 setup: a confirmed grant commits under this request_id 
+PASS H1-01 confirm=false on an existing request_id is not_confirmed (checked before replay; no ledger row) 
+--- test_counters
+PASS C-01 a denial moves the actor and global counters and writes one detail row 
+PASS C-02 the 21st denial is counted and its detail is omitted (denial 21, detail 20) 
+PASS C-04 an actor counter write failure raises and rolls back; no forbidden 
+PASS C-05 a global counter write failure raises and rolls back the actor row too 
+PASS C-06 a required detail write failure raises and rolls back both counters 
+PASS C-07 no-UID denial moves the global counter only 
+PASS I-01 a REPEATABLE READ session raises the isolation check 
+--- test_global_cap_provisional
+PASS GC-00 a denial creates this hour's global window row 
+PASS GC-01 just below the provisional cap (999 global details) the denial writes its detail row 
+PASS GC-02 at the provisional cap (1,000 global details) the denial is counted but writes no detail row 
+SUMMARY: 282 passed, 0 failed

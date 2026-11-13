@@ -1,0 +1,29 @@
+== rebuilding qrquick_scratch on /var/run/postgresql:5432 (server address: socket)
+== stubs (Supabase auth/storage/roles stand-ins)
+   applied 0001_stage1_foundation.sql
+   applied 0002_services_public_policy_fix.sql
+   applied 0003_customer_files.sql
+   applied 0004_shop_features_payment_qr.sql
+   applied 0005_shop_assets_policy_fix.sql
+   applied 0006_payments_and_statistics.sql
+   applied 0007_security_hardening.sql
+   applied 0008_payment_intents.sql
+psql:/home/claude/joyyxh/ps-qr/supabase/migrations/0009_cash_policy_and_payment_hardening.sql:27: NOTICE:  trigger "orders_qrquick_minimum_order" for relation "public.orders" does not exist, skipping
+   applied 0009_cash_policy_and_payment_hardening.sql
+   applied 0010_print_agents.sql
+   applied 0011_service_options.sql
+psql:/home/claude/joyyxh/ps-qr/supabase/migrations/0012_print_eligibility.sql:71: NOTICE:  trigger "orders_cancel_unprintable_jobs" for relation "public.orders" does not exist, skipping
+   applied 0012_print_eligibility.sql
+   seed applied (development data only)
+== suites (requires-migration header is checked against 0012)
+   PASS  paper_sizes_tests: 74 of 74 checks
+   PASS  print_eligibility_tests: 19 of 19 checks
+   PASS  service_pricing_tests: 34 of 34 checks
+   PASS  stage1_isolation_tests: 30 of 30 checks
+   PASS  stage3_owner_tests: 30 of 30 checks
+   PASS  stage4_files_tests: 23 of 23 checks
+   PASS  stage5_orders_tests: 23 of 23 checks
+   PASS  stage6_features_tests: 42 of 42 checks
+   PASS  stage7_stats_tests: 54 of 54 checks
+   PASS  stage8_print_tests: 48 of 48 checks
+== 10 suites run, 0 skipped, 377 checks, 0 failing

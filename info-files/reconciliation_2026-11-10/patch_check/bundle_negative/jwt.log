@@ -1,0 +1,4 @@
+checksums: 14 listed, 14 files on disk
+config: empty (not configured), service key: false
+FAIL service_role token in src/qr.js
+RESULT: FAIL

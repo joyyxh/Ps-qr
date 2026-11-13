@@ -1,0 +1,18 @@
+Stage 7: record R18 lock-order contract as design only (docs only)
+
+The owner accepted the final R18 lock-order contract as an approved design
+decision (2026-11-01). Design approval does not authorise implementation.
+
+- STAGE7_DECISIONS.md: new section 13 third-record block (contract, rules,
+  function requirements, two-session tests, remaining blockers); R18 row,
+  12A.12 item 7B, 15.3 item 7B, 14.6 item 6 and register item 33 updated.
+- OWNER_DECISION_SHEET.md: new Part 1C; Part 1 and Part 1B R18 statements
+  aligned with Part 1C; Part 4 and Part 8 status rows updated; a dated
+  bullet reworded to refer only to the superseded advisory-lock design.
+
+Not approved: licence_lock_shop(), shop_licence_meta, admin RPCs, retry
+(item 23), refund R-a (item 24), recovery SKIP LOCKED, 7F, tests, staging
+and local setup. No SQL, migration, printing code or CLAUDE.md change.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DxRqmb5mEMWYPJvm5FH5tt

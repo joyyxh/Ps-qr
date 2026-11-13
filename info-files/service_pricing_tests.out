@@ -1,0 +1,51 @@
+BEGIN
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+                                name                                 | ok |                              detail                              
+---------------------------------------------------------------------+----+------------------------------------------------------------------
+ P01 per_side colour: 2 pages x 2 copies x 1000 = 4000               | t  | total=4000, expected=4000
+ P02 per_side duplex does not halve sides: 3 x 1 x 200 = 600         | t  | total=600, expected=600
+ P03 per_sheet duplex rounds up: ceil(5/2) = 3 x 1 x 150 = 450       | t  | total=450, expected=450
+ P04 per_sheet simplex bills every page: 5 x 2 x 150 = 1500          | t  | total=1500, expected=1500
+ P05 per_copy ignores pages and sides: 4 x 3000 = 12000              | t  | total=12000, expected=12000
+ P06 100 copies is allowed: 1 x 100 x 200 = 20000                    | t  | total=20000, expected=20000
+ P07 total is the sum of items: 2000 + 750 = 2750                    | t  | total=2750, expected=2750
+ P08 client prices and totals are ignored: server says 200           | t  | total=200, expected=200
+ P09 other-print prices its own colour: 1 x 1200 = 1200              | t  | total=1200, expected=1200
+ P10 three colour copy items at the limit: 3 x 300000 = 900000       | t  | total=900000, expected=900000
+ V01 copies 0 is refused                                             | t  | 22023: copies must be between 1 and 100
+ V02 copies 101 is refused                                           | t  | 22023: copies must be between 1 and 100
+ V03 copies as text is refused                                       | t  | 22P02: invalid input syntax for type integer: "abc"
+ V04 fractional copies are refused                                   | t  | 22P02: invalid input syntax for type integer: "1.5"
+ V05 items must be an array                                          | t  | 22023: items must be an array
+ V06 an empty order is refused                                       | t  | 22023: an order needs between 1 and 20 items
+ V07 more than 20 items is refused                                   | t  | 22023: an order needs between 1 and 20 items
+ V08 an item without a file is refused                               | t  | 22023: each item needs an uploaded file
+ V09 the same file twice in one order is refused                     | t  | 22023: each file can be used once per order
+ V10 a service from another shop is refused                          | t  | P0002: service is not available at this shop
+ V11 an inactive service is refused                                  | t  | P0002: service is not available at this shop
+ V12 an unknown service is refused                                   | t  | P0002: service is not available at this shop
+ V13 a colour-only service in B&W is refused                         | t  | 22023: this service is not offered in the requested colour mode
+ V14 a B&W-only service in colour is refused                         | t  | 22023: this service is not offered in the requested colour mode
+ V15 a file from another shop is refused                             | t  | P0002: file not found or no longer available
+ V16 an unknown shop is refused                                      | t  | P0002: shop not found
+ V17 setup: an order claims a file                                   | t  | ok
+ V18 a claimed file is refused                                       | t  | P0002: file not found or no longer available
+ V19 a total over Rs 10,000 is refused                               | t  | 22023: order total exceeds the online limit of Rs 10,000
+ V20 colour is refused when demo-xerox has colour off                | t  | 22023: this shop is not offering colour printing right now
+ V21 other-print colour is unaffected by demo-xerox colour off: 1200 | t  | total=1200, expected=1200
+ V22 duplex is refused when demo-xerox has double-sided off          | t  | 22023: this shop is not offering double-sided printing right now
+ V23 colour works again once switched back on: 1 x 1000 = 1000       | t  | total=1000, expected=1000
+ V24 a closed shop gives no quote                                    | t  | P0001: shop is closed
+(34 rows)
+
+ROLLBACK

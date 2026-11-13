@@ -1,0 +1,884 @@
+
+> printnest-web@0.1.0 test
+> node --test tests/logic.test.js tests/api.test.js tests/owner-logic.test.js tests/auth.test.js tests/owner-api.test.js tests/orders.test.js tests/stats.test.js tests/qr-features.test.js tests/ui.test.js tests/print-logic.test.js tests/owner-dashboard.test.js
+
+TAP version 13
+# Subtest: quote posts the cart to the quote_order RPC with only the publishable key
+ok 1 - quote posts the cart to the quote_order RPC with only the publishable key
+  ---
+  duration_ms: 28.695694
+  type: 'test'
+  ...
+# Subtest: placeOrder strips price and total fields before sending
+ok 2 - placeOrder strips price and total fields before sending
+  ---
+  duration_ms: 0.626668
+  type: 'test'
+  ...
+# Subtest: placeOrder sends UPI only when explicitly selected
+ok 3 - placeOrder sends UPI only when explicitly selected
+  ---
+  duration_ms: 0.575745
+  type: 'test'
+  ...
+# Subtest: track sends the tracking code to the track_order RPC
+ok 4 - track sends the tracking code to the track_order RPC
+  ---
+  duration_ms: 0.506079
+  type: 'test'
+  ...
+# Subtest: paper sizes and extra charges are read for one shop, and only active charges are asked for
+ok 5 - paper sizes and extra charges are read for one shop, and only active charges are asked for
+  ---
+  duration_ms: 0.773014
+  type: 'test'
+  ...
+# Subtest: getShop builds an encoded, active-only query
+ok 6 - getShop builds an encoded, active-only query
+  ---
+  duration_ms: 0.570698
+  type: 'test'
+  ...
+# Subtest: getShop returns null when no shop matches
+ok 7 - getShop returns null when no shop matches
+  ---
+  duration_ms: 0.397832
+  type: 'test'
+  ...
+# Subtest: server error messages are surfaced to the caller
+ok 8 - server error messages are surfaced to the caller
+  ---
+  duration_ms: 1.389865
+  type: 'test'
+  ...
+# Subtest: uploadFile sends the raw file with only the publishable key and returns what the server measured
+ok 9 - uploadFile sends the raw file with only the publishable key and returns what the server measured
+  ---
+  duration_ms: 1.040868
+  type: 'test'
+  ...
+# Subtest: uploadFile surfaces the reason the server gave, with its code
+ok 10 - uploadFile surfaces the reason the server gave, with its code
+  ---
+  duration_ms: 0.813925
+  type: 'test'
+  ...
+# Subtest: uploadFile explains a dropped connection in plain words
+ok 11 - uploadFile explains a dropped connection in plain words
+  ---
+  duration_ms: 0.400921
+  type: 'test'
+  ...
+# Subtest: signIn posts the password to the password grant and keeps the session
+ok 12 - signIn posts the password to the password grant and keeps the session
+  ---
+  duration_ms: 26.026464
+  type: 'test'
+  ...
+# Subtest: signIn passes on the server message for a wrong password
+ok 13 - signIn passes on the server message for a wrong password
+  ---
+  duration_ms: 0.954128
+  type: 'test'
+  ...
+# Subtest: signUp reports when the owner must confirm their email first
+ok 14 - signUp reports when the owner must confirm their email first
+  ---
+  duration_ms: 0.570288
+  type: 'test'
+  ...
+# Subtest: signUp keeps the session when the project signs the owner in straight away
+ok 15 - signUp keeps the session when the project signs the owner in straight away
+  ---
+  duration_ms: 0.541189
+  type: 'test'
+  ...
+# Subtest: signUp sends the configured HTTPS callback and never localhost
+ok 16 - signUp sends the configured HTTPS callback and never localhost
+  ---
+  duration_ms: 0.550858
+  type: 'test'
+  ...
+# Subtest: confirmation callback fetches the user and persists a usable owner session
+ok 17 - confirmation callback fetches the user and persists a usable owner session
+  ---
+  duration_ms: 0.763023
+  type: 'test'
+  ...
+# Subtest: customer and route hashes are not mistaken for auth callbacks
+ok 18 - customer and route hashes are not mistaken for auth callbacks
+  ---
+  duration_ms: 0.219154
+  type: 'test'
+  ...
+# Subtest: a fresh session is reused without any network call
+ok 19 - a fresh session is reused without any network call
+  ---
+  duration_ms: 0.554267
+  type: 'test'
+  ...
+# Subtest: an expired session is refreshed once, even when two requests ask at the same moment
+ok 20 - an expired session is refreshed once, even when two requests ask at the same moment
+  ---
+  duration_ms: 1.645594
+  type: 'test'
+  ...
+# Subtest: a refresh the server rejects signs the owner out
+ok 21 - a refresh the server rejects signs the owner out
+  ---
+  duration_ms: 1.197106
+  type: 'test'
+  ...
+# Subtest: a refresh that fails because the network is down keeps the session for a retry
+ok 22 - a refresh that fails because the network is down keeps the session for a retry
+  ---
+  duration_ms: 0.642271
+  type: 'test'
+  ...
+# Subtest: signOut clears the session even when the server call fails
+ok 23 - signOut clears the session even when the server call fails
+  ---
+  duration_ms: 0.466641
+  type: 'test'
+  ...
+# Subtest: the session store survives blocked or corrupt storage
+ok 24 - the session store survives blocked or corrupt storage
+  ---
+  duration_ms: 0.353544
+  type: 'test'
+  ...
+# Subtest: toSession refuses a token response without a user
+ok 25 - toSession refuses a token response without a user
+  ---
+  duration_ms: 0.15427
+  type: 'test'
+  ...
+# Subtest: isFresh keeps a one minute safety margin
+ok 26 - isFresh keeps a one minute safety margin
+  ---
+  duration_ms: 0.086393
+  type: 'test'
+  ...
+# Subtest: formatPaise shows rupees with two decimals
+ok 27 - formatPaise shows rupees with two decimals
+  ---
+  duration_ms: 1.576828
+  type: 'test'
+  ...
+# Subtest: formatPaise rejects fractional paise
+ok 28 - formatPaise rejects fractional paise
+  ---
+  duration_ms: 0.497664
+  type: 'test'
+  ...
+# Subtest: unitLabel and statusLabel fall back safely for unknown values
+ok 29 - unitLabel and statusLabel fall back safely for unknown values
+  ---
+  duration_ms: 0.178047
+  type: 'test'
+  ...
+# Subtest: escapeHtml neutralises markup in shop-provided text
+ok 30 - escapeHtml neutralises markup in shop-provided text
+  ---
+  duration_ms: 0.155269
+  type: 'test'
+  ...
+# Subtest: buildItem returns the file and the customer choices, never prices
+ok 31 - buildItem returns the file and the customer choices, never prices
+  ---
+  duration_ms: 1.031086
+  type: 'test'
+  ...
+# Subtest: paper options: a shop with no paper rows prints A4 only, as the server assumes
+ok 32 - paper options: a shop with no paper rows prints A4 only, as the server assumes
+  ---
+  duration_ms: 0.314423
+  type: 'test'
+  ...
+# Subtest: paper options follow the shop rows: offered flag and surcharge in paise, missing rows are not offered
+ok 33 - paper options follow the shop rows: offered flag and surcharge in paise, missing rows are not offered
+  ---
+  duration_ms: 0.30585
+  type: 'test'
+  ...
+# Subtest: paper surcharge and charge basis read in plain words
+ok 34 - paper surcharge and charge basis read in plain words
+  ---
+  duration_ms: 0.159523
+  type: 'test'
+  ...
+# Subtest: the owner paper-size form turns rupees into paise and refuses a form with no size offered
+ok 35 - the owner paper-size form turns rupees into paise and refuses a form with no size offered
+  ---
+  duration_ms: 0.619022
+  type: 'test'
+  ...
+# Subtest: the owner charges form checks name, amount, basis and the limit of ten
+ok 36 - the owner charges form checks name, amount, basis and the limit of ten
+  ---
+  duration_ms: 0.757455
+  type: 'test'
+  ...
+# Subtest: the customer timeline marks earlier steps done, the current step, and the rest to come
+ok 37 - the customer timeline marks earlier steps done, the current step, and the rest to come
+  ---
+  duration_ms: 1.284799
+  type: 'test'
+  ...
+# Subtest: a cancelled or rejected order has no steps and one terminal message
+ok 38 - a cancelled or rejected order has no steps and one terminal message
+  ---
+  duration_ms: 0.160742
+  type: 'test'
+  ...
+# Subtest: an unknown status shows every step as still to come rather than guessing a position
+ok 39 - an unknown status shows every step as still to come rather than guessing a position
+  ---
+  duration_ms: 0.142514
+  type: 'test'
+  ...
+# Subtest: buildItem keeps the chosen paper size and refuses a missing or unknown one
+ok 40 - buildItem keeps the chosen paper size and refuses a missing or unknown one
+  ---
+  duration_ms: 0.172126
+  type: 'test'
+  ...
+# Subtest: buildItem rejects a missing service, a missing upload and bad copies
+ok 41 - buildItem rejects a missing service, a missing upload and bad copies
+  ---
+  duration_ms: 0.271404
+  type: 'test'
+  ...
+# Subtest: checkUploadFile accepts PDF, JPEG and PNG and explains anything else
+ok 42 - checkUploadFile accepts PDF, JPEG and PNG and explains anything else
+  ---
+  duration_ms: 0.399678
+  type: 'test'
+  ...
+# Subtest: the file picker offers exactly the three accepted types
+ok 43 - the file picker offers exactly the three accepted types
+  ---
+  duration_ms: 0.092626
+  type: 'test'
+  ...
+# Subtest: fileAlreadyInOrder spots a file that is already a cart line
+ok 44 - fileAlreadyInOrder spots a file that is already a cart line
+  ---
+  duration_ms: 0.103226
+  type: 'test'
+  ...
+# Subtest: colourAvailable reads the nullable colour price
+ok 45 - colourAvailable reads the nullable colour price
+  ---
+  duration_ms: 0.085648
+  type: 'test'
+  ...
+# Subtest: the tracking payment line never says cash is due on a cancelled or rejected order
+ok 46 - the tracking payment line never says cash is due on a cancelled or rejected order
+  ---
+  duration_ms: 0.259873
+  type: 'test'
+  ...
+# Subtest: the tracking payment line still shows cash due, UPI not paid, and verified for live orders
+ok 47 - the tracking payment line still shows cash due, UPI not paid, and verified for live orders
+  ---
+  duration_ms: 0.092633
+  type: 'test'
+  ...
+# Subtest: the revenue split adds up only when items plus extra charges equal the order value
+ok 48 - the revenue split adds up only when items plus extra charges equal the order value
+  ---
+  duration_ms: 0.092038
+  type: 'test'
+  ...
+# Subtest: the buttons offered match the moves the database allows
+ok 49 - the buttons offered match the moves the database allows
+  ---
+  duration_ms: 1.748277
+  type: 'test'
+  ...
+# Subtest: finished orders offer no buttons
+ok 50 - finished orders offer no buttons
+  ---
+  duration_ms: 0.320102
+  type: 'test'
+  ...
+# Subtest: no button moves an order backwards
+ok 51 - no button moves an order backwards
+  ---
+  duration_ms: 0.232136
+  type: 'test'
+  ...
+# Subtest: every offered button has a readable label
+ok 52 - every offered button has a readable label
+  ---
+  duration_ms: 0.238001
+  type: 'test'
+  ...
+# Subtest: only rejecting and cancelling need a confirmation
+ok 53 - only rejecting and cancelling need a confirmation
+  ---
+  duration_ms: 0.207734
+  type: 'test'
+  ...
+# Subtest: open orders are the ones still waiting for the shop
+ok 54 - open orders are the ones still waiting for the shop
+  ---
+  duration_ms: 0.12473
+  type: 'test'
+  ...
+# Subtest: customers and owners see the same order words, and a rejected order reads as Cancelled
+ok 55 - customers and owners see the same order words, and a rejected order reads as Cancelled
+  ---
+  duration_ms: 0.349874
+  type: 'test'
+  ...
+# Subtest: owner status labels are short and never fall back to the raw code for known statuses
+ok 56 - owner status labels are short and never fall back to the raw code for known statuses
+  ---
+  duration_ms: 0.13099
+  type: 'test'
+  ...
+# Subtest: describeOrderItem reads like a print ticket
+ok 57 - describeOrderItem reads like a print ticket
+  ---
+  duration_ms: 0.368324
+  type: 'test'
+  ...
+# Subtest: listOrders reads the shop orders with their items, newest first
+ok 58 - listOrders reads the shop orders with their items, newest first
+  ---
+  duration_ms: 28.304838
+  type: 'test'
+  ...
+# Subtest: updateOrderStatus sends only the status, to one order in one shop
+ok 59 - updateOrderStatus sends only the status, to one order in one shop
+  ---
+  duration_ms: 0.763597
+  type: 'test'
+  ...
+# Subtest: updateOrderStatus reports no permission when no order was changed
+ok 60 - updateOrderStatus reports no permission when no order was changed
+  ---
+  duration_ms: 2.967815
+  type: 'test'
+  ...
+# Subtest: a refused status change keeps its database code so the page can explain it
+ok 61 - a refused status change keeps its database code so the page can explain it
+  ---
+  duration_ms: 0.544571
+  type: 'test'
+  ...
+# Subtest: listOrders also asks for each item’s file, so the owner can open it
+ok 62 - listOrders also asks for each item’s file, so the owner can open it
+  ---
+  duration_ms: 0.454881
+  type: 'test'
+  ...
+# Subtest: getFileLink asks the owner-file-link function with the owner token and both ids
+ok 63 - getFileLink asks the owner-file-link function with the owner token and both ids
+  ---
+  duration_ms: 0.555118
+  type: 'test'
+  ...
+# Subtest: getFileLink reports a file outside the owner’s shop as not found
+ok 64 - getFileLink reports a file outside the owner’s shop as not found
+  ---
+  duration_ms: 0.483935
+  type: 'test'
+  ...
+# Subtest: getFileLink sends nothing without a signed-in owner
+ok 65 - getFileLink sends nothing without a signed-in owner
+  ---
+  duration_ms: 0.184065
+  type: 'test'
+  ...
+# Subtest: every owner request is sent with the owner token and the publishable key
+ok 66 - every owner request is sent with the owner token and the publishable key
+  ---
+  duration_ms: 26.701408
+  type: 'test'
+  ...
+# Subtest: signed-out owners get a 401 and no request is sent
+ok 67 - signed-out owners get a 401 and no request is sent
+  ---
+  duration_ms: 0.868509
+  type: 'test'
+  ...
+# Subtest: listMyShops reads the owner memberships and sorts the shops by name
+ok 68 - listMyShops reads the owner memberships and sorts the shops by name
+  ---
+  duration_ms: 2.165717
+  type: 'test'
+  ...
+# Subtest: createShop calls the create_shop function with the shop details
+ok 69 - createShop calls the create_shop function with the shop details
+  ---
+  duration_ms: 0.654265
+  type: 'test'
+  ...
+# Subtest: updateShop sends only the editable shop columns, so the slug cannot be changed
+ok 70 - updateShop sends only the editable shop columns, so the slug cannot be changed
+  ---
+  duration_ms: 0.596491
+  type: 'test'
+  ...
+# Subtest: updateShop reports a permission error when the database changes no rows
+ok 71 - updateShop reports a permission error when the database changes no rows
+  ---
+  duration_ms: 0.662639
+  type: 'test'
+  ...
+# Subtest: createService takes the shop from the page, not from the submitted fields
+ok 72 - createService takes the shop from the page, not from the submitted fields
+  ---
+  duration_ms: 0.635668
+  type: 'test'
+  ...
+# Subtest: updateService is limited to one service in one shop
+ok 73 - updateService is limited to one service in one shop
+  ---
+  duration_ms: 0.521329
+  type: 'test'
+  ...
+# Subtest: updateService reports a permission error when no service was changed
+ok 74 - updateService reports a permission error when no service was changed
+  ---
+  duration_ms: 0.737398
+  type: 'test'
+  ...
+# Subtest: pickFields keeps only allowed keys that were given
+ok 75 - pickFields keeps only allowed keys that were given
+  ---
+  duration_ms: 0.399518
+  type: 'test'
+  ...
+# Subtest: the browser code never contains a service-role or secret key
+ok 76 - the browser code never contains a service-role or secret key
+  ---
+  duration_ms: 1.939636
+  type: 'test'
+  ...
+# Subtest: paper sizes and extra charges are read for one shop, and saved through the set functions with the whole list
+ok 77 - paper sizes and extra charges are read for one shop, and saved through the set functions with the whole list
+  ---
+  duration_ms: 2.184227
+  type: 'test'
+  ...
+# Subtest: an order shows a label and a tone, and failed or stuck prints come first
+ok 78 - an order shows a label and a tone, and failed or stuck prints come first
+  ---
+  duration_ms: 2.522061
+  type: 'test'
+  ...
+# Subtest: an order needs the owner when a status, payment, send or retry is waiting
+ok 79 - an order needs the owner when a status, payment, send or retry is waiting
+  ---
+  duration_ms: 0.48355
+  type: 'test'
+  ...
+# Subtest: an order does not need the owner once its files are at the printer, or when it is closed
+ok 80 - an order does not need the owner once its files are at the printer, or when it is closed
+  ---
+  duration_ms: 0.144996
+  type: 'test'
+  ...
+# Subtest: the home counts add up the open payments and orders ready to print
+ok 81 - the home counts add up the open payments and orders ready to print
+  ---
+  duration_ms: 0.213544
+  type: 'test'
+  ...
+# Subtest: oldest orders come first and the list passed in is not reordered
+ok 82 - oldest orders come first and the list passed in is not reordered
+  ---
+  duration_ms: 0.368645
+  type: 'test'
+  ...
+# Subtest: the printer counts as ready only when a paired computer is online
+ok 83 - the printer counts as ready only when a paired computer is online
+  ---
+  duration_ms: 0.13977
+  type: 'test'
+  ...
+# Subtest: validateSlug accepts simple web addresses and lowercases them
+ok 84 - validateSlug accepts simple web addresses and lowercases them
+  ---
+  duration_ms: 1.259471
+  type: 'test'
+  ...
+# Subtest: validateSlug rejects bad formats and reserved words
+ok 85 - validateSlug rejects bad formats and reserved words
+  ---
+  duration_ms: 0.626959
+  type: 'test'
+  ...
+# Subtest: validateShopDetails trims values and turns blanks into null
+ok 86 - validateShopDetails trims values and turns blanks into null
+  ---
+  duration_ms: 1.014218
+  type: 'test'
+  ...
+# Subtest: validateShopDetails rejects bad names, phone numbers and long addresses
+ok 87 - validateShopDetails rejects bad names, phone numbers and long addresses
+  ---
+  duration_ms: 0.295917
+  type: 'test'
+  ...
+# Subtest: rupeesToPaise converts typed rupees to whole paise without float errors
+ok 88 - rupeesToPaise converts typed rupees to whole paise without float errors
+  ---
+  duration_ms: 0.635679
+  type: 'test'
+  ...
+# Subtest: rupeesToPaise rejects anything that is not a plain amount
+ok 89 - rupeesToPaise rejects anything that is not a plain amount
+  ---
+  duration_ms: 0.229775
+  type: 'test'
+  ...
+# Subtest: paiseToRupeesInput shows the amount the way an owner would type it
+ok 90 - paiseToRupeesInput shows the amount the way an owner would type it
+  ---
+  duration_ms: 0.151857
+  type: 'test'
+  ...
+# Subtest: validateService returns whole paise and only the service fields
+ok 91 - validateService returns whole paise and only the service fields
+  ---
+  duration_ms: 0.295047
+  type: 'test'
+  ...
+# Subtest: validateService accepts a colour-only service
+ok 92 - validateService accepts a colour-only service
+  ---
+  duration_ms: 0.505016
+  type: 'test'
+  ...
+# Subtest: validateService needs a price and a known charging unit
+ok 93 - validateService needs a price and a known charging unit
+  ---
+  duration_ms: 0.577263
+  type: 'test'
+  ...
+# Subtest: validateService marks a service hidden only when the box is unticked
+ok 94 - validateService marks a service hidden only when the box is unticked
+  ---
+  duration_ms: 0.210883
+  type: 'test'
+  ...
+# Subtest: job labels are plain words, and unknown statuses are shown as they are
+ok 95 - job labels are plain words, and unknown statuses are shown as they are
+  ---
+  duration_ms: 1.077192
+  type: 'test'
+  ...
+# Subtest: the failure text prefers the agent's own message and never claims a page printed
+ok 96 - the failure text prefers the agent's own message and never claims a page printed
+  ---
+  duration_ms: 0.500907
+  type: 'test'
+  ...
+# Subtest: the newest attempt is kept for each order item
+ok 97 - the newest attempt is kept for each order item
+  ---
+  duration_ms: 0.204639
+  type: 'test'
+  ...
+# Subtest: only file items without a job are sent, and only for a paid approved or printing order
+ok 98 - only file items without a job are sent, and only for a paid approved or printing order
+  ---
+  duration_ms: 0.892697
+  type: 'test'
+  ...
+# Subtest: a failed job can be printed again freely; a job that may have printed needs confirmation
+ok 99 - a failed job can be printed again freely; a job that may have printed needs confirmation
+  ---
+  duration_ms: 0.289754
+  type: 'test'
+  ...
+# Subtest: the pairing command uses the print-agent function address without a trailing slash
+ok 100 - the pairing command uses the print-agent function address without a trailing slash
+  ---
+  duration_ms: 0.253242
+  type: 'test'
+  ...
+# Subtest: printer names come with the facts the owner needs to choose
+ok 101 - printer names come with the facts the owner needs to choose
+  ---
+  duration_ms: 0.240417
+  type: 'test'
+  ...
+# Subtest: the printing notice warns when nothing can print, and stays quiet when a computer is connected
+ok 102 - the printing notice warns when nothing can print, and stays quiet when a computer is connected
+  ---
+  duration_ms: 0.188874
+  type: 'test'
+  ...
+# Subtest: owner print calls send the right database function and arguments
+ok 103 - owner print calls send the right database function and arguments
+  ---
+  duration_ms: 26.006125
+  type: 'test'
+  ...
+# Subtest: the order list asks for the order item id, which the print lines need
+ok 104 - the order list asks for the order item id, which the print lines need
+  ---
+  duration_ms: 0.833678
+  type: 'test'
+  ...
+# Subtest: the configured public address is used, trimmed, when it is set
+ok 105 - the configured public address is used, trimmed, when it is set
+  ---
+  duration_ms: 1.181125
+  type: 'test'
+  ...
+# Subtest: without a configured address, the page address is used and a local one is reported
+ok 106 - without a configured address, the page address is used and a local one is reported
+  ---
+  duration_ms: 0.391354
+  type: 'test'
+  ...
+# Subtest: addressProblem explains each way a QR code cannot reach customers
+ok 107 - addressProblem explains each way a QR code cannot reach customers
+  ---
+  duration_ms: 0.180866
+  type: 'test'
+  ...
+# Subtest: a local address is reported before a plain http one
+ok 108 - a local address is reported before a plain http one
+  ---
+  duration_ms: 0.120606
+  type: 'test'
+  ...
+# Subtest: shopAddress joins the page address and the shop hash, with the slug encoded
+ok 109 - shopAddress joins the page address and the shop hash, with the slug encoded
+  ---
+  duration_ms: 0.407346
+  type: 'test'
+  ...
+# Subtest: colour and double-sided are offered unless the shop has switched them off
+ok 110 - colour and double-sided are offered unless the shop has switched them off
+  ---
+  duration_ms: 0.161645
+  type: 'test'
+  ...
+# Subtest: the payment QR must be a PNG or JPEG of at most 2 MB
+ok 111 - the payment QR must be a PNG or JPEG of at most 2 MB
+  ---
+  duration_ms: 2.152743
+  type: 'test'
+  ...
+# Subtest: the public picture address is built from the bucket path, one segment at a time
+ok 112 - the public picture address is built from the bucket path, one segment at a time
+  ---
+  duration_ms: 0.258952
+  type: 'test'
+  ...
+# Subtest: the QR matrix has the three finder patterns in the corners
+ok 113 - the QR matrix has the three finder patterns in the corners
+  ---
+  duration_ms: 11.715585
+  type: 'test'
+  ...
+# Subtest: the same text always makes the same code, and different text a different one
+ok 114 - the same text always makes the same code, and different text a different one
+  ---
+  duration_ms: 22.379209
+  type: 'test'
+  ...
+# Subtest: the SVG has a four-module quiet zone around the code
+ok 115 - the SVG has a four-module quiet zone around the code
+  ---
+  duration_ms: 8.031335
+  type: 'test'
+  ...
+# Subtest: saveFeatures sends yes/no values only and refuses anything else before any request
+ok 116 - saveFeatures sends yes/no values only and refuses anything else before any request
+  ---
+  duration_ms: 1.037264
+  type: 'test'
+  ...
+# Subtest: saveFeatures calls the database function for the shop
+ok 117 - saveFeatures calls the database function for the shop
+  ---
+  duration_ms: 32.394911
+  type: 'test'
+  ...
+# Subtest: listFeatureCatalog reads the catalogue in display order
+ok 118 - listFeatureCatalog reads the catalogue in display order
+  ---
+  duration_ms: 0.717098
+  type: 'test'
+  ...
+# Subtest: uploadPaymentQr stores the picture in the shop folder, attaches it, then removes the old one
+ok 119 - uploadPaymentQr stores the picture in the shop folder, attaches it, then removes the old one
+  ---
+  duration_ms: 3.404982
+  type: 'test'
+  ...
+# Subtest: uploadPaymentQr removes the new picture again when the shop cannot be pointed at it
+ok 120 - uploadPaymentQr removes the new picture again when the shop cannot be pointed at it
+  ---
+  duration_ms: 3.366123
+  type: 'test'
+  ...
+# Subtest: uploadPaymentQr refuses a bad file before any request
+ok 121 - uploadPaymentQr refuses a bad file before any request
+  ---
+  duration_ms: 0.350095
+  type: 'test'
+  ...
+# Subtest: removePaymentQr detaches the picture, then removes the file, and ignores a failed delete
+ok 122 - removePaymentQr detaches the picture, then removes the file, and ignores a failed delete
+  ---
+  duration_ms: 1.714516
+  type: 'test'
+  ...
+# Subtest: a shop list row carries the features and the payment QR path
+ok 123 - a shop list row carries the features and the payment QR path
+  ---
+  duration_ms: 0.770252
+  type: 'test'
+  ...
+# Subtest: istToday uses the calendar day in India, not the device time zone
+ok 124 - istToday uses the calendar day in India, not the device time zone
+  ---
+  duration_ms: 1.902075
+  type: 'test'
+  ...
+# Subtest: addDays moves across month ends and leap days
+ok 125 - addDays moves across month ends and leap days
+  ---
+  duration_ms: 0.44991
+  type: 'test'
+  ...
+# Subtest: weeks start on Monday and month or year ends are correct
+ok 126 - weeks start on Monday and month or year ends are correct
+  ---
+  duration_ms: 0.237163
+  type: 'test'
+  ...
+# Subtest: presets run from the start of the period up to today
+ok 127 - presets run from the start of the period up to today
+  ---
+  duration_ms: 1.11017
+  type: 'test'
+  ...
+# Subtest: comparisons use the same length in the same place in the calendar
+ok 128 - comparisons use the same length in the same place in the calendar
+  ---
+  duration_ms: 0.462305
+  type: 'test'
+  ...
+# Subtest: custom ranges are checked the same way the database checks them
+ok 129 - custom ranges are checked the same way the database checks them
+  ---
+  duration_ms: 0.305681
+  type: 'test'
+  ...
+# Subtest: percentage changes and their wording
+ok 130 - percentage changes and their wording
+  ---
+  duration_ms: 0.250519
+  type: 'test'
+  ...
+# Subtest: daily rows group into days, weeks, months and years
+ok 131 - daily rows group into days, weeks, months and years
+  ---
+  duration_ms: 0.515841
+  type: 'test'
+  ...
+# Subtest: CSV cells are escaped and cannot start a spreadsheet formula
+ok 132 - CSV cells are escaped and cannot start a spreadsheet formula
+  ---
+  duration_ms: 0.520472
+  type: 'test'
+  ...
+# Subtest: the daily report puts money in rupees with two decimals
+ok 133 - the daily report puts money in rupees with two decimals
+  ---
+  duration_ms: 0.597433
+  type: 'test'
+  ...
+# Subtest: the orders export shows India times and the payment details
+ok 134 - the orders export shows India times and the payment details
+  ---
+  duration_ms: 0.474567
+  type: 'test'
+  ...
+# Subtest: payment buttons follow the database rules
+ok 135 - payment buttons follow the database rules
+  ---
+  duration_ms: 0.261969
+  type: 'test'
+  ...
+# Subtest: payment and reason labels read well and fall back safely
+ok 136 - payment and reason labels read well and fall back safely
+  ---
+  duration_ms: 0.530824
+  type: 'test'
+  ...
+# Subtest: activity lines describe each kind of change
+ok 137 - activity lines describe each kind of change
+  ---
+  duration_ms: 0.257913
+  type: 'test'
+  ...
+# Subtest: statistics are requested with the shop and the dates, as the owner
+ok 138 - statistics are requested with the shop and the dates, as the owner
+  ---
+  duration_ms: 25.017443
+  type: 'test'
+  ...
+# Subtest: payments and cancel reasons send only the fields the database function takes
+ok 139 - payments and cancel reasons send only the fields the database function takes
+  ---
+  duration_ms: 1.310568
+  type: 'test'
+  ...
+# Subtest: the export reads every page of the period, with India-time bounds
+ok 140 - the export reads every page of the period, with India-time bounds
+  ---
+  duration_ms: 1.913663
+  type: 'test'
+  ...
+# Subtest: an export that would be cut short is refused, not truncated
+ok 141 - an export that would be cut short is refused, not truncated
+  ---
+  duration_ms: 35.359186
+  type: 'test'
+  ...
+# Subtest: QRquick shell is customer-first and no longer defaults to a demo shop
+ok 142 - QRquick shell is customer-first and no longer defaults to a demo shop
+  ---
+  duration_ms: 8.154271
+  type: 'test'
+  ...
+# Subtest: QRquick manifest opens the customer home and supports any orientation
+ok 143 - QRquick manifest opens the customer home and supports any orientation
+  ---
+  duration_ms: 2.105064
+  type: 'test'
+  ...
+# Subtest: shop entry allow-lists slug-shaped routes and does not navigate to arbitrary origins
+ok 144 - shop entry allow-lists slug-shaped routes and does not navigate to arbitrary origins
+  ---
+  duration_ms: 2.44651
+  type: 'test'
+  ...
+# Subtest: theme selection is persisted under the QRquick namespace
+ok 145 - theme selection is persisted under the QRquick namespace
+  ---
+  duration_ms: 1.395975
+  type: 'test'
+  ...
+1..145
+# tests 145
+# suites 0
+# pass 145
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1311.511733

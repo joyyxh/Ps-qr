@@ -1,0 +1,15 @@
+322dc24 Integrate secure printing agent and owner-only app mode
+ supabase/functions/owner-file-link/index.ts |   2 +-
+ supabase/functions/upload-file/index.ts     |  19 +++
+ supabase/tests/stage1_isolation_tests.sql   |  12 +-
+ supabase/tests/stage4_files_tests.sql       |  12 +-
+ supabase/tests/stage5_orders_tests.sql      |  10 +-
+ supabase/tests/stage6_features_tests.sql    |   6 +-
+ web/package.json                            |   2 +-
+ web/src/logic.js                            | 106 +++++++++++++++++
+ web/src/owner-api.js                        |  37 +++++-
+ web/src/owner.js                            | 178 ++++++++++++++++++++++++++--
+ web/styles.css                              |   4 +
+ web/tests/orders.test.js                    |   2 +-
+ 12 files changed, 358 insertions(+), 32 deletions(-)
+1

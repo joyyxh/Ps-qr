@@ -1,0 +1,17 @@
+   PASS  refused: DATABASE_URL set
+   PASS  refused: SUPABASE_DB_URL set
+   PASS  refused: PGURL set
+   PASS  refused: PGSERVICE set
+   PASS  refused: PGSERVICEFILE set
+   PASS  refused: PGHOSTADDR set
+   PASS  refused: PGHOST is a remote name
+   PASS  refused: PGHOST is a remote address
+   PASS  refused: PGHOST is a comma list
+   PASS  refused: PGHOST contains a space
+   PASS  refused: PGHOST has an equals sign
+   PASS  refused: PGHOST is a missing socket dir
+   PASS  refused: PGPORT is not a number
+   PASS  refused: PGPORT is out of range
+   PASS  refused: PGPORT is zero
+   PASS  psql was never called
+== guard tests: 16 passed, 0 failed

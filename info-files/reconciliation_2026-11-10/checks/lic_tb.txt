@@ -1,0 +1,8 @@
+licence_audit_log
+licence_config
+licence_coverages
+licence_denial_windows
+licence_denials
+licence_requests
+platform_admins
+shop_licence_meta

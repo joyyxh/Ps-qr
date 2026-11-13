@@ -1,0 +1,12 @@
+PASS  local: no QR code is built for a local address
+PASS  local: no JavaScript errors
+PASS  published: address field shows the QR address  (https://printnest.example/#/s/demo-xerox)
+FAIL  published: warning shown only for a local address  (["No printing computer is set up yet, so orders will not print automatically."])
+PASS  published: code is drawn on the page
+PASS  published: on-screen code scans to the shop address  (decoded=https://printnest.example/#/s/demo-xerox)
+PASS  published: download is named for the shop  (qrquick-demo-xerox-qr.png)
+PASS  published: downloaded PNG scans to the shop address  (decoded=https://printnest.example/#/s/demo-xerox)
+PASS  published: no horizontal scroll at phone width  (overflow=0px)
+PASS  published: no JavaScript errors
+
+9 of 10 checks passed.

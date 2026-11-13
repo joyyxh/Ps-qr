@@ -1,0 +1,30 @@
+== rebuilding qrquick_scratch on /var/run/postgresql:5432 (server address: socket)
+== stubs (Supabase auth/storage/roles stand-ins)
+   applied 0001_stage1_foundation.sql
+   applied 0002_services_public_policy_fix.sql
+   applied 0003_customer_files.sql
+   applied 0004_shop_features_payment_qr.sql
+   applied 0005_shop_assets_policy_fix.sql
+   applied 0006_payments_and_statistics.sql
+   applied 0007_security_hardening.sql
+   applied 0008_payment_intents.sql
+psql:/tmp/qrq-mut-claim/supabase/migrations/0009_cash_policy_and_payment_hardening.sql:27: NOTICE:  trigger "orders_qrquick_minimum_order" for relation "public.orders" does not exist, skipping
+   applied 0009_cash_policy_and_payment_hardening.sql
+   applied 0010_print_agents.sql
+   applied 0011_service_options.sql
+psql:/tmp/qrq-mut-claim/supabase/migrations/0012_print_eligibility.sql:71: NOTICE:  trigger "orders_cancel_unprintable_jobs" for relation "public.orders" does not exist, skipping
+   applied 0012_print_eligibility.sql
+   seed applied (development data only)
+== suites (requires-migration header is checked against 0012)
+   PASS  paper_sizes_tests: 74 of 74 checks
+      FAIL E18 the claim refuses a queued job whose order was refunded -- {"job_id": "a52ce634-ecb0-45eb-8c86-eb969aa0e577", "attempt": 1, "printer": null, "settings": {"pages": 1, "paper": "A4", "colour": false, "copies": 2, "duplex": false, "file_name": "elig.pdf"}, "file_name": "elig.pdf", "mime_type": "application/pdf", "size_bytes": 1024, "lease_until": "2026-10-24T08:41:24.352092+00:00", "storage_path": "bbbbbbbb-0000-0000-0000-000000000001/82b2f81e-e667-4760-b6ea-6826abe83172.pdf"}
+   FAIL  print_eligibility_tests: 1 of 19 checks failed
+   PASS  service_pricing_tests: 34 of 34 checks
+   PASS  stage1_isolation_tests: 30 of 30 checks
+   PASS  stage3_owner_tests: 30 of 30 checks
+   PASS  stage4_files_tests: 23 of 23 checks
+   PASS  stage5_orders_tests: 23 of 23 checks
+   PASS  stage6_features_tests: 42 of 42 checks
+   PASS  stage7_stats_tests: 54 of 54 checks
+   PASS  stage8_print_tests: 48 of 48 checks
+== 10 suites run, 0 skipped, 377 checks, 1 failing

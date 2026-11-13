@@ -1,0 +1,17 @@
+approve_order_for_print
+create_print_agent_pairing
+create_shop
+owner_print_status
+place_order
+quote_order
+retry_print_job
+revoke_print_agent
+set_cancel_reason
+set_order_payment
+set_payment_qr
+set_print_agent_printer
+set_shop_features
+shop_licence_status
+shop_recent_activity
+shop_stats_daily
+shop_stats_summary

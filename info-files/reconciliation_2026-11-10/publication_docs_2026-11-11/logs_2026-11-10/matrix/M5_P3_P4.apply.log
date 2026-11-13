@@ -1,0 +1,4 @@
+applied P3_7D_admin.patch
+applied P4_7E_web.patch
+admin exit=1
+web exit=0

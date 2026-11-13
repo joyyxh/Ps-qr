@@ -1,0 +1,11 @@
+test('signUp refuses a session reply and keeps nothing, so an owner cannot skip email verification', async () => {
+  await assert.rejects(auth.signUp('x@example.com', 'long-password'), (err) => {
+    assert.equal(err.code, 'confirmation_disabled');
+    return true;
+  });
+  assert.equal(storage._data.has(SESSION_KEY), false);
+test('confirmation callback holds the session in memory until the owner chooses a password', async () => {
+  assert.equal(callback.type, 'signup');
+  assert.equal(callback.pending, true);
+  assert.equal(storage._data.has(SESSION_KEY), false, 'nothing is stored before a password is saved');
+  assert.equal(auth.hasPendingSignup(), true);

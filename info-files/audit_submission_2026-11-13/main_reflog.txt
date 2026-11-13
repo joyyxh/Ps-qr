@@ -1,0 +1,4 @@
+37e4623 HEAD@{2026-10-25 13:37:05 +0000}: commit: Add owner email-code registration and password setup
+4d97e40 HEAD@{2026-10-21 10:53:37 +0000}: merge origin/main: Fast-forward
+acacd4a HEAD@{2026-10-21 10:53:37 +0000}: reset: moving to HEAD
+acacd4a HEAD@{2026-10-20 08:51:16 +0000}: clone: from https://github.com/joyyxh/ps-qr

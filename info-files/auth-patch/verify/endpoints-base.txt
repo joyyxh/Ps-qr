@@ -1,0 +1,8 @@
+/auth/v1/user
+/rest/v1/rpc
+functions/v1/owner-file-link
+functions/v1/print-agent
+functions/v1/upload-file
+rpc('place_order
+rpc('quote_order
+rpc('track_order

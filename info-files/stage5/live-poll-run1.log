@@ -1,0 +1,36 @@
+PASS   orders page opens with the open order
+PASS   one orders request on open (requests=1)
+PASS   status says updates are automatic
+PASS   no refresh before 25 s (requests=1)
+PASS   refresh at 25 s
+PASS   held refresh started
+PASS   no second request while one is waiting (requests=3)
+PASS   refresh resumes after the held reply
+PASS   no requests while the page is hidden (requests=4)
+PASS   refresh at once when the page is visible again
+PASS   quick hidden/visible toggles add no extra request (requests=6)
+PASS   timer resumes after the toggles
+PASS   failed refresh is attempted
+PASS   failure says updates are paused (Automatic updates are paused because the connection failed. The list shows the last update. Use Refresh to try again.)
+PASS   last list is still on screen after a failure
+PASS   no retry before the 25 s backoff
+PASS   first retry after 25 s
+PASS   second retry waits 50 s (requests=9)
+PASS   second retry at 50 s
+PASS   third retry waits 100 s (requests=10)
+PASS   recovery refresh at 100 s
+PASS   status returns to automatic after recovery
+PASS   Refresh button sends one request
+PASS   Refresh leaves the list in place
+PASS   unchanged refresh happens
+PASS   unchanged data does not redraw the list
+PASS   changed refresh happens
+PASS   new order appears without a reload (cards=2)
+PASS   list was redrawn for the change
+PASS   expired session is reported
+PASS   no requests after the session has ended (requests=15)
+PASS   leaving the Orders page stops automatic refresh (requests=15)
+PASS   the Orders list is gone after leaving
+PASS   no page errors
+
+all checks passed

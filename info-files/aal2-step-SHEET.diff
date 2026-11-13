@@ -1,0 +1,56 @@
+--- pre-2026-11-04-aal2/OWNER_DECISION_SHEET.md	2026-11-04 13:32:40.460135511 +0000
++++ /home/claude/joyyxh/ps-qr-stage7/OWNER_DECISION_SHEET.md	2026-11-04 13:33:16.340583018 +0000
+@@ -1,6 +1,6 @@
+ # Stage 7 owner decision sheet
+ 
+-**Status: documentation only.** Prepared 2026-10-31 from `STAGE7_DECISIONS.md`, corrected after the review of the same date, and updated 2026-11-02 for the O1–O13 record and the consistency pass, and updated 2026-11-04 for the ten decisions in Part 1H and the six Stage 7C decisions in Part 1I. This sheet approves nothing: no decision, gate, setup, migration, test, price, publication, production change or external action. It proposes no price. A "Claude suggests" entry is a suggestion, not a default. Nothing here has been checked against production.
++**Status: documentation only.** Prepared 2026-10-31 from `STAGE7_DECISIONS.md`, corrected after the review of the same date, and updated 2026-11-02 for the O1–O13 record and the consistency pass, and updated 2026-11-04 for the ten decisions in Part 1H and the six Stage 7C decisions in Part 1I, and the AAL2 failure decision in Part 1J. This sheet approves nothing: no decision, gate, setup, migration, test, price, publication, production change or external action. It proposes no price. A "Claude suggests" entry is a suggestion, not a default. Nothing here has been checked against production.
+ 
+ **Item 2 (hold start) is DEFERRED** (owner instruction 1, 2026-10-31). It is not a Stage 7 closure requirement. **Enforcement activation is not a Stage 7 closure requirement** (owner instruction 2).
+ 
+@@ -76,7 +76,7 @@
+ 
+ | No. | Owner decision (2026-11-02, OWNER-APPROVED) | Conditions and OPEN items |
+ |---|---|---|
+-| 1 | AAL2: `aal2` is required for every platform-admin RPC. | OPEN: verified recovery procedure if the admin loses the TOTP factor; hosted and local verification of the `aal` claim (R16, S-3). Both remain prerequisites before 7C. |
++| 1 | AAL2: `aal2` is required for every platform-admin RPC. | OPEN: verified recovery procedure if the admin loses the TOTP factor; hosted and local verification of the `aal` claim (R16, S-3). Both remain prerequisites before 7C. 2026-11-04 (Part 1J): a failed AAL2 check is an authorisation failure, returning a committed `forbidden` result, logged and counted; the protected operation is not executed. |
+ | 2 | Item 15: option (a), a provisional ceiling for staging only. | OPEN: the production ceiling value; the remaining C-12 and item 15 details. |
+ | 3 | Migration placement P1: `licence_requests` and `licence_denials` go in the existing `0011_licence_foundation.sql`. | Subject to pre-staging review. Not applied. 0011 does not yet contain these tables. Placement is confirmed by O2 (Part 1G). Adding the tables to the file is still a separate implementation step, not approved here. |
+ | 4 | Lifetime grants: admin-only. | Replaces the earlier "owner-only" recommendation. Under 0011 as written, any platform admin can grant lifetime, because no role column exists. |
+@@ -190,6 +190,20 @@
+ | Blocks production only | Backdating window. Denial ceiling, threshold and alert mechanism (O9). Final C-12 acceptance. Lawyer review of retention and DPDP. Production admin UUID and MFA; admin count. Production migration list and live signatures (dashboard). |
+ 
+ 
++## Part 1J. Owner decision recorded 2026-11-04: AAL2 failure handling
++
++Recorded in `STAGE7_DECISIONS.md` §13 ("Owner decision record (2026-11-04): AAL2 failure handling") and §12A.8. It approves no 7C implementation, staging run, test, SQL, migration change, commit, push, merge or deployment.
++
++| No. | Owner decision (2026-11-04) | Status | Effect and limits |
++|---|---|---|---|
++| AAL2-1 | A platform-admin RPC request that fails the required AAL2 assurance check is an authorisation failure. | DECIDED | Consistent with A4 (Part 1I). |
++| AAL2-2 | It returns a committed `forbidden` result. | DECIDED | Committed, as R3 requires. |
++| AAL2-3 | It is logged to `licence_denials` and counted toward the authorisation-denial counter. | DECIDED | Not written to the replay ledger or the audit log. |
++| AAL2-4 | The protected admin operation is not executed. | DECIDED | No coverage, audit or replay-ledger row is written. |
++
++**Still open:** whether a denied request increments `state_version` (§12B.11 and R2 conflict with the denial-before-lock order); handling of a missing or unreadable `aal` claim; hosted and local verification of the claim (O11, R16, S-3); the A3 recovery procedure text.
++
++
+ ## Part 2. Decide now (owner answers, RECOMMENDED)
+ 
+ These are defaults the owner can confirm or change. A confirmed answer records a decision and approves no gate.
+@@ -220,7 +234,7 @@
+ 
+ | ID | Decision | Needed before | Claude suggests | Consequence |
+ |---|---|---|---|---|
+-| Item 5, Dec 14 | Production-owner evidence: the admin Auth user UUID (never inferred) and the MFA status. Whether `aal2` is required for admin RPCs. Both are EXTERNAL BLOCKER | 7A, the bootstrap row, 7C, 7D | Require `aal2`. The production owner supplies the UUID | 7A cannot finish without them. The UUID is not put in the migration. 2026-11-02 (Part 1D): `aal2` requirement OWNER-APPROVED. Recovery procedure and hosted and local claim verification OPEN. A3 (2026-11-04, Part 1I): the written procedure is required before 7C sign-off. |
++| Item 5, Dec 14 | Production-owner evidence: the admin Auth user UUID (never inferred) and the MFA status. Whether `aal2` is required for admin RPCs. Both are EXTERNAL BLOCKER | 7A, the bootstrap row, 7C, 7D | Require `aal2`. The production owner supplies the UUID | 7A cannot finish without them. The UUID is not put in the migration. 2026-11-02 (Part 1D): `aal2` requirement OWNER-APPROVED. Recovery procedure and hosted and local claim verification OPEN. A3 (2026-11-04, Part 1I): the written procedure is required before 7C sign-off. AAL2 failure handling decided 2026-11-04 (Part 1J). |
+ | Dec 16, maximum length (item 7) | Maximum custom grant length | 7C validation | DECIDED (owner, 2026-11-01): none. No maximum duration | Closed. The 7B schema has no duration cap. The 7C validation must not impose one. |
+ | Item 15, C-12 | Global denial ceiling value. Accept count-only records above the cap of 20 per user per hour | 7C | Set the ceiling after staging measures row growth. No value is proposed here. **Circular:** §15.3 requires this ceiling accepted before 7C, but the measurement needs the 7C denial log on staging. Owner to choose: (a) a test-only provisional ceiling for staging measurement, or (b) a value set without measurement. 2026-11-02 (Part 1D): option (a) chosen, a provisional ceiling for staging only. Production ceiling and remaining C-12 details OPEN. No staging ceiling value is set yet (Part 1I, B1). | Sets denial-log growth. Detail above the cap is lost, and the owner must accept that. |
+ | Dec 7 | Deletion schedule: whether licence expiry should change file deletion timing. This is separate from the expiry behaviour already approved (A, B, C) | Enforcement activation, and any retention change | No view given here. The current schedule stays until decided | Open under item 1. The current purge schedule is unverified live (§5C). |
+@@ -338,5 +352,6 @@
+ - Not approved (2026-11-01): the superseded advisory-lock admin contract. This refers only to the earlier advisory-lock R18 design. It does not refer to the R18 lock-order design, whose design is APPROVED (Part 1C) and whose implementation is NOT approved. Also not approved: admin RPCs, printing fixes 23 and 24, tests, staging, local setup, commits and pushes. (`licence_lock_shop()` was approved for implementation on 2026-11-01, scope only: Part 1F.)
+ - 2026-11-01, third record: R18 lock-order contract approved as design only (Part 1C). Implementation is not approved; no code, SQL, test, setup, commit or push is approved.
+ - 2026-11-04, Part 1I (Stage 7C): A1 different-kind grants may coexist; A2 calendar-based grants keep the start's clock time (custom-grant boundaries OPEN); A3 procedure required before 7C implementation sign-off, not before implementation starts; A4 response contract; A5 staff receive no licence information; B2 permission-rejected calls not counted for staging. No gate approved.
++- 2026-11-04, Part 1J: AAL2-1 to AAL2-4 decided. A failed AAL2 check is an authorisation failure: committed `forbidden`, logged and counted, protected operation not executed. No gate approved.
+ 
+ Not listed here, and still open: §12B.2 B (conditional on C-1 and C-3; EXTERNAL BLOCKER), I (pricing, blocked), K (fix implementation, Part 7), L (local setup first), M1 (proposal), and M8 (policy, legal review needed).

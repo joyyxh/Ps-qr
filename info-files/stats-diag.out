@@ -1,0 +1,64 @@
+PASS  shop tab bar links to Statistics next to Orders
+PASS  statistics page opens with This month selected
+PASS  net earnings tile shows ₹22.00
+PASS  completed revenue shows ₹18.00
+PASS  order value is shown apart from earnings
+PASS  weekly chart draws 7 days of earning bars
+PASS  cancellation reasons are named
+PASS  services table lists the passport photo line as colour
+PASS  recent activity shows the refund
+PASS  earnings can be grouped by week
+PASS  Today asks for one day only ({"p_shop_id":"bbbbbbbb-0000-0000-0000-000000000001","p_from":"2026-10-21","p_to":"2026-10-21"})
+PASS  a backwards custom range is refused on screen
+PASS  custom range sends the chosen dates (current period request found)
+PASS  previous week loads a new 7-day report
+PASS  daily CSV file name (printnest-demo-xerox-daily-2026-10-01-to-2026-10-10.csv)
+PASS  daily CSV has the header row
+PASS  orders CSV includes the order codes
+PASS  unpaid order offers Mark paid in cash
+PASS  marking paid sends the payment action, not a price ({"p_order_id":"ord-1","p_action":"set_paid","p_channel":"cash"})
+PASS  the order shows Paid in cash after the change
+PASS  refund asks for confirmation first (Record a refund of ₹9.00 for order WXYZ2345? This cannot be undone.)
+PASS  refund is sent as a refund action
+PASS  cancel reason is saved for the rejected order
+FAIL  status buttons still show for open orders
+OFFENDERS:
+  section[card] right=484 text=Based on your orders and the p
+  p[muted small] right=463 text=Based on your orders and the p
+  div[segmented stats-periods] right=463 text=TodayThis weekThis monthThis y
+  button[] right=462 text=This year
+  button[] right=462 text=Custom
+  p[muted small] right=463 text=Showing 1 Oct 2026 – 22 Oct 20
+  p[] right=463 text=Refresh
+  p[error] right=463 text=
+  section[card] right=484 text=Earnings and revenue
+        M
+  h2[] right=463 text=Earnings and revenue
+  p[muted small] right=463 text=Money you recorded as received
+  div[stat-grid] right=463 text=Net earnings
+    ₹22.00
+    Sa
+  div[stat] right=463 text=Received in cash
+    ₹22.00
+  span[label] right=452 text=Received in cash
+  span[value] right=452 text=₹22.00
+DIAG STATS inner=390 scrollWidth=484
+  section.card w=464 l=20 r=484 disp=block cols=none minW=auto ws=normal
+  div.owner-content w=350 l=20 r=370 disp=grid cols=464.109px minW=0px ws=normal
+  div.owner-main w=350 l=20 r=370 disp=grid cols=350px minW=0px ws=normal
+  div.owner-shell w=350 l=20 r=370 disp=grid cols=350px minW=0px ws=normal
+  main. w=390 l=0 r=390 disp=grid cols=350px minW=0px ws=normal
+  body. w=390 l=0 r=390 disp=block cols=none minW=0px ws=normal
+DIAG WIDE DESCENDANTS
+  p.muted small w=422 l=41 r=463 disp=block cols=none minW=0px ws=normal
+  div.segmented stats-periods w=422 l=41 r=463 disp=flex cols=none minW=0px ws=normal
+  p.muted small w=422 l=41 r=463 disp=block cols=none minW=0px ws=normal
+  p. w=422 l=41 r=463 disp=block cols=none minW=0px ws=normal
+  p.error w=422 l=41 r=463 disp=block cols=none minW=0px ws=normal
+DIAG TRY shell-1fr: scrollWidth=484
+DIAG TRY card-min0: scrollWidth=390
+DIAG TRY owner-widths: scrollWidth=484
+FAIL  no sideways scrolling at 390px wide ({"scroll":484,"inner":390})
+PASS  no page errors or console errors
+
+2 CHECK(S) FAILED

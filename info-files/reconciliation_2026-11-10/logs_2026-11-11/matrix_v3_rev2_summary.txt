@@ -1,0 +1,61 @@
+--- M1_P3_only
+applied P3_7D_admin.patch
+admin exit=1
+web exit=0
+  admin # tests 27
+  admin # pass 23
+  admin # fail 4
+  web # tests 163
+  web # pass 163
+  web # fail 0
+--- M2_P4_only
+applied P4_7E_web.patch
+admin: no directory
+web exit=0
+  web # tests 212
+  web # pass 212
+  web # fail 0
+--- M3_P2_P3
+applied P2_7B_7C_database.patch
+applied P3_7D_admin.patch
+admin exit=0
+web exit=0
+  admin # tests 72
+  admin # pass 72
+  admin # fail 0
+  web # tests 163
+  web # pass 163
+  web # fail 0
+--- M4_P2_P4
+applied P2_7B_7C_database.patch
+applied P4_7E_web.patch
+admin: no directory
+web exit=0
+  web # tests 212
+  web # pass 212
+  web # fail 0
+--- M5_P3_P4
+applied P3_7D_admin.patch
+applied P4_7E_web.patch
+admin exit=1
+web exit=0
+  admin # tests 27
+  admin # pass 23
+  admin # fail 4
+  web # tests 212
+  web # pass 212
+  web # fail 0
+--- M6_P1_P2_P3_P4
+applied P1_stage7_governance.patch
+applied P2_7B_7C_database.patch
+applied P3_7D_admin.patch
+applied P4_7E_web.patch
+admin exit=0
+web exit=0
+  admin # tests 72
+  admin # pass 72
+  admin # fail 0
+  web # tests 212
+  web # pass 212
+  web # fail 0
+M7 P2 alone: applies cleanly (no npm test covers it)

@@ -1,0 +1,626 @@
+
+> qrquick-print-agent@0.1.0 test
+> node --test
+
+TAP version 13
+# Subtest: pair saves the token, prints no token, and sends the code to the server
+ok 1 - pair saves the token, prints no token, and sends the code to the server
+  ---
+  duration_ms: 63.391122
+  type: 'test'
+  ...
+# Subtest: pair refuses an insecure server address before contacting anything
+ok 2 - pair refuses an insecure server address before contacting anything
+  ---
+  duration_ms: 5.779443
+  type: 'test'
+  ...
+# Subtest: set-printer only accepts a printer that exists on this computer
+ok 3 - set-printer only accepts a printer that exists on this computer
+  ---
+  duration_ms: 9.516851
+  type: 'test'
+  ...
+# Subtest: run refuses to start before the computer is paired
+ok 4 - run refuses to start before the computer is paired
+  ---
+  duration_ms: 7.938172
+  type: 'test'
+  ...
+# Subtest: doctor reports a failed connection and exits non-zero
+ok 5 - doctor reports a failed connection and exits non-zero
+  ---
+  duration_ms: 6.333015
+  type: 'test'
+  ...
+# Subtest: doctor sends the real printer list, so the owner keeps seeing the printers
+ok 6 - doctor sends the real printer list, so the owner keeps seeing the printers
+  ---
+  duration_ms: 4.885689
+  type: 'test'
+  ...
+# Subtest: unknown commands and help
+ok 7 - unknown commands and help
+  ---
+  duration_ms: 2.817922
+  type: 'test'
+  ...
+# Subtest: detects PDF, JPEG and PNG by their first bytes, not by file name
+ok 8 - detects PDF, JPEG and PNG by their first bytes, not by file name
+  ---
+  duration_ms: 3.819425
+  type: 'test'
+  ...
+# Subtest: wraps an RGB PNG in a valid one-page PDF with the picture as a Flate stream
+ok 9 - wraps an RGB PNG in a valid one-page PDF with the picture as a Flate stream
+  ---
+  duration_ms: 1.94069
+  type: 'test'
+  ...
+# Subtest: wraps a greyscale PNG with DeviceGray
+ok 10 - wraps a greyscale PNG with DeviceGray
+  ---
+  duration_ms: 1.195289
+  type: 'test'
+  ...
+# Subtest: wraps a JPEG without re-encoding it (DCTDecode)
+ok 11 - wraps a JPEG without re-encoding it (DCTDecode)
+  ---
+  duration_ms: 0.731951
+  type: 'test'
+  ...
+# Subtest: refuses PNG pictures with transparency, alpha or 16-bit depth
+ok 12 - refuses PNG pictures with transparency, alpha or 16-bit depth
+  ---
+  duration_ms: 2.699326
+  type: 'test'
+  ...
+# Subtest: refuses CMYK JPEG and other colour formats with a clear message
+ok 13 - refuses CMYK JPEG and other colour formats with a clear message
+  ---
+  duration_ms: 0.523043
+  type: 'test'
+  ...
+# Subtest: readImage rejects anything that is not a JPEG or PNG
+ok 14 - readImage rejects anything that is not a JPEG or PNG
+  ---
+  duration_ms: 0.537176
+  type: 'test'
+  ...
+# Subtest: reads the CUPS printer list, enabled state and default
+ok 15 - reads the CUPS printer list, enabled state and default
+  ---
+  duration_ms: 4.345753
+  type: 'test'
+  ...
+# Subtest: reads printer options, marking the default value with an asterisk
+ok 16 - reads printer options, marking the default value with an asterisk
+  ---
+  duration_ms: 1.092399
+  type: 'test'
+  ...
+# Subtest: colour and double-sided come only from the printer's own options
+ok 17 - colour and double-sided come only from the printer's own options
+  ---
+  duration_ms: 0.841016
+  type: 'test'
+  ...
+# Subtest: an IPP "one-sided" value is NOT read as double-sided
+ok 18 - an IPP "one-sided" value is NOT read as double-sided
+  ---
+  duration_ms: 0.400164
+  type: 'test'
+  ...
+# Subtest: lp arguments: printer, copies, colour, duplex, media, then "--" before the file
+ok 19 - lp arguments: printer, copies, colour, duplex, media, then "--" before the file
+  ---
+  duration_ms: 0.546309
+  type: 'test'
+  ...
+# Subtest: lp arguments leave out media the printer does not list, and pick a grey mode for black-and-white
+ok 20 - lp arguments leave out media the printer does not list, and pick a grey mode for black-and-white
+  ---
+  duration_ms: 0.528431
+  type: 'test'
+  ...
+# Subtest: Linux adapter lists printers with default and capability flags
+ok 21 - Linux adapter lists printers with default and capability flags
+  ---
+  duration_ms: 1.074831
+  type: 'test'
+  ...
+# Subtest: Linux adapter reports a missing CUPS as print_engine_missing
+ok 22 - Linux adapter reports a missing CUPS as print_engine_missing
+  ---
+  duration_ms: 0.937714
+  type: 'test'
+  ...
+# Subtest: Linux adapter submits with lp and returns the request id
+ok 23 - Linux adapter submits with lp and returns the request id
+  ---
+  duration_ms: 0.887004
+  type: 'test'
+  ...
+# Subtest: Linux adapter turns an lp refusal into spooler_error
+ok 24 - Linux adapter turns an lp refusal into spooler_error
+  ---
+  duration_ms: 0.802924
+  type: 'test'
+  ...
+# Subtest: reads Windows printer lists whether PowerShell returns one object or many
+ok 25 - reads Windows printer lists whether PowerShell returns one object or many
+  ---
+  duration_ms: 0.451059
+  type: 'test'
+  ...
+# Subtest: reads colour and duplex from the print configuration, and says "unknown" when absent
+ok 26 - reads colour and duplex from the print configuration, and says "unknown" when absent
+  ---
+  duration_ms: 0.474081
+  type: 'test'
+  ...
+# Subtest: SumatraPDF settings: copies, colour mode and duplex
+ok 27 - SumatraPDF settings: copies, colour mode and duplex
+  ---
+  duration_ms: 0.166979
+  type: 'test'
+  ...
+# Subtest: SumatraPDF arguments keep the printer name as one argument (no shell parsing)
+ok 28 - SumatraPDF arguments keep the printer name as one argument (no shell parsing)
+  ---
+  duration_ms: 0.248153
+  type: 'test'
+  ...
+# Subtest: finds SumatraPDF in the usual install folders only
+ok 29 - finds SumatraPDF in the usual install folders only
+  ---
+  duration_ms: 0.387739
+  type: 'test'
+  ...
+# Subtest: Windows adapter prints with SumatraPDF and reports a missing install clearly
+ok 30 - Windows adapter prints with SumatraPDF and reports a missing install clearly
+  ---
+  duration_ms: 1.044599
+  type: 'test'
+  ...
+# Subtest: Windows adapter reads printers through PowerShell and passes the name as an environment value
+ok 31 - Windows adapter reads printers through PowerShell and passes the name as an environment value
+  ---
+  duration_ms: 0.427472
+  type: 'test'
+  ...
+# Subtest: run sends the saved token and printer list to the saved address, stops at once on 401, and prints nothing
+ok 32 - run sends the saved token and printer list to the saved address, stops at once on 401, and prints nothing
+  ---
+  duration_ms: 73.30803
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer is refused before the saved config is read, so nothing starts
+ok 33 - run --simulated-printer is refused before the saved config is read, so nothing starts
+  ---
+  duration_ms: 12.822006
+  type: 'test'
+  ...
+# Subtest: the simulated printer is clearly named, marked simulated, and is the default
+ok 34 - the simulated printer is clearly named, marked simulated, and is the default
+  ---
+  duration_ms: 1.529567
+  type: 'test'
+  ...
+# Subtest: simulated results are deterministic: each accepted job gets the next simulated id
+ok 35 - simulated results are deterministic: each accepted job gets the next simulated id
+  ---
+  duration_ms: 14.849518
+  type: 'test'
+  ...
+# Subtest: the simulated spooler refuses a non-PDF file or a printer it does not have
+ok 36 - the simulated spooler refuses a non-PDF file or a printer it does not have
+  ---
+  duration_ms: 4.822305
+  type: 'test'
+  ...
+# Subtest: a simulated run records "printing" before the print, then reports sent and says SIMULATED
+ok 37 - a simulated run records "printing" before the print, then reports sent and says SIMULATED
+  ---
+  duration_ms: 13.199878
+  type: 'test'
+  ...
+# Subtest: a picture is wrapped in a PDF first, so the simulated spooler receives a PDF
+ok 38 - a picture is wrapped in a PDF first, so the simulated spooler receives a PDF
+  ---
+  duration_ms: 11.171681
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is simulated
+ok 39 - an unknown file type is refused and nothing is simulated
+  ---
+  duration_ms: 2.557162
+  type: 'test'
+  ...
+# Subtest: a file the server cannot give us is reported once as failed and nothing is simulated
+ok 40 - a file the server cannot give us is reported once as failed and nothing is simulated
+  ---
+  duration_ms: 3.752362
+  type: 'test'
+  ...
+# Subtest: a job the server has already moved on from is not simulated again
+ok 41 - a job the server has already moved on from is not simulated again
+  ---
+  duration_ms: 13.000647
+  type: 'test'
+  ...
+# Subtest: no answer to "printing" means nothing is simulated and nothing is reported as failed
+ok 42 - no answer to "printing" means nothing is simulated and nothing is reported as failed
+  ---
+  duration_ms: 11.67448
+  type: 'test'
+  ...
+# Subtest: a result that could not be sent is kept and sent later, without a second simulated print
+ok 43 - a result that could not be sent is kept and sent later, without a second simulated print
+  ---
+  duration_ms: 27.478759
+  type: 'test'
+  ...
+# Subtest: a simulated printer that is turned off fails the job before anything is simulated
+ok 44 - a simulated printer that is turned off fails the job before anything is simulated
+  ---
+  duration_ms: 1.876705
+  type: 'test'
+  ...
+# Subtest: a black-and-white simulated printer refuses a colour order before anything is simulated
+ok 45 - a black-and-white simulated printer refuses a colour order before anything is simulated
+  ---
+  duration_ms: 1.62624
+  type: 'test'
+  ...
+# Subtest: an order for a printer this computer does not have fails as printer_not_found
+ok 46 - an order for a printer this computer does not have fails as printer_not_found
+  ---
+  duration_ms: 1.624683
+  type: 'test'
+  ...
+# Subtest: the simulated module never imports the command runner or a real printer adapter
+ok 47 - the simulated module never imports the command runner or a real printer adapter
+  ---
+  duration_ms: 0.845551
+  type: 'test'
+  ...
+# Subtest: a fixture with one unpaid job refuses the whole file, so nothing is simulated
+ok 48 - a fixture with one unpaid job refuses the whole file, so nothing is simulated
+  ---
+  duration_ms: 13.815573
+  type: 'test'
+  ...
+# Subtest: only a literal approved and paid order can be simulated
+ok 49 - only a literal approved and paid order can be simulated
+  ---
+  duration_ms: 5.566855
+  type: 'test'
+  ...
+# Subtest: a file outside the fixture folder is refused
+ok 50 - a file outside the fixture folder is refused
+  ---
+  duration_ms: 6.031706
+  type: 'test'
+  ...
+# Subtest: job ids, states and attempt numbers are checked, and a repeated job id is refused
+ok 51 - job ids, states and attempt numbers are checked, and a repeated job id is refused
+  ---
+  duration_ms: 6.00442
+  type: 'test'
+  ...
+# Subtest: a link inside the fixture folder that points outside it is refused before anything runs
+ok 52 - a link inside the fixture folder that points outside it is refused before anything runs
+  ---
+  duration_ms: 8.106976
+  type: 'test'
+  ...
+# Subtest: simulate refuses a fixture whose link leaves the folder, and starts nothing
+ok 53 - simulate refuses a fixture whose link leaves the folder, and starts nothing
+  ---
+  duration_ms: 13.686523
+  type: 'test'
+  ...
+# Subtest: a link that stays inside the fixture folder is still simulated
+ok 54 - a link that stays inside the fixture folder is still simulated
+  ---
+  duration_ms: 25.512045
+  type: 'test'
+  ...
+# Subtest: a file replaced by a link to outside after the check is refused when it is read
+ok 55 - a file replaced by a link to outside after the check is refused when it is read
+  ---
+  duration_ms: 11.508117
+  type: 'test'
+  ...
+# Subtest: a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+ok 56 - a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+  ---
+  duration_ms: 18.546704
+  type: 'test'
+  ...
+# Subtest: the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+ok 57 - the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+  ---
+  duration_ms: 24.895124
+  type: 'test'
+  ...
+# Subtest: printing and needs-check jobs are never claimed or printed again
+ok 58 - printing and needs-check jobs are never claimed or printed again
+  ---
+  duration_ms: 29.531869
+  type: 'test'
+  ...
+# Subtest: settings the simulated printer cannot do are refused before anything is simulated
+ok 59 - settings the simulated printer cannot do are refused before anything is simulated
+  ---
+  duration_ms: 7.470458
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is simulated
+ok 60 - an unknown file type is refused and nothing is simulated
+  ---
+  duration_ms: 8.717553
+  type: 'test'
+  ...
+# Subtest: a picture is wrapped in a PDF and then simulated
+ok 61 - a picture is wrapped in a PDF and then simulated
+  ---
+  duration_ms: 21.453867
+  type: 'test'
+  ...
+# Subtest: a file whose size does not match what was ordered is refused
+ok 62 - a file whose size does not match what was ordered is refused
+  ---
+  duration_ms: 5.79954
+  type: 'test'
+  ...
+# Subtest: a missing file is reported as a failed download, and nothing is simulated
+ok 63 - a missing file is reported as a failed download, and nothing is simulated
+  ---
+  duration_ms: 6.785837
+  type: 'test'
+  ...
+# Subtest: the in-memory server refuses a result that would skip the printing step
+ok 64 - the in-memory server refuses a result that would skip the printing step
+  ---
+  duration_ms: 1.015323
+  type: 'test'
+  ...
+# Subtest: the in-memory server keeps the job rules that migration 0010 states
+ok 65 - the in-memory server keeps the job rules that migration 0010 states
+  ---
+  duration_ms: 0.575008
+  type: 'test'
+  ...
+# Subtest: a server that never runs out of jobs stops at the safety limit instead of hanging
+ok 66 - a server that never runs out of jobs stops at the safety limit instead of hanging
+  ---
+  duration_ms: 36.754578
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer is refused before any request, even against a localhost server
+ok 67 - run --simulated-printer is refused before any request, even against a localhost server
+  ---
+  duration_ms: 5.01499
+  type: 'test'
+  ...
+# Subtest: run refuses an unknown option before any request
+ok 68 - run refuses an unknown option before any request
+  ---
+  duration_ms: 4.110123
+  type: 'test'
+  ...
+# Subtest: simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+ok 69 - simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+  ---
+  duration_ms: 17.5558
+  type: 'test'
+  ...
+# Subtest: simulate with a fixture file runs it offline and prints a summary
+ok 70 - simulate with a fixture file runs it offline and prints a summary
+  ---
+  duration_ms: 22.640374
+  type: 'test'
+  ...
+# Subtest: simulate with an unpaid job in the file stops before anything starts
+ok 71 - simulate with an unpaid job in the file stops before anything starts
+  ---
+  duration_ms: 4.686292
+  type: 'test'
+  ...
+# Subtest: simulate refuses extra arguments and a file that does not exist
+ok 72 - simulate refuses extra arguments and a file that does not exist
+  ---
+  duration_ms: 2.32674
+  type: 'test'
+  ...
+# Subtest: API client: only claim-style calls carry the agent token; pairing does not
+ok 73 - API client: only claim-style calls carry the agent token; pairing does not
+  ---
+  duration_ms: 50.137064
+  type: 'test'
+  ...
+# Subtest: API client turns the server's { code, message } into AgentApiError
+ok 74 - API client turns the server's { code, message } into AgentApiError
+  ---
+  duration_ms: 2.704492
+  type: 'test'
+  ...
+# Subtest: API client reports a dropped connection as "network", without the link or token
+ok 75 - API client reports a dropped connection as "network", without the link or token
+  ---
+  duration_ms: 0.923084
+  type: 'test'
+  ...
+# Subtest: file download refuses anything over the size limit
+ok 76 - file download refuses anything over the size limit
+  ---
+  duration_ms: 2.581076
+  type: 'test'
+  ...
+# Subtest: server address must be https, except a local test server
+ok 77 - server address must be https, except a local test server
+  ---
+  duration_ms: 0.766805
+  type: 'test'
+  ...
+# Subtest: config is saved and loaded back, and a missing file is "not paired"
+ok 78 - config is saved and loaded back, and a missing file is "not paired"
+  ---
+  duration_ms: 23.634037
+  type: 'test'
+  ...
+# Subtest: journal keeps an active job and pending reports across reads
+ok 79 - journal keeps an active job and pending reports across reads
+  ---
+  duration_ms: 14.458736
+  type: 'test'
+  ...
+# Subtest: a damaged journal stops the agent instead of guessing
+ok 80 - a damaged journal stops the agent instead of guessing
+  ---
+  duration_ms: 8.683804
+  type: 'test'
+  ...
+# Subtest: the test page is a valid PDF with a correct cross-reference table
+ok 81 - the test page is a valid PDF with a correct cross-reference table
+  ---
+  duration_ms: 1.960241
+  type: 'test'
+  ...
+# Subtest: records "printing" on the server before the printer receives the file, then reports sent
+ok 82 - records "printing" on the server before the printer receives the file, then reports sent
+  ---
+  duration_ms: 31.760742
+  type: 'test'
+  ...
+# Subtest: does not touch the printer when the server does not confirm the start
+ok 83 - does not touch the printer when the server does not confirm the start
+  ---
+  duration_ms: 18.487779
+  type: 'test'
+  ...
+# Subtest: a printer error is reported once as failed and never retried by the agent
+ok 84 - a printer error is reported once as failed and never retried by the agent
+  ---
+  duration_ms: 9.789709
+  type: 'test'
+  ...
+# Subtest: an error code the server cannot accept is replaced with a safe one
+ok 85 - an error code the server cannot accept is replaced with a safe one
+  ---
+  duration_ms: 5.055208
+  type: 'test'
+  ...
+# Subtest: a colour order on a black-and-white printer fails before anything is sent
+ok 86 - a colour order on a black-and-white printer fails before anything is sent
+  ---
+  duration_ms: 2.376785
+  type: 'test'
+  ...
+# Subtest: an offline printer fails before anything is sent
+ok 87 - an offline printer fails before anything is sent
+  ---
+  duration_ms: 2.565589
+  type: 'test'
+  ...
+# Subtest: no printer chosen and no default fails with printer_not_found
+ok 88 - no printer chosen and no default fails with printer_not_found
+  ---
+  duration_ms: 2.656611
+  type: 'test'
+  ...
+# Subtest: the printer named on the order wins over this computer's fallback
+ok 89 - the printer named on the order wins over this computer's fallback
+  ---
+  duration_ms: 12.741726
+  type: 'test'
+  ...
+# Subtest: a file whose size differs from the upload is refused
+ok 90 - a file whose size differs from the upload is refused
+  ---
+  duration_ms: 2.536926
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is printed
+ok 91 - an unknown file type is refused and nothing is printed
+  ---
+  duration_ms: 2.50675
+  type: 'test'
+  ...
+# Subtest: a JPEG is wrapped in a PDF for printers that only accept PDF
+ok 92 - a JPEG is wrapped in a PDF for printers that only accept PDF
+  ---
+  duration_ms: 20.078141
+  type: 'test'
+  ...
+# Subtest: a finish report that cannot be sent is kept and sent later, once
+ok 93 - a finish report that cannot be sent is kept and sent later, once
+  ---
+  duration_ms: 26.729291
+  type: 'test'
+  ...
+# Subtest: a result the server no longer expects (409) is dropped without a retry loop
+ok 94 - a result the server no longer expects (409) is dropped without a retry loop
+  ---
+  duration_ms: 10.458815
+  type: 'test'
+  ...
+# Subtest: after a restart, a job the printer accepted is reported as sent
+ok 95 - after a restart, a job the printer accepted is reported as sent
+  ---
+  duration_ms: 13.951944
+  type: 'test'
+  ...
+# Subtest: after a restart during sending, nothing is reported and nothing is reprinted
+ok 96 - after a restart during sending, nothing is reported and nothing is reprinted
+  ---
+  duration_ms: 6.126892
+  type: 'test'
+  ...
+# Subtest: a revoked agent (401) stops the loop with AgentRevokedError
+ok 97 - a revoked agent (401) stops the loop with AgentRevokedError
+  ---
+  duration_ms: 5.312834
+  type: 'test'
+  ...
+# Subtest: run prints the one job it is given and stops when aborted
+ok 98 - run prints the one job it is given and stops when aborted
+  ---
+  duration_ms: 12.540134
+  type: 'test'
+  ...
+# Subtest: the status report lists printers with only the fields the server stores
+ok 99 - the status report lists printers with only the fields the server stores
+  ---
+  duration_ms: 1.961508
+  type: 'test'
+  ...
+# Subtest: order settings default to one black-and-white A4 copy and reject silly copy counts
+ok 100 - order settings default to one black-and-white A4 copy and reject silly copy counts
+  ---
+  duration_ms: 0.510262
+  type: 'test'
+  ...
+# Subtest: checkSettings refuses what the printer cannot do, and allows what it can
+ok 101 - checkSettings refuses what the printer cannot do, and allows what it can
+  ---
+  duration_ms: 0.266326
+  type: 'test'
+  ...
+# Subtest: choosePrinter prefers the order, then this computer's fallback, then the system default
+ok 102 - choosePrinter prefers the order, then this computer's fallback, then the system default
+  ---
+  duration_ms: 0.201283
+  type: 'test'
+  ...
+1..102
+# tests 102
+# suites 0
+# pass 102
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1776.282868

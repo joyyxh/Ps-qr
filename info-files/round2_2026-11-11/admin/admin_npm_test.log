@@ -1,0 +1,447 @@
+
+> qrquick-admin@0.1.0 test
+> node --test tests/validate.test.js tests/licence-api.test.js tests/read-api.test.js tests/read-model.test.js tests/auth.test.js tests/guards.test.js tests/security.test.js
+
+TAP version 13
+# Subtest: decodeJwtPayload reads base64url claims and returns null for anything else
+ok 1 - decodeJwtPayload reads base64url claims and returns null for anything else
+  ---
+  duration_ms: 2.861536
+  type: 'test'
+  ...
+# Subtest: a token without an aal claim is not aal2 (fails closed)
+ok 2 - a token without an aal claim is not aal2 (fails closed)
+  ---
+  duration_ms: 0.363268
+  type: 'test'
+  ...
+# Subtest: nextAuthStep: only aal2 reaches the dashboard
+ok 3 - nextAuthStep: only aal2 reaches the dashboard
+  ---
+  duration_ms: 0.490661
+  type: 'test'
+  ...
+# Subtest: needsRefresh refreshes within the skew window and when expiry is unknown
+ok 4 - needsRefresh refreshes within the skew window and when expiry is unknown
+  ---
+  duration_ms: 0.197827
+  type: 'test'
+  ...
+# Subtest: sign-in posts the password once to the password grant, with the publishable key only
+ok 5 - sign-in posts the password once to the password grant, with the publishable key only
+  ---
+  duration_ms: 34.653676
+  type: 'test'
+  ...
+# Subtest: a refused sign-in gives a generic message, and a network failure says nothing was sent
+ok 6 - a refused sign-in gives a generic message, and a network failure says nothing was sent
+  ---
+  duration_ms: 0.952098
+  type: 'test'
+  ...
+# Subtest: user lookup returns the email and factors
+ok 7 - user lookup returns the email and factors
+  ---
+  duration_ms: 1.162756
+  type: 'test'
+  ...
+# Subtest: TOTP enrolment returns the factor ID and setup material without storing it
+ok 8 - TOTP enrolment returns the factor ID and setup material without storing it
+  ---
+  duration_ms: 0.655738
+  type: 'test'
+  ...
+# Subtest: TOTP verification runs challenge then verify and returns the aal2 session
+ok 9 - TOTP verification runs challenge then verify and returns the aal2 session
+  ---
+  duration_ms: 1.041911
+  type: 'test'
+  ...
+# Subtest: a rejected TOTP code gives a generic message
+ok 10 - a rejected TOTP code gives a generic message
+  ---
+  duration_ms: 0.991885
+  type: 'test'
+  ...
+# Subtest: fetchWithTimeout aborts a request that takes too long
+ok 11 - fetchWithTimeout aborts a request that takes too long
+  ---
+  duration_ms: 20.342129
+  type: 'test'
+  ...
+# Subtest: a usable configuration needs an https URL and a non-empty publishable key
+ok 12 - a usable configuration needs an https URL and a non-empty publishable key
+  ---
+  duration_ms: 0.799479
+  type: 'test'
+  ...
+# Subtest: secret keys are refused in every form: sb_secret_ prefix or a service_role JWT
+ok 13 - secret keys are refused in every form: sb_secret_ prefix or a service_role JWT
+  ---
+  duration_ms: 0.345239
+  type: 'test'
+  ...
+# Subtest: the QR code is shown only as an SVG data image, never as markup or another URL
+ok 14 - the QR code is shown only as an SVG data image, never as markup or another URL
+  ---
+  duration_ms: 0.133132
+  type: 'test'
+  ...
+# Subtest: every committed rejection code that 0012 can return has a plain-language message
+ok 15 - every committed rejection code that 0012 can return has a plain-language message
+  ---
+  duration_ms: 0.457298
+  type: 'test'
+  ...
+# Subtest: unknown codes fall back to the generic message, never to the raw code
+ok 16 - unknown codes fall back to the generic message, never to the raw code
+  ---
+  duration_ms: 0.216914
+  type: 'test'
+  ...
+# Subtest: every code the admin read RPCs (0013) can return has a plain-language message
+ok 17 - every code the admin read RPCs (0013) can return has a plain-language message
+  ---
+  duration_ms: 0.291897
+  type: 'test'
+  ...
+# Subtest: the read gate records the same three denial reasons as the write RPCs
+ok 18 - the read gate records the same three denial reasons as the write RPCs
+  ---
+  duration_ms: 0.268217
+  type: 'test'
+  ...
+# Subtest: ALLOWED_KEYS equals licence_admin_allowed_keys() in migration 0012, action by action
+ok 19 - ALLOWED_KEYS equals licence_admin_allowed_keys() in migration 0012, action by action
+  ---
+  duration_ms: 1.945881
+  type: 'test'
+  ...
+# Subtest: RPC names match the four approved 7C admin RPCs
+ok 20 - RPC names match the four approved 7C admin RPCs
+  ---
+  duration_ms: 0.3261
+  type: 'test'
+  ...
+# Subtest: grant payload has exactly the grant keys, trimmed reason, lower-case shop ID and null optionals
+ok 21 - grant payload has exactly the grant keys, trimmed reason, lower-case shop ID and null optionals
+  ---
+  duration_ms: 0.297968
+  type: 'test'
+  ...
+# Subtest: extend payload never includes licence-type, date or target fields
+ok 22 - extend payload never includes licence-type, date or target fields
+  ---
+  duration_ms: 0.196573
+  type: 'test'
+  ...
+# Subtest: revoke payload carries the coverage ID and no grant fields
+ok 23 - revoke payload carries the coverage ID and no grant fields
+  ---
+  duration_ms: 0.191275
+  type: 'test'
+  ...
+# Subtest: replace payload carries the target and the grant fields
+ok 24 - replace payload carries the target and the grant fields
+  ---
+  duration_ms: 0.235721
+  type: 'test'
+  ...
+# Subtest: missing confirmation, reason, version or shop each produce a field error
+ok 25 - missing confirmation, reason, version or shop each produce a field error
+  ---
+  duration_ms: 0.13269
+  type: 'test'
+  ...
+# Subtest: unknown action is refused without a payload
+ok 26 - unknown action is refused without a payload
+  ---
+  duration_ms: 0.117796
+  type: 'test'
+  ...
+# Subtest: the client never sends a hash, a user ID or a request ID inside the payload
+ok 27 - the client never sends a hash, a user ID or a request ID inside the payload
+  ---
+  duration_ms: 0.466646
+  type: 'test'
+  ...
+# Subtest: an identical retry after an unknown outcome reuses the request ID
+ok 28 - an identical retry after an unknown outcome reuses the request ID
+  ---
+  duration_ms: 0.664976
+  type: 'test'
+  ...
+# Subtest: a changed payload gets a new request ID
+ok 29 - a changed payload gets a new request ID
+  ---
+  duration_ms: 0.268767
+  type: 'test'
+  ...
+# Subtest: a committed outcome clears the pending ID, so the same payload later is a new operation
+ok 30 - a committed outcome clears the pending ID, so the same payload later is a new operation
+  ---
+  duration_ms: 1.344597
+  type: 'test'
+  ...
+# Subtest: stableStringify ignores key order
+ok 31 - stableStringify ignores key order
+  ---
+  duration_ms: 0.148871
+  type: 'test'
+  ...
+# Subtest: a committed success is returned as a result with the expected headers, path and body
+ok 32 - a committed success is returned as a result with the expected headers, path and body
+  ---
+  duration_ms: 19.180777
+  type: 'test'
+  ...
+# Subtest: a committed rejection (ok false) is a result, not an error
+ok 33 - a committed rejection (ok false) is a result, not an error
+  ---
+  duration_ms: 0.542041
+  type: 'test'
+  ...
+# Subtest: 401 asks for a new sign-in; 5xx, timeout and network failure are unknown outcomes
+ok 34 - 401 asks for a new sign-in; 5xx, timeout and network failure are unknown outcomes
+  ---
+  duration_ms: 1.173242
+  type: 'test'
+  ...
+# Subtest: a non-5xx HTTP error is an error that committed nothing; a malformed 200 is unknown
+ok 35 - a non-5xx HTTP error is an error that committed nothing; a malformed 200 is unknown
+  ---
+  duration_ms: 0.498325
+  type: 'test'
+  ...
+# Subtest: no request is sent when the configuration is empty
+ok 36 - no request is sent when the configuration is empty
+  ---
+  duration_ms: 0.102282
+  type: 'test'
+  ...
+# Subtest: an unknown action is refused before any request
+ok 37 - an unknown action is refused before any request
+  ---
+  duration_ms: 0.611269
+  type: 'test'
+  ...
+# Subtest: the parameter lists match the 0013 function signatures, in the same order
+ok 38 - the parameter lists match the 0013 function signatures, in the same order
+  ---
+  duration_ms: 1.592718
+  type: 'test'
+  ...
+# Subtest: 0013 grants the three reads to authenticated only, and the gate to no client role
+ok 39 - 0013 grants the three reads to authenticated only, and the gate to no client role
+  ---
+  duration_ms: 0.420272
+  type: 'test'
+  ...
+# Subtest: search trims the query and counts characters, not UTF-16 units, as the server does
+ok 40 - search trims the query and counts characters, not UTF-16 units, as the server does
+  ---
+  duration_ms: 0.515441
+  type: 'test'
+  ...
+# Subtest: a licence view needs a UUID shop ID and sends only p_shop_id
+ok 41 - a licence view needs a UUID shop ID and sends only p_shop_id
+  ---
+  duration_ms: 0.338889
+  type: 'test'
+  ...
+# Subtest: audit pages: the first page sends null cursor fields; a later page sends the cursor pair
+ok 42 - audit pages: the first page sends null cursor fields; a later page sends the cursor pair
+  ---
+  duration_ms: 0.365251
+  type: 'test'
+  ...
+# Subtest: a read is never sent without a configuration, a known name or the exact parameter keys
+ok 43 - a read is never sent without a configuration, a known name or the exact parameter keys
+  ---
+  duration_ms: 0.2955
+  type: 'test'
+  ...
+# Subtest: a successful read is posted with the token in a header only, never in the URL
+ok 44 - a successful read is posted with the token in a header only, never in the URL
+  ---
+  duration_ms: 20.553309
+  type: 'test'
+  ...
+# Subtest: the response is classified: committed rejection, session refused, or error (never unknown for a read)
+ok 45 - the response is classified: committed rejection, session refused, or error (never unknown for a read)
+  ---
+  duration_ms: 1.821657
+  type: 'test'
+  ...
+# Subtest: a read is sent once: a failed read is not retried
+ok 46 - a read is sent once: a failed read is not retried
+  ---
+  duration_ms: 0.811429
+  type: 'test'
+  ...
+# Subtest: the search response needs a shop list, has_more and well-formed shops
+ok 47 - the search response needs a shop list, has_more and well-formed shops
+  ---
+  duration_ms: 0.430129
+  type: 'test'
+  ...
+# Subtest: the licence response needs a version, a state, coverages and the truncation flag
+ok 48 - the licence response needs a version, a state, coverages and the truncation flag
+  ---
+  duration_ms: 0.348828
+  type: 'test'
+  ...
+# Subtest: the audit response needs entries and a next cursor or null
+ok 49 - the audit response needs entries and a next cursor or null
+  ---
+  duration_ms: 0.154857
+  type: 'test'
+  ...
+# Subtest: an unknown RPC name has no response shape
+ok 50 - an unknown RPC name has no response shape
+  ---
+  duration_ms: 0.050961
+  type: 'test'
+  ...
+# Subtest: the labels cover exactly the values the database allows
+ok 51 - the labels cover exactly the values the database allows
+  ---
+  duration_ms: 3.016019
+  type: 'test'
+  ...
+# Subtest: times are shown in India Standard Time, not UTC
+ok 52 - times are shown in India Standard Time, not UTC
+  ---
+  duration_ms: 0.497675
+  type: 'test'
+  ...
+# Subtest: an empty time reads None and an unreadable time is named as such
+ok 53 - an empty time reads None and an unreadable time is named as such
+  ---
+  duration_ms: 0.181015
+  type: 'test'
+  ...
+# Subtest: an active licence shows its access end, with no next start
+ok 54 - an active licence shows its access end, with no next start
+  ---
+  duration_ms: 0.294411
+  type: 'test'
+  ...
+# Subtest: a scheduled licence shows its next start
+ok 55 - a scheduled licence shows its next start
+  ---
+  duration_ms: 0.143937
+  type: 'test'
+  ...
+# Subtest: a shop with no licence shows the no-licence state and no dates
+ok 56 - a shop with no licence shows the no-licence state and no dates
+  ---
+  duration_ms: 0.237812
+  type: 'test'
+  ...
+# Subtest: an unexpected state is shown as Unknown rather than echoed
+ok 57 - an unexpected state is shown as Unknown rather than echoed
+  ---
+  duration_ms: 0.162323
+  type: 'test'
+  ...
+# Subtest: a coverage label names its kind, its status and its period, and an open end reads no end
+ok 58 - a coverage label names its kind, its status and its period, and an open end reads no end
+  ---
+  duration_ms: 0.247567
+  type: 'test'
+  ...
+# Subtest: an audit entry shows its action, reason and coverage, and a missing coverage reads None
+ok 59 - an audit entry shows its action, reason and coverage, and a missing coverage reads None
+  ---
+  duration_ms: 0.425739
+  type: 'test'
+  ...
+# Subtest: an unknown audit action is shown as Unknown
+ok 60 - an unknown audit action is shown as Unknown
+  ---
+  duration_ms: 0.408496
+  type: 'test'
+  ...
+# Subtest: no HTML sinks: server data is written with textContent only
+ok 61 - no HTML sinks: server data is written with textContent only
+  ---
+  duration_ms: 91.614921
+  type: 'test'
+  ...
+# Subtest: no persistent browser storage for tokens or any other state
+ok 62 - no persistent browser storage for tokens or any other state
+  ---
+  duration_ms: 3.692236
+  type: 'test'
+  ...
+# Subtest: only the publishable key path exists: no secret key literal outside the guard
+ok 63 - only the publishable key path exists: no secret key literal outside the guard
+  ---
+  duration_ms: 0.995576
+  type: 'test'
+  ...
+# Subtest: modules import only from inside the admin folder and never from the public web app
+ok 64 - modules import only from inside the admin folder and never from the public web app
+  ---
+  duration_ms: 4.173897
+  type: 'test'
+  ...
+# Subtest: the page sets a strict Content Security Policy and has no inline script or handlers
+ok 65 - the page sets a strict Content Security Policy and has no inline script or handlers
+  ---
+  duration_ms: 0.59286
+  type: 'test'
+  ...
+# Subtest: the page is private: noindex, no-referrer, and robots.txt disallows everything
+ok 66 - the page is private: noindex, no-referrer, and robots.txt disallows everything
+  ---
+  duration_ms: 0.217948
+  type: 'test'
+  ...
+# Subtest: the committed configuration is empty: this build targets no project
+ok 67 - the committed configuration is empty: this build targets no project
+  ---
+  duration_ms: 0.14539
+  type: 'test'
+  ...
+# Subtest: no plain http URL is used anywhere in the panel
+ok 68 - no plain http URL is used anywhere in the panel
+  ---
+  duration_ms: 3.589233
+  type: 'test'
+  ...
+# Subtest: isUuid accepts the canonical form only
+ok 69 - isUuid accepts the canonical form only
+  ---
+  duration_ms: 1.028712
+  type: 'test'
+  ...
+# Subtest: parseStateVersion accepts whole numbers from 0 and rejects anything else
+ok 70 - parseStateVersion accepts whole numbers from 0 and rejects anything else
+  ---
+  duration_ms: 0.854062
+  type: 'test'
+  ...
+# Subtest: normaliseReason trims, requires one character and caps the length in characters
+ok 71 - normaliseReason trims, requires one character and caps the length in characters
+  ---
+  duration_ms: 0.275361
+  type: 'test'
+  ...
+# Subtest: normaliseInstant treats empty as null and accepts dates or zoned timestamps only
+ok 72 - normaliseInstant treats empty as null and accepts dates or zoned timestamps only
+  ---
+  duration_ms: 1.374309
+  type: 'test'
+  ...
+1..72
+# tests 72
+# suites 0
+# pass 72
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 691.799965
+EXIT=0

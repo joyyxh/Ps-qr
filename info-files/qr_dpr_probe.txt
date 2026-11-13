@@ -1,0 +1,1 @@
+probe plan: run qr-smoke with QR_SCREEN_DPR=1 and =2, compare decoded on-screen result

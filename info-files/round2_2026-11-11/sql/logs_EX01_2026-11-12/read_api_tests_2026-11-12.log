@@ -1,0 +1,154 @@
+--- test_backdate_window
+PASS BW-01 a backdate of 31 days minus one hour (inside the window) is accepted 
+PASS BW-02 a backdate of 31 days plus one hour (outside the window) is backdate_window_exceeded 
+PASS BW-03 replace is held to the same window 
+PASS BW-04 the window is read from licence_config: 2 days refuses a 3-day backdate 
+PASS BW-05 with no row (production state, OPEN) every backdate fails closed: a 31-day-plus-one-hour backdate is backdate_window_exceeded 
+PASS BW-06 a non-positive configured window raises (fails closed) 
+--- test_shop_licence_status
+PASS SL-01 owner gets active, an access end and no next start 
+PASS SL-02 the response has exactly the decision D keys 
+PASS SL-03 staff are denied with no fields 
+PASS SL-04 a non-member is denied 
+PASS SL-04 a non-member asking about an unknown shop is denied 
+PASS SL-05 anon has no EXECUTE on shop_licence_status 
+PASS SL-05 service_role has no EXECUTE on shop_licence_status 
+PASS SL-06 lifetime: active, no expiry, no access end 
+PASS SL-07 SCHEDULED: inactive, next start shown, no access end 
+PASS SL-08 EXPIRED: the inactive shape with no next start 
+PASS SL-08 the state is EXPIRED 
+PASS SL-09 setup: revoke the period 
+PASS SL-09 REVOKED has the same shape as EXPIRED (the two are not distinguished) 
+PASS SL-09 the state is REVOKED 
+PASS PR-03 anon has no EXECUTE on licence_admin_grant(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_grant(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on licence_admin_extend(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_extend(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on licence_admin_revoke(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_revoke(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on licence_admin_replace(uuid,jsonb) 
+PASS PR-03 service_role has no EXECUTE on licence_admin_replace(uuid,jsonb) 
+PASS PR-03 anon has no EXECUTE on shop_licence_status(uuid) 
+PASS PR-03 service_role has no EXECUTE on shop_licence_status(uuid) 
+PASS PR-03 authenticated has EXECUTE on shop_licence_status 
+--- test_authorisation
+PASS A-00 aal2 admin success path 
+FAIL A-01 admin with no aal claim is forbidden | got={'ok': False, 'code': 'forbidden'} before=(0, 0, 0, 0) after=(0, 0, 0, 0) a0=(0, 0) a1=(1, 0) g0=(1001, 1000) g1=(1002, 1000) rows=0->0
+PASS A-01 no coverage, audit or ledger row was written for the denied call 
+FAIL A-02 aal1 is insufficient and forbidden | got={'ok': False, 'code': 'forbidden'} before=(0, 0, 0, 0) after=(0, 0, 0, 0) a0=(1, 0) a1=(2, 0) g0=(1002, 1000) g1=(1003, 1000) rows=0->0
+FAIL A-03 aal is compared exactly (AAL2 in capitals is forbidden) | got={'ok': False, 'code': 'forbidden'} before=(0, 0, 0, 0) after=(0, 0, 0, 0) a0=(2, 0) a1=(3, 0) g0=(1003, 1000) g1=(1004, 1000) rows=0->0
+FAIL A-09 denied extend writes nothing | got={'ok': False, 'code': 'forbidden'} before=(0, 0, 0, 0) after=(0, 0, 0, 0) a0=(3, 0) a1=(4, 0) g0=(1004, 1000) g1=(1005, 1000) rows=0->0
+FAIL A-05 a signed-in user who is not a platform admin is forbidden | got={'ok': False, 'code': 'forbidden'} before=(0, 0, 0, 0) after=(0, 0, 0, 0) a0=(0, 0) a1=(1, 0) g0=(1005, 1000) g1=(1006, 1000) rows=0->0
+FAIL A-06 a disabled admin is forbidden | got={'ok': False, 'code': 'forbidden'} before=(0, 0, 0, 0) after=(0, 0, 0, 0) a0=(0, 0) a1=(1, 0) g0=(1006, 1000) g1=(1007, 1000) rows=0->0
+PASS A-04 unreadable claims are forbidden, global counter only, nothing written 
+PASS A-08 no claims at all (no caller UID) is forbidden with the global counter only 
+PASS A-07 anon has no EXECUTE, so the call is refused by privilege, not by a row 
+--- test_concurrent_denial_counters
+FAIL CD-01 two concurrent denials for one actor both count: actor denial +2, detail +2, global +2 | a=(0, 0)->(2, 0) g=(1009, 1000)->(1011, 1000) b=BEGIN
+SET
+{"ok": false, "code": "forbidden"}
+COMMIT
+ 
+--- test_backdate_fail_closed_and_boundaries
+PASS BW-07 no window: an unconfirmed backdate is backdate_not_confirmed (the order is kept) 
+PASS BW-08 no window: a confirmed custom backdate is backdate_window_exceeded 
+PASS BW-09 no window: a confirmed lifetime backdate is backdate_window_exceeded 
+PASS BW-10 no window: a replace with a confirmed backdate is backdate_window_exceeded 
+PASS BW-11 no window: a grant with no start is not a backdate and is accepted 
+PASS BW-12 no window: a future custom start (scheduled) is accepted 
+PASS BW-13 window 2 days: a backdate of 2 days minus one hour is accepted (inside the boundary) 
+PASS BW-14 window 2 days: a backdate of 2 days plus one hour is backdate_window_exceeded 
+--- test_h4_owner_status_unlogged
+PASS H4-01 shop_licence_status stays STABLE (provolatile 's'): this change does not alter it 
+PASS H4-02 the owner gets the decision D shape (ok true) 
+PASS H4-03 staff, an outsider and an unknown shop are committed forbidden 
+PASS H4-04 the denials write NO denial row and move NO counter (H4 exception to A4) 
+--- test_admin_read_privileges
+PASS AR-01 anon has no EXECUTE on admin_search_shops 
+PASS AR-01 anon has no EXECUTE on admin_shop_audit 
+PASS AR-01 anon has no EXECUTE on admin_shop_licence 
+PASS AR-01 service_role has no EXECUTE on admin_search_shops 
+PASS AR-01 service_role has no EXECUTE on admin_shop_audit 
+PASS AR-01 service_role has no EXECUTE on admin_shop_licence 
+PASS AR-02 the gate helper is not callable by authenticated clients 
+PASS AR-03 authenticated has EXECUTE on the three read RPCs 
+PASS AR-04 the read RPCs are VOLATILE, so a denial can write its counters 
+--- test_admin_read_authorisation
+FAIL test_admin_read_authorisation raised ValueError | not enough values to unpack (expected 3, got 1)
+--- test_search_validation_and_matching
+PASS SR-01 a 1-character query is invalid_request 
+PASS SR-01 an 81-character query is invalid_request 
+PASS SR-02 limit 0 is invalid_request 
+PASS SR-02 limit 26 is invalid_request 
+PASS SR-02 a null limit is invalid_request 
+PASS SR-01 an 80-character query after trimming is accepted 
+PASS SR-03 an underscore in the query is literal 
+PASS SR-03 a percent sign in the query is literal 
+PASS SR-04 a match in the middle of a name is not returned 
+PASS SR-04 a name prefix is matched, case-insensitively 
+PASS SR-05 an exact shop UUID matches that shop 
+PASS SR-05 a slug prefix matches 
+PASS SR-06 search output has exactly the top-level keys and item keys, and no phone 
+PASS SR-06 each item has exactly shop_id, slug and name 
+PASS SR-07 no match gives an empty list and has_more false 
+--- test_search_limits_and_order
+PASS SR-08 a limit of 25 returns 25 shops and has_more true when 26 match 
+PASS SR-08 results are ordered by name 
+PASS SR-08 exactly 25 matches at limit 25: has_more is false 
+PASS SR-08 a smaller limit returns one shop and has_more true 
+--- test_shop_licence_view
+PASS SL-A1 an unknown shop is shop_not_found 
+PASS SL-A1 an unknown shop writes no denial row (not an authorisation failure) 
+PASS SL-A2 a null shop id is invalid_request 
+PASS SL-A3 a shop with no meta row has state_version 0, state NONE and no coverages 
+PASS SL-A4 the response has exactly the expected keys 
+PASS SL-A5 setup: a confirmed grant 
+PASS SL-A5 after the grant: state_version is 1 and the coverage ID is the one the write returned 
+PASS SL-A5 the coverage has exactly the expected keys and no actor or request field 
+PASS SL-A6 no actor, request, revocation or phone field appears anywhere in the response 
+PASS SL-A7 the state matches shop_licence_state and the version matches shop_licence_meta 
+--- test_coverage_filtering
+PASS CF-01 only live and scheduled coverages are listed (expired and revoked are excluded) 
+PASS CF-01 statuses are current and scheduled 
+PASS CF-01 the state is ACTIVE (a current coverage covers now), with an access end and no next start 
+PASS CF-02 the list is capped at 50 and coverages_truncated is true 
+PASS CF-02 the first 50 by start are returned, in ascending start order, and the state is SCHEDULED 
+PASS CF-02 the next start equals the earliest listed start 
+--- test_licence_state_consistency_under_concurrency
+PASS SC-01 a read during an uncommitted grant sees the old version with the old coverage list, never a mix 
+PASS SC-02 after the commit the read sees version 1 and one coverage together 
+--- test_audit_pagination
+PASS AU-01 pages of 3 return every entry once, in (created_at, id) descending order 
+PASS AU-01 the pages are 3, 3, 3, 1 and only the last has next null 
+PASS AU-02 the seven equal-timestamp rows are each returned exactly once across the pages 
+PASS AU-03 each entry has exactly the expected keys 
+PASS AU-03 the microsecond timestamp survives the cursor round trip 
+PASS AU-04 the default page size is 25 and returns all 10 with next null 
+PASS AU-05 limit 0 and limit 101 are invalid_request 
+PASS AU-05 a cursor with only created_at, or only entry_id, is invalid_request 
+PASS AU-06 an unknown shop is shop_not_found 
+--- test_audit_index_is_usable
+PASS IX-01 the audit keyset query can use licence_audit_log_shop_created_id_idx 
+PASS IX-02 the name prefix search can use shops_name_pattern_idx 
+--- test_denial_cap_and_invariants
+FAIL DN-01 21 sequential denials: actor denial +21, actor detail +20 (the cap), global denial +21 | a=(0, 0)->(21, 0) g=(1012, 1000)->(1033, 1000)
+PASS DN-02 the detail rows in the hour equal the actor's detail_count (no orphan, no missing row) 
+--- test_denial_concurrency
+FAIL DC-01 eight concurrent denials for one actor all return forbidden and all count (+8, detail +8) | a=(0, 0)->(8, 0) results={'{"ok": false, "code": "forbidden"}'}
+FAIL DC-02 thirty concurrent denials: the cap is exact under contention (denial +30, detail +20, no overshoot) | a=(0, 0)->(30, 0)
+PASS DC-02 the detail rows for that actor equal its detail_count 
+FAIL DC-03 five denials and five admin reads at once: the denials count exactly, the reads never count | a=(0, 0)->(5, 0)
+PASS DC-04 invariant: 0 <= detail_count <= denial_count on every counter row 
+SUMMARY: 108 passed, 12 failed
+  FAILED: A-01 admin with no aal claim is forbidden
+  FAILED: A-02 aal1 is insufficient and forbidden
+  FAILED: A-03 aal is compared exactly (AAL2 in capitals is forbidden)
+  FAILED: A-09 denied extend writes nothing
+  FAILED: A-05 a signed-in user who is not a platform admin is forbidden
+  FAILED: A-06 a disabled admin is forbidden
+  FAILED: CD-01 two concurrent denials for one actor both count: actor denial +2, detail +2, global +2
+  FAILED: test_admin_read_authorisation raised ValueError
+  FAILED: DN-01 21 sequential denials: actor denial +21, actor detail +20 (the cap), global denial +21
+  FAILED: DC-01 eight concurrent denials for one actor all return forbidden and all count (+8, detail +8)
+  FAILED: DC-02 thirty concurrent denials: the cap is exact under contention (denial +30, detail +20, no overshoot)
+  FAILED: DC-03 five denials and five admin reads at once: the denials count exactly, the reads never count

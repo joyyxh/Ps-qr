@@ -1,0 +1,45 @@
+--- /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/OWNER_DECISION_SHEET.before-decision1-2026-10-31.md	2026-10-31 12:15:08.524662616 +0000
++++ OWNER_DECISION_SHEET.md	2026-10-31 12:15:58.192463950 +0000
+@@ -10,7 +10,7 @@
+ 
+ ## Part 1. Recorded on 2026-10-31
+ 
+-These five owner instructions are recorded in `STAGE7_DECISIONS.md` §13. They change statuses and wording. They approve no gate.
++These six owner decisions, dated 2026-10-31, are recorded in `STAGE7_DECISIONS.md` §13. They change statuses and wording. They approve no gate.
+ 
+ | No. | Instruction | Effect |
+ |---|---|---|
+@@ -19,6 +19,7 @@
+ | 3 | Items 11 and 26 are not general closure requirements | Item 11 is required before enforcement activation. Item 26 is required before the relevant production migration. |
+ | 4 | Trials are DEFERRED out of Stage 7, not permanently removed | Trial terms are not approved (Dec 5, item 9, C-10). |
+ | 5 | Item 23: investigation and targeted local tests are approved only after the proposed code diff is reviewed | Staging tests need a separate explicit approval. Implementation needs its own approval. |
++| 6 | Decision 1 (item 16): QRquick licences are issued per shop. Each individual shop requires its own licence. A single owner account may manage multiple shops, but licensing one shop does not automatically license the others. Changing the printer computer does not change the licence. | Decision 1 is DECIDED. Item 16 stays RECOMMENDED for the renewal rule (decision 2). The unit no longer blocks 7B. |
+ 
+ ## Part 2. Decide now (owner answers, RECOMMENDED)
+ 
+@@ -42,7 +43,6 @@
+ |---|---|---|---|---|
+ | C-5 | Keep `paid_verified` and `licence_payments` out of 0011. `trial` is also out (C-10, deferred) | RECOMMENDED | Accept | 0011 has no paid tables. Paid tables come later, under their own gate. |
+ | Item 8 (C-8; fixes 5 and 9) | Revoking current coverage does not cancel future coverage. A same-instant tie gives REVOKED. The exclusive end is displayed | RECOMMENDED | Accept all three | The 7B state function and revocation trigger depend on them. |
+-| Item 16 | Licence unit | RECOMMENDED: per shop | Per shop | A per-owner or per-computer unit would change the 7B data model. The term does not change the schema. |
+ | Item 7 | Basis ranking: a lifetime grant over an admin grant (§12A.6) | RECOMMENDED; not separately confirmed | Confirm the ranking | Sets the order in the 7B state function. M6 covers paid coverage only. |
+ 
+ Not needed before the 7B design (§15.3): item 5 and Dec 13 to 15; C-6; C-1; C-3; the grant-limit inputs in Part 4; C-7 and the other paid-path items; item 2 (M1 only); item 26 (before a production migration only).
+@@ -123,8 +123,8 @@
+ 
+ | Gate | Owner input | External evidence | Approval |
+ |---|---|---|---|
+-| 7A owner inputs | Dec 13 to 16 and 18 to 19. Confirmations for items 6, 7, 8, 13 and 16 | Production owner: UUID and MFA status (item 5) | Owner's written answers |
+-| 7B schema, migration 0011, staging only | C-5; item 8; item 16; item 7 basis ranking. A staging copy with 0010 applied, under its own approval. Option A or B (Part 4). Decision L and the fixture approach (Part 4) | None for staging. A production migration needs item 26 | Separate approval to create 0011, and one for each staging run |
++| 7A owner inputs | Dec 13 to 16 and 18 to 19. Confirmations for items 6, 7, 8, 13 and 16 (item 16 for the renewal rule only) | Production owner: UUID and MFA status (item 5) | Owner's written answers |
++| 7B schema, migration 0011, staging only | C-5; item 8; item 7 basis ranking. The licence unit (item 16) is decided: per shop (Part 1, row 6). A staging copy with 0010 applied, under its own approval. Option A or B (Part 4). Decision L and the fixture approach (Part 4) | None for staging. A production migration needs item 26 | Separate approval to create 0011, and one for each staging run |
+ | 7C admin RPCs | 7B on staging; the item 15 ceiling; C-12; the grant-limit inputs (Dec 16, including maximum length); item 33 lock tests on staging | Item 5 | Separate approval |
+ | 7D admin UI | 7C on staging; hosting (Dec 15) | Item 6 visibility check; item 5 | Separate approval |
+ | 7E owner status | 7C; the labels (Dec 19, item 13); display rule (item 8) | None | Separate approval |
+@@ -158,5 +158,6 @@
+ - M2 refusal after the natural end. M3 denial design (cap of 20 per user per hour; the build is gate 7C). M4 custom-grant convention. M5 paid-path block. M6 lifetime over paid coverage, as policy (its tests need the paid path). M7 review required for both printing fixes.
+ - Approved, but blocked with the paid path (M5): §12B.2 F, H and J, and the paid term in M4.
+ - Approved for design only: §12B.2 E. Enabling stays blocked until item 11 is answered.
++- Licence unit: per shop (decision 1, owner decision 2026-10-31). Item 16 stays RECOMMENDED for the renewal rule (decision 2).
+ 
+ Not listed here, and still open: §12B.2 B (conditional on C-1 and C-3; EXTERNAL BLOCKER), I (pricing, blocked), K (fix implementation, Part 7), L (local setup first), M1 (proposal), and M8 (policy, legal review needed).

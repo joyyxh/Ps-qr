@@ -1,0 +1,13 @@
+PASS  signed out shows the owner sign-in form
+PASS  wrong password shows a clear message
+PASS  owner session is kept in sessionStorage
+PASS  owner session is not kept in localStorage
+PASS  stored session does not contain the password
+PASS  owner list request carries the owner token
+SMOKE TEST CRASHED: locator.textContent: Timeout 8000ms exceeded.
+Call log:
+[2m  - waiting for locator('.kpi').filter({ hasText: 'Waiting for approval' }).locator('.value')[22m
+
+    at /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/owner-sweep.cjs:346:101 {
+  name: 'TimeoutError'
+}

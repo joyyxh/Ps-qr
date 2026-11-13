@@ -1,0 +1,18 @@
+FAIL  local: address field shows the QR address  (https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+FAIL  local: warning shown only for a local address  ([])
+PASS  local: code is drawn on the page
+FAIL  local: on-screen code scans to the shop address  (decoded=https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  local: download is named for the shop  (qrquick-demo-xerox-qr.png)
+FAIL  local: downloaded PNG scans to the shop address  (decoded=https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  local: no horizontal scroll at phone width  (overflow=0px)
+FAIL  local: no JavaScript errors  (console: Failed to load resource: the server responded with a status of 404 (Not Found) | console: Failed to load resource: the server responded with a status of 404 (Not Found) | console: Failed to load resource: the server responded with a status of 404 (Not Found))
+PASS  published: address field shows the QR address  (https://printnest.example/#/s/demo-xerox)
+PASS  published: warning shown only for a local address  ([])
+PASS  published: code is drawn on the page
+PASS  published: on-screen code scans to the shop address  (decoded=https://printnest.example/#/s/demo-xerox)
+PASS  published: download is named for the shop  (qrquick-demo-xerox-qr.png)
+PASS  published: downloaded PNG scans to the shop address  (decoded=https://printnest.example/#/s/demo-xerox)
+PASS  published: no horizontal scroll at phone width  (overflow=0px)
+FAIL  published: no JavaScript errors  (console: Failed to load resource: the server responded with a status of 404 (Not Found) | console: Failed to load resource: the server responded with a status of 404 (Not Found) | console: Failed to load resource: the server responded with a status of 404 (Not Found))
+
+10 of 16 checks passed.

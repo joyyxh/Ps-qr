@@ -1,0 +1,159 @@
+--- test_grant_success
+PASS G-01 one_month grant from now succeeds with exactly one version step 
+PASS G-01 coverage is admin_grant starting now, IST calendar end 
+PASS G-01 one audit row for the grant, carrying this request_id 
+FAIL G-02 one_year grant on version 1 | got={"ok": false, "code": "overlap"} before=(1, 1, 1, 1) after=(1, 1, 1, 1)
+FAIL test_grant_success raised RuntimeError | query failed: psql:<stdin>:1: ERROR:  invalid input syntax for type uuid: "None"
+LINE 1: ...ia/Kolkata' from public.licence_coverages where id = 'None';
+                                                                ^
+SQL: select ends_at = ((starts_at at time zone 'Asia/Kolkata') + interval '1 year') at time zone 'Asia/Kolkata' from public.licence_coverages where id = 'None';
+--- test_grant_rejections
+PASS G-05 empty reason after trimming is invalid_reason 
+PASS G-05 missing reason is invalid_reason 
+PASS G-07 reason of 501 code points is invalid_reason 
+PASS G-08 confirm false is not_confirmed 
+PASS G-09 unknown field is rejected, not ignored 
+PASS G-09 request_id inside the payload is an unknown field 
+PASS G-09 a client-supplied caller UID is an unknown field 
+PASS G-10 custom without end is end_required 
+PASS G-10 custom without start is start_required 
+PASS G-10 custom with end equal to start is custom_range_invalid 
+PASS G-11 one_month with an end is end_not_allowed 
+PASS G-11 lifetime with an end is end_not_allowed 
+PASS G-12 backdate without confirmation is backdate_not_confirmed 
+PASS G-13 unknown grant kind is invalid_grant_kind 
+PASS G-19 timestamp without an offset is invalid_timestamp 
+PASS G-19 seven fractional digits is invalid_timestamp 
+PASS G-14 stale expected_state_version is stale_state_version 
+PASS G-14 expected_state_version written as 5.0 is invalid_request 
+PASS G-15 unknown shop is shop_not_found 
+--- test_grant_overlap
+PASS O-0 first one_month grant 
+PASS O-1 overlapping same-kind admin grant is overlap 
+PASS O-2 touching admin grant (starts at the existing end) is allowed 
+PASS O-3 first lifetime grant succeeds 
+PASS O-3 a second non-revoked lifetime grant is overlap 
+PASS O-4 an admin grant over a lifetime grant is allowed (different kind) 
+PASS O-5 a revoked coverage does not block a new same-kind grant 
+--- test_extend
+PASS X-01 extend month succeeds 
+PASS X-01 extension starts exactly at the old end (no gap, no overlap) 
+PASS X-01 extension end is one calendar month after its start (IST) 
+PASS X-02 extend with no coverage succeeds 
+PASS X-02 extension with no coverage starts now, one calendar year 
+PASS X-04 an active lifetime grant rejects extend 
+PASS X-05 a scheduled (future) lifetime grant also rejects extend 
+PASS X-06 extend is allowed once every non-revoked lifetime grant is revoked 
+PASS X-07 unsupported unit (day) is invalid_extension_unit 
+PASS X-07 unsupported unit (week) is invalid_extension_unit 
+PASS X-07 unsupported unit (six months) is invalid_extension_unit 
+PASS X-07 unsupported unit (two years) is invalid_extension_unit 
+PASS X-07 unsupported unit (empty) is invalid_extension_unit 
+PASS X-07 unsupported unit (wrong case) is invalid_extension_unit 
+PASS X-08 a start field is an unknown field for extend 
+PASS X-09 missing reason is invalid_reason for extend 
+PASS X-10 stale expected version is stale_state_version for extend 
+--- test_revoke
+PASS R-01 revoke an active coverage succeeds 
+PASS R-01 the target is revoked now, with the revoker and reason recorded 
+PASS R-01 one audit row of action revoke, pointing at the target 
+PASS R-01 the ledger row for this request carries the target coverage id 
+PASS R-01 state is REVOKED after revoking the only period 
+PASS R-02 revoking an already revoked coverage is coverage_already_revoked 
+PASS R-03 revoking at or after the natural end is natural_end_passed (M2) 
+PASS R-04 cancelling a future period is allowed 
+PASS R-04 the cancelled period has no effect: state is NONE 
+PASS R-05 a target in another shop is coverage_not_found 
+PASS R-05 the other shop's coverage is untouched 
+PASS R-06 an unknown target is coverage_not_found 
+PASS R-08 missing reason for revoke is invalid_reason 
+PASS R-07 revoking a lifetime grant succeeds 
+--- test_replace
+PASS P-01 replace succeeds with one version step 
+PASS P-01 the target is revoked and the new coverage starts now with a one-year end 
+PASS P-01 two audit rows of action replace share one request_id 
+PASS P-01 the ledger target is the revoked coverage 
+PASS P-02 replace with a target in another shop is coverage_not_found 
+PASS P-02 the other shop's coverage is untouched 
+PASS P-03 replace of a naturally ended coverage is natural_end_passed 
+PASS P-04 replacement overlapping another same-kind coverage is overlap 
+PASS P-04 a rejected replace leaves the target active (atomic) 
+PASS P-06 replacement custom without a start is start_required 
+PASS P-06 the target stays active after the rejected replace 
+PASS P-07 a backdated replacement that overlaps the target's past is overlap 
+PASS P-05 replacing a lifetime grant with a one-month grant succeeds 
+--- test_authorisation
+PASS A-00 aal2 admin success path 
+PASS A-01 admin with no aal claim is forbidden 
+PASS A-01 no coverage, audit or ledger row was written for the denied call 
+PASS A-02 aal1 is insufficient and forbidden 
+PASS A-03 aal is compared exactly (AAL2 in capitals is forbidden) 
+PASS A-09 denied extend writes nothing 
+PASS A-05 a signed-in user who is not a platform admin is forbidden 
+PASS A-06 a disabled admin is forbidden 
+PASS A-04 unreadable claims are forbidden, global counter only, nothing written 
+PASS A-08 no claims at all (no caller UID) is forbidden with the global counter only 
+PASS A-07 anon has no EXECUTE, so the call is refused by privilege, not by a row 
+--- test_replay_and_conflicts
+PASS RP-00 original grant commits 
+PASS RP-01 same request_id and same hash replays the stored result 
+PASS RP-02 same request_id with a different reason is request_conflict 
+PASS RP-04 same request_id with a different expected version is request_conflict 
+PASS RP-05 same request_id with a different grant kind is request_conflict 
+PASS RP-06 same request_id with a different end is request_conflict 
+PASS RP-06 same request_id with a different start is request_conflict 
+PASS RP-07 adding backdate_confirm changes the hash, so request_conflict 
+PASS RP-08 the same request_id from another admin is request_conflict (UID is hashed) 
+PASS RP-03 the same request_id on another shop is request_conflict 
+PASS RP-12 date-only and offset forms of the same instant replay (same hash) 
+PASS RP-11 trailing spaces in the reason are trimmed before hashing, so it replays 
+PASS RP-11 original with NFC reason commits 
+PASS RP-11 the NFD form with trailing spaces replays the NFC original 
+PASS RP-09 revoke commits 
+PASS RP-09 revoke replay returns the target id and no coverage id 
+PASS RP-10 replace commits 
+PASS RP-10 replace replay returns the new coverage and the target 
+PASS RP-13 a new request on a moved version with an old expected version is stale 
+PASS RP-13 a new request_id with the stale expected version is stale_state_version 
+--- test_hash_fields
+PASS H-00 extend commits with unit month 
+PASS H-01 same request_id with a different extension unit is request_conflict 
+PASS H-02 revoke of the future period commits 
+PASS H-02 same request_id with a different target is request_conflict 
+PASS H-03 replace commits as one_month 
+PASS H-03 same request_id with a different grant kind is request_conflict 
+PASS H-03 same request_id with a different reason is request_conflict 
+--- test_privileges
+PASS PR-01 authenticated EXECUTE on licence_admin_grant(uuid,jsonb) is True 
+PASS PR-01 authenticated EXECUTE on licence_admin_extend(uuid,jsonb) is True 
+PASS PR-01 authenticated EXECUTE on licence_admin_revoke(uuid,jsonb) is True 
+PASS PR-01 authenticated EXECUTE on licence_admin_replace(uuid,jsonb) is True 
+PASS PR-01 anon EXECUTE on licence_admin_grant(uuid,jsonb) is False 
+PASS PR-01 service_role EXECUTE on licence_admin_grant(uuid,jsonb) is False 
+PASS PR-01 authenticated EXECUTE on licence_admin_core(text,uuid,jsonb) is False 
+PASS PR-01 authenticated EXECUTE on licence_admin_deny(text,text,uuid,uuid) is False 
+PASS PR-01 authenticated EXECUTE on licence_admin_canonical_bytes(text,uuid,uuid,bigint,boolean,text,text,text,uuid,timestamptz,timestamptz,boolean) is False 
+PASS PR-01 authenticated EXECUTE on licence_lock_shop(uuid,text) is False 
+PASS PR-01 service_role EXECUTE on licence_admin_core(text,uuid,jsonb) is False 
+PASS PR-01 anon EXECUTE on licence_admin_core(text,uuid,jsonb) is False 
+PASS PR-02 authenticated cannot read the replay ledger (permission denied, or zero rows) 
+--- test_concurrency
+PASS CC-01 second writer waits on the shop lock, then is refused as stale 
+PASS CC-02 the same request_id on two shops: the loser gets request_conflict via re-read, never a raw error 
+--- test_counters
+PASS C-01 a denial moves the actor and global counters and writes one detail row 
+PASS C-02 the 21st denial is counted and its detail is omitted (denial 21, detail 20) 
+PASS C-04 an actor counter write failure raises and rolls back; no forbidden 
+PASS C-05 a global counter write failure raises and rolls back the actor row too 
+PASS C-06 a required detail write failure raises and rolls back both counters 
+PASS C-07 no-UID denial moves the global counter only 
+PASS I-01 a REPEATABLE READ session raises the isolation check 
+--- test_global_cap_provisional
+PASS GC-00 a denial creates this hour's global window row 
+FAIL test_global_cap_provisional raised RuntimeError | query failed: psql:<stdin>:1: ERROR:  new row for relation "licence_denial_windows" violates check constraint "licence_denial_windows_detail_count_range"
+DETAIL:  Failing row contains (2, global, null, 2026-11-07 04:00:00+00, 32, 1000).
+SQL: update public.licence_denial_windows set detail_count = 1000 where scope = 'global' and window_start = date_trunc('hour', now() at time zone 'UTC') at time zone 'UTC'; select 1;
+SUMMARY: 134 passed, 3 failed
+  FAILED: G-02 one_year grant on version 1
+  FAILED: test_grant_success raised RuntimeError
+  FAILED: test_global_cap_provisional raised RuntimeError

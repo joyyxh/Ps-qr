@@ -1,0 +1,59 @@
+PASS  shop page links to Statistics next to Orders
+PASS  statistics page opens with This month selected
+PASS  net earnings tile shows ₹22.00
+PASS  completed revenue shows ₹18.00
+PASS  order value is shown apart from earnings
+PASS  weekly chart draws 7 days of earning bars
+PASS  cancellation reasons are named
+PASS  services table lists the passport photo line as colour
+PASS  recent activity shows the refund
+PASS  earnings can be grouped by week
+PASS  Today asks for one day only ({"p_shop_id":"bbbbbbbb-0000-0000-0000-000000000001","p_from":"2026-10-17","p_to":"2026-10-17"})
+PASS  a backwards custom range is refused on screen
+PASS  custom range sends the chosen dates (current period request found)
+PASS  previous week loads a new 7-day report
+PASS  daily CSV file name (printnest-demo-xerox-daily-2026-10-01-to-2026-10-10.csv)
+PASS  daily CSV has the header row
+PASS  orders CSV includes the order codes
+PASS  unpaid order offers Mark paid in cash
+PASS  marking paid sends the payment action, not a price ({"p_order_id":"ord-1","p_action":"set_paid","p_channel":"cash"})
+PASS  the order shows Paid in cash after the change
+PASS  refund asks for confirmation first (Record a refund of ₹9.00 for order WXYZ2345? This cannot be undone.)
+PASS  refund is sent as a refund action
+PASS  cancel reason is saved for the rejected order
+PASS  status buttons still show for open orders
+OFFENDERS:
+  table[breakdown] right=455 text=DayOrders placedNet earnings
+ 
+  thead[] right=455 text=DayOrders placedNet earnings
+ 
+  tr[] right=455 text=DayOrders placedNet earnings
+ 
+  th[num] right=455 text=Cancelled or rejected
+  tbody[] right=455 text=Mon 12 Oct
+          0
+       
+  tr[] right=455 text=Mon 12 Oct
+          0
+       
+  td[num] right=455 text=0
+  tr[] right=455 text=Tue 13 Oct
+          0
+       
+  td[num] right=455 text=0
+  tr[] right=455 text=Wed 14 Oct
+          2
+       
+  td[num] right=455 text=0
+  tr[] right=455 text=Thu 15 Oct
+          0
+       
+  td[num] right=455 text=0
+  tr[] right=455 text=Fri 16 Oct
+          0
+       
+  td[num] right=455 text=0
+PASS  no sideways scrolling at 390px wide ({"scroll":390,"inner":390})
+PASS  no page errors or console errors
+
+ALL CHECKS PASSED

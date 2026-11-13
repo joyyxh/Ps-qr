@@ -1,0 +1,642 @@
+diff --git a/supabase/functions/owner-file-link/index.ts b/supabase/functions/owner-file-link/index.ts
+index d9e2c67..851c14c 100644
+--- a/supabase/functions/owner-file-link/index.ts
++++ b/supabase/functions/owner-file-link/index.ts
+@@ -77,7 +77,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
+ 
+     // 2. Storage path from the server-only table, then a short-lived signed URL.
+     const fileRes = await fetch(
+-      `${SUPABASE_URL}/rest/v1/customer_files?select=storage_path&id=eq.${fileId}`,
++      `${SUPABASE_URL}/rest/v1/customer_files?select=storage_path&id=eq.${fileId}&storage_deleted_at=is.null`,
+       { headers: serviceHeaders() },
+     );
+     if (!fileRes.ok) throw new Error(`file lookup failed: ${fileRes.status}`);
+diff --git a/supabase/functions/upload-file/index.ts b/supabase/functions/upload-file/index.ts
+index 5a7de1c..d1203d4 100644
+--- a/supabase/functions/upload-file/index.ts
++++ b/supabase/functions/upload-file/index.ts
+@@ -99,6 +99,21 @@ async function removeObject(path: string): Promise<void> {
+   });
+ }
+ 
++// Anonymous uploads: at most 30 files per connection in 10 minutes. Fails closed.
++async function uploadAllowed(req: Request): Promise<boolean> {
++  const forwarded = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
++  const ip = forwarded || req.headers.get("cf-connecting-ip") || "unknown";
++  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
++  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
++  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/consume_rate_limit`, {
++    method: "POST",
++    headers: serviceHeaders({ "Content-Type": "application/json" }),
++    body: JSON.stringify({ p_key: `upload:${hex}`, p_limit: 30, p_window_seconds: 600 }),
++  });
++  if (!res.ok) throw new Error(`rate limit check failed: ${res.status}`);
++  return (await res.json()) === true;
++}
++
+ async function insertFileRow(row: Record<string, unknown>): Promise<Record<string, unknown>> {
+   const res = await fetch(`${SUPABASE_URL}/rest/v1/customer_files`, {
+     method: "POST",
+@@ -118,6 +133,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
+     const slug = parseShopSlug(new URL(req.url).searchParams.get("shop"));
+     const shop = await findOpenShop(slug);
+ 
++    if (!(await uploadAllowed(req))) {
++      throw new UploadError(429, "rate_limited", "Too many uploads from this connection. Wait a few minutes and try again.");
++    }
++
+     const declared = Number(req.headers.get("content-length") ?? "0");
+     if (declared > MAX_UPLOAD_BYTES) {
+       throw new UploadError(413, "too_large", "The file is larger than 10 MB. Try a smaller file.");
+diff --git a/supabase/tests/stage1_isolation_tests.sql b/supabase/tests/stage1_isolation_tests.sql
+index 57c3a23..b8ab3a3 100644
+--- a/supabase/tests/stage1_isolation_tests.sql
++++ b/supabase/tests/stage1_isolation_tests.sql
+@@ -21,9 +21,9 @@ create or replace function pg_temp.fixture_file(p_shop_slug text, p_pages intege
+ language plpgsql as $$
+ declare v_id uuid;
+ begin
+-  insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+-  select s.id, 'fixture/' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
+-  from public.shops s
++  insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
++  select x.u, s.id, s.id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
++  from public.shops s, (select gen_random_uuid() as u) x
+   where s.slug = p_shop_slug
+   returning id into v_id;
+   return v_id;
+@@ -162,9 +162,9 @@ begin
+ 
+   -- T08 a file with 0 pages cannot be stored (the server measures pages; the table enforces 1-500)
+   begin
+-    insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+-    select id, 'fixture/zero-' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, 0, 'zero.pdf'
+-    from public.shops where slug = 'demo-xerox';
++    insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
++    select x.u, id, id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, 0, 'zero.pdf'
++    from public.shops, (select gen_random_uuid() as u) x where slug = 'demo-xerox';
+     insert into stage1_results values ('T08 a file with 0 pages cannot be stored', false, 'no error raised');
+   exception when others then
+     insert into stage1_results values ('T08 a file with 0 pages cannot be stored', sqlstate = '23514', sqlstate || ': ' || sqlerrm);
+diff --git a/supabase/tests/stage4_files_tests.sql b/supabase/tests/stage4_files_tests.sql
+index 7d98e23..73f3397 100644
+--- a/supabase/tests/stage4_files_tests.sql
++++ b/supabase/tests/stage4_files_tests.sql
+@@ -72,10 +72,10 @@ create or replace function pg_temp.fixture_file(
+ ) returns uuid language plpgsql as $$
+ declare v_id uuid;
+ begin
+-  insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name, expires_at)
+-  select s.id, 'fixture/' || gen_random_uuid()::text || '.pdf', 'application/pdf', 2048, p_pages, p_name,
++  insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name, expires_at)
++  select x.u, s.id, s.id::text || '/' || x.u::text || '.pdf', 'application/pdf', 2048, p_pages, p_name,
+          coalesce(p_expires, now() + interval '1 day')
+-  from public.shops s
++  from public.shops s, (select gen_random_uuid() as u) x
+   where s.slug = p_shop_slug
+   returning id into v_id;
+   return v_id;
+@@ -243,9 +243,9 @@ begin
+ 
+   -- F18 the table refuses a file name over 120 characters
+   begin
+-    insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+-    select id, 'fixture/long-' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, 1, repeat('a', 121)
+-    from public.shops where slug = 'demo-xerox';
++    insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
++    select x.u, id, id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, 1, repeat('a', 121)
++    from public.shops, (select gen_random_uuid() as u) x where slug = 'demo-xerox';
+     insert into stage4_results values ('F18 a file name over 120 characters is refused', false, 'no error raised');
+   exception when others then
+     insert into stage4_results values ('F18 a file name over 120 characters is refused', sqlstate = '23514', sqlstate || ': ' || sqlerrm);
+diff --git a/supabase/tests/stage5_orders_tests.sql b/supabase/tests/stage5_orders_tests.sql
+index bcc963a..7e9cc3e 100644
+--- a/supabase/tests/stage5_orders_tests.sql
++++ b/supabase/tests/stage5_orders_tests.sql
+@@ -68,9 +68,9 @@ create or replace function pg_temp.fixture_file(p_shop_slug text, p_pages intege
+ language plpgsql as $$
+ declare v_id uuid;
+ begin
+-  insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+-  select s.id, 'fixture/' || gen_random_uuid()::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
+-  from public.shops s
++  insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
++  select x.u, s.id, s.id::text || '/' || x.u::text || '.pdf', 'application/pdf', 1024, p_pages, 'fixture.pdf'
++  from public.shops s, (select gen_random_uuid() as u) x
+   where s.slug = p_shop_slug
+   returning id into v_id;
+   return v_id;
+@@ -134,6 +134,10 @@ begin
+   perform pg_temp.expect_rows('S02 owner A approves a pending order', 1,
+     'update public.orders set status = ''approved'' where id = ' || q1);
+ 
++  -- Migration 0008: an order cannot start printing until the payment is verified.
++  -- The owner records the cash payment first, as the owner screen does.
++  perform public.set_order_payment(order_1, 'set_paid', 'cash');
++
+   perform pg_temp.expect_rows('S03 owner A starts printing', 1,
+     'update public.orders set status = ''printing'' where id = ' || q1);
+ 
+diff --git a/supabase/tests/stage6_features_tests.sql b/supabase/tests/stage6_features_tests.sql
+index 0647ca9..a8916f9 100644
+--- a/supabase/tests/stage6_features_tests.sql
++++ b/supabase/tests/stage6_features_tests.sql
+@@ -65,9 +65,9 @@ create or replace function pg_temp.fixture_file(
+ ) returns uuid language plpgsql as $$
+ declare v_id uuid;
+ begin
+-  insert into public.customer_files (shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
+-  select s.id, 'fixture/' || gen_random_uuid()::text || '.pdf', 'application/pdf', 2048, p_pages, p_name
+-  from public.shops s
++  insert into public.customer_files (id, shop_id, storage_path, mime_type, size_bytes, page_count, original_name)
++  select x.u, s.id, s.id::text || '/' || x.u::text || '.pdf', 'application/pdf', 2048, p_pages, p_name
++  from public.shops s, (select gen_random_uuid() as u) x
+   where s.slug = p_shop_slug
+   returning id into v_id;
+   return v_id;
+diff --git a/web/package.json b/web/package.json
+index 6b13d5b..01b2153 100644
+--- a/web/package.json
++++ b/web/package.json
+@@ -5,7 +5,7 @@
+   "type": "module",
+   "description": "QRquick customer printing page (static, no build step)",
+   "scripts": {
+-    "test": "node --test tests/logic.test.js tests/api.test.js tests/owner-logic.test.js tests/auth.test.js tests/owner-api.test.js tests/orders.test.js tests/stats.test.js tests/qr-features.test.js tests/ui.test.js",
++    "test": "node --test tests/logic.test.js tests/api.test.js tests/owner-logic.test.js tests/auth.test.js tests/owner-api.test.js tests/orders.test.js tests/stats.test.js tests/qr-features.test.js tests/ui.test.js tests/print-logic.test.js",
+     "start": "python3 -m http.server 5173"
+   }
+ }
+diff --git a/web/src/logic.js b/web/src/logic.js
+index 4e7c03d..aafee53 100644
+--- a/web/src/logic.js
++++ b/web/src/logic.js
+@@ -278,6 +278,112 @@ export function describeOrderItem(item) {
+   return `${item.service_name} · ${pages} × ${copies} · ${mode}, ${sides}`;
+ }
+ 
++// ---------- owner: automatic printing ----------
++// The owner app shows what the printing computers report. The database decides every
++// change (migration 0010). These helpers only choose the words and the buttons.
++
++const JOB_STATUS_LABELS = {
++  queued: 'Waiting for a printing computer',
++  claimed: 'Being sent to the printer',
++  printing: 'Printing',
++  sent: 'Sent to the printer',
++  failed: 'Not printed',
++  needs_check: 'Check the printer',
++};
++
++export function printJobLabel(status) {
++  return JOB_STATUS_LABELS[status] ?? status;
++}
++
++// Plain words for the reasons a job did not print. A message from the agent is more
++// specific, so it is shown first when there is one.
++const FAILURE_TEXT = {
++  printer_offline: 'The printer is turned off or offline. Turn it on, then print again.',
++  printer_not_found: 'That printer is not connected to the printing computer.',
++  printer_unknown: 'The printer options could not be read on the printing computer.',
++  unsupported_setting: 'This printer cannot print what the order asks for.',
++  print_engine_missing: 'The printing software is not set up on the printing computer.',
++  spooler_error: 'The printing computer could not send the job to the printer.',
++  download_failed: 'The file could not be downloaded to the printing computer.',
++  file_changed: 'The file does not match the upload. Ask the customer to upload it again.',
++  file_type_unknown: 'The file is not a PDF, JPEG or PNG.',
++  image_unsupported: 'This picture format cannot be printed here. Ask for a JPG or PDF.',
++  too_many_claims: 'The printing computer could not finish this job after several tries.',
++  bad_settings: 'The order settings could not be read.',
++};
++
++export function printFailureText(job) {
++  if (!job) return '';
++  if (job.status === 'needs_check') {
++    return 'The printer may already have printed this. Check it before printing again.';
++  }
++  if (job.status !== 'failed') return '';
++  return job.error_message || FAILURE_TEXT[job.error_code] || 'The order did not print.';
++}
++
++// The newest job for each order item. A retry creates a new attempt number.
++export function latestJobsByItem(jobs) {
++  const latest = new Map();
++  for (const job of jobs ?? []) {
++    const current = latest.get(job.order_item_id);
++    if (!current || job.attempt > current.attempt) latest.set(job.order_item_id, job);
++  }
++  return latest;
++}
++
++// The file items of an order that have no print job yet.
++export function itemsToSend(order, jobsByItem) {
++  return (order.order_items ?? []).filter((item) => item.file_id && item.id && !jobsByItem.has(item.id));
++}
++
++// "Send to printer" shows for a paid order that is approved or already printing, when a
++// file item has no job yet. Once every file is queued the button goes away.
++export function canSendToPrint(order, jobsByItem) {
++  if (!['approved', 'printing'].includes(order.status)) return false;
++  if (order.payment_status !== 'paid') return false;
++  return itemsToSend(order, jobsByItem).length > 0;
++}
++
++// Print again. A failed job is safe to retry. A job that may already have printed needs
++// the owner to confirm first.
++export function retryOptions(job) {
++  if (!job) return null;
++  if (job.status === 'failed') return { confirmMayHavePrinted: false, warning: '' };
++  if (job.status === 'needs_check') {
++    return {
++      confirmMayHavePrinted: true,
++      warning: 'The printer may already have printed this page. Only print it again if you checked the printer and nothing came out.',
++    };
++  }
++  return null;
++}
++
++export function printAgentFunctionUrl(supabaseUrl) {
++  return `${String(supabaseUrl ?? '').replace(/\/$/, '')}/functions/v1/print-agent`;
++}
++
++export function agentStatusLabel(agent) {
++  return agent.online ? 'Connected' : 'Not connected right now';
++}
++
++export function printerOptionLabel(printer) {
++  const notes = [];
++  if (printer.isDefault) notes.push('system default');
++  if (!printer.enabled) notes.push('offline');
++  if (printer.capabilitiesKnown) notes.push(printer.colour ? 'colour' : 'black and white');
++  if (printer.duplex) notes.push('double-sided');
++  return notes.length ? `${printer.name} (${notes.join(', ')})` : printer.name;
++}
++
++// A line for the top of the orders page about the printing computers. '' when all is well.
++export function printingNotice({ agents = [], jobs = [] }) {
++  if (!agents.length) return 'No printing computer is set up yet, so orders will not print automatically.';
++  if (agents.some((agent) => agent.online)) return '';
++  const waiting = jobs.filter((job) => job.status === 'queued').length;
++  if (!waiting) return 'No printing computer is connected right now.';
++  return `No printing computer is connected. ${waiting} job${waiting === 1 ? ' is' : 's are'} waiting.`;
++}
++
+ // ---------- owner: statistics, payments and CSV ----------
+ // Calendar days are "YYYY-MM-DD" strings in India time (IST). The arithmetic
+ // below runs on those strings in UTC, so the result does not depend on the
+diff --git a/web/src/owner-api.js b/web/src/owner-api.js
+index 61135ec..7f6c30a 100644
+--- a/web/src/owner-api.js
++++ b/web/src/owner-api.js
+@@ -12,7 +12,7 @@ const SERVICE_FIELDS = ['name', 'pricing_unit', 'bw_price_paise', 'colour_price_
+ const ORDER_SELECT =
+   'id,tracking_code,status,total_paise,customer_note,created_at,' +
+   'payment_status,payment_channel,paid_at,refunded_at,refund_paise,cancel_reason,' +
+-  'order_items(service_name,pricing_unit,page_count,copies,colour,duplex,billable_units,amount_paise,file_id,file_name)';
++  'order_items(id,service_name,pricing_unit,page_count,copies,colour,duplex,billable_units,amount_paise,file_id,file_name)';
+ // Fields for the CSV export. File names are left out: the export does not need them.
+ const EXPORT_SELECT =
+   'tracking_code,status,total_paise,created_at,payment_status,payment_channel,paid_at,refunded_at,refund_paise,cancel_reason,' +
+@@ -251,6 +251,41 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
+       return rows[0];
+     },
+ 
++    // ----- automatic printing -----
++
++    // The printing computers of this shop and its recent print jobs.
++    printStatus(shopId) {
++      return request('POST', 'rpc/owner_print_status', { body: { p_shop_id: shopId } });
++    },
++
++    // A one-time code, valid for ten minutes, that pairs a shop computer with this shop.
++    createPrintPairing(shopId) {
++      return request('POST', 'rpc/create_print_agent_pairing', { body: { p_shop_id: shopId } });
++    },
++
++    revokePrintAgent(agentId) {
++      return request('POST', 'rpc/revoke_print_agent', { body: { p_agent_id: agentId } });
++    },
++
++    // printer: the printer name the computer reports, or null to use the computer's default.
++    setAgentPrinter(agentId, printer) {
++      return request('POST', 'rpc/set_print_agent_printer', {
++        body: { p_agent_id: agentId, p_printer: printer },
++      });
++    },
++
++    // Queues the files of a paid order and moves the order to printing. Safe to repeat.
++    approveForPrint(orderId) {
++      return request('POST', 'rpc/approve_order_for_print', { body: { p_order_id: orderId } });
++    },
++
++    // Only a failed job, or a job that may have printed (confirmMayHavePrinted true), can be retried.
++    retryPrintJob(jobId, confirmMayHavePrinted = false) {
++      return request('POST', 'rpc/retry_print_job', {
++        body: { p_job_id: jobId, p_confirm_may_have_printed: confirmMayHavePrinted === true },
++      });
++    },
++
+     // ----- shop features and payment QR -----
+ 
+     // The features a shop can switch on or off: key, label and whether it changes the price.
+diff --git a/web/src/owner.js b/web/src/owner.js
+index 2170528..acbc8c9 100644
+--- a/web/src/owner.js
++++ b/web/src/owner.js
+@@ -31,6 +31,15 @@ import {
+   validateCashPolicy,
+   validateShopDetails,
+   validateSlug,
++  agentStatusLabel,
++  canSendToPrint,
++  latestJobsByItem,
++  printAgentFunctionUrl,
++  printerOptionLabel,
++  printFailureText,
++  printingNotice,
++  printJobLabel,
++  retryOptions,
+ } from './logic.js';
+ import { createStatsPages } from './owner-stats.js';
+ import { qrCanvas, qrSvg } from './qr.js';
+@@ -46,7 +55,7 @@ const CONNECTION_MESSAGE = 'Could not reach the server. Check your internet conn
+ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNEST_CONFIG ?? {} }) {
+   let current = []; // the owner route being shown, used by "Try again"
+   let managed = null; // { shop, services } for the shop page on screen
+-  let orderView = null; // { shop, orders, showAll } for the orders page on screen
++  let orderView = null; // { shop, orders, showAll, printing, jobsByItem, pairing } for the orders page on screen
+   const statsPages = createStatsPages({ app, ownerApi, messageFor });
+ 
+   // ---------- navigation and shared helpers ----------
+@@ -740,14 +749,31 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+ 
+   // ---------- orders ----------
+ 
++  async function loadOrderView(shopId) {
++    const [orders, printing] = await Promise.all([
++      ownerApi.listOrders(shopId),
++      // If the printer status cannot load, the orders still show; printing is marked unavailable.
++      ownerApi.printStatus(shopId).catch(() => null),
++    ]);
++    return { orders, printing };
++  }
++
+   async function renderOrdersFor(shop) {
+-    const orders = await ownerApi.listOrders(shop.id);
+-    orderView = { shop, orders, showAll: false };
++    const { orders, printing } = await loadOrderView(shop.id);
++    orderView = { shop, orders, printing, showAll: false, jobsByItem: new Map(), pairing: null };
+     renderOrders();
+   }
+ 
++  // Reloads the orders and the printer status together, so the job lines stay current.
++  async function reloadOrders() {
++    const { orders, printing } = await loadOrderView(orderView.shop.id);
++    orderView.orders = orders;
++    orderView.printing = printing;
++  }
++
+   function renderOrders({ notice = '', error = '' } = {}) {
+     const { shop, orders, showAll } = orderView;
++    orderView.jobsByItem = latestJobsByItem(orderView.printing?.jobs ?? []);
+     const visible = showAll ? orders : orders.filter((order) => isOpenOrder(order.status));
+     show(ordersHtml(shop, visible, orders.length, showAll, notice, error));
+     bindOrders();
+@@ -769,6 +795,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+         </div>
+         <p class="muted small">Page counts are what customers typed. Files are not uploaded yet, so check the
+            count at the counter.</p>
++        ${printPanelHtml()}
+         <div class="segmented">
+           <button type="button" class="${showAll ? '' : 'on'}" data-action="filter" data-all="false">Open orders</button>
+           <button type="button" class="${showAll ? 'on' : ''}" data-action="filter" data-all="true">All orders</button>
+@@ -789,10 +816,15 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+             `data-file-order="${escapeHtml(order.id)}">Download file</button></span>`
+           : '';
+         return `<li><span>${escapeHtml(describeOrderItem(item))}</span>` +
+-          `<span class="num">${formatPaise(item.amount_paise)}</span>${file}</li>`;
++          `<span class="num">${formatPaise(item.amount_paise)}</span>${file}${jobLineHtml(order, item)}</li>`;
+       })
+       .join('');
++    const sendButton = canSendToPrint(order, orderView.jobsByItem)
++      ? `<button type="button" data-send-order="${escapeHtml(order.id)}" data-code="${escapeHtml(order.tracking_code)}">Send to printer</button>`
++      : '';
++    // "Start printing" is not offered here: Send to printer queues the files and starts printing.
+     const buttons = nextOrderStatuses(order.status)
++      .filter((status) => status !== 'printing')
+       .map(
+         (status) => `
+         <button type="button" class="${isIrreversibleMove(status) ? 'danger' : ''}"
+@@ -811,7 +843,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+         <ul class="plain">${items}</ul>
+         ${order.customer_note ? `<p class="note"><strong>Customer note:</strong> ${escapeHtml(order.customer_note)}</p>` : ''}
+         ${paymentSection(order)}
+-        ${buttons ? `<div class="actions">${buttons}</div>` : ''}
++        ${sendButton || buttons ? `<div class="actions">${sendButton}${buttons}</div>` : ''}
+       </li>`;
+   }
+ 
+@@ -856,17 +888,22 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+     onAll('[data-file-id]', 'click', onFileLink);
+     onAll('[data-pay-order]', 'click', onPaymentAction);
+     onAll('[data-reason-order]', 'change', onReasonChange);
++    on('[data-print-action="pair"]', 'click', onPairPrinter);
++    onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
++    onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
++    onAll('[data-send-order]', 'click', onSendToPrint);
++    onAll('[data-retry-job]', 'click', onRetryJob);
+   }
+ 
+   // Records a payment step, then reloads the orders so the page shows what the database holds.
+   async function runOrderChange(change, notice) {
+     try {
+       await change();
+-      orderView.orders = await ownerApi.listOrders(orderView.shop.id);
++      await reloadOrders();
+       renderOrders({ notice });
+     } catch (err) {
+       try {
+-        orderView.orders = await ownerApi.listOrders(orderView.shop.id);
++        await reloadOrders();
+       } catch {
+         // Keep the list on screen. The error below explains what failed.
+       }
+@@ -903,7 +940,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+ 
+   async function refreshOrders(notice = '') {
+     try {
+-      orderView.orders = await ownerApi.listOrders(orderView.shop.id);
++      await reloadOrders();
+       renderOrders({ notice });
+     } catch (err) {
+       renderOrders({ error: messageFor(err) });
+@@ -919,11 +956,11 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+     button.disabled = true;
+     try {
+       await ownerApi.updateOrderStatus(orderView.shop.id, orderId, status);
+-      orderView.orders = await ownerApi.listOrders(orderView.shop.id);
++      await reloadOrders();
+       renderOrders({ notice: `Order ${code} is now ${ownerStatusLabel(status).toLowerCase()}.` });
+     } catch (err) {
+       try {
+-        orderView.orders = await ownerApi.listOrders(orderView.shop.id);
++        await reloadOrders();
+       } catch {
+         // Keep the list on screen. The error below explains what failed.
+       }
+@@ -931,6 +968,127 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
+     }
+   }
+ 
++  // ----- automatic printing -----
++
++  // Sends a paid order's files to the printing computers. The notice says "sent", not
++  // "printed": a page only prints when a computer picks the job up.
++  async function onSendToPrint(event) {
++    const button = event.currentTarget;
++    const { sendOrder, code } = button.dataset;
++    button.disabled = true;
++    await runOrderChange(
++      () => ownerApi.approveForPrint(sendOrder),
++      `Order ${code} was sent to the printing computer. It prints when the computer picks it up.`
++    );
++  }
++
++  // Printing again asks for a second confirmation when the page may already have come out.
++  async function onRetryJob(event) {
++    const button = event.currentTarget;
++    const { retryJob, retryConfirm, retryWarning, code } = button.dataset;
++    const mayHavePrinted = retryConfirm === 'true';
++    if (mayHavePrinted && !window.confirm(`${retryWarning}\n\nPrint order ${code} again?`)) return;
++    button.disabled = true;
++    await runOrderChange(
++      () => ownerApi.retryPrintJob(retryJob, mayHavePrinted),
++      `Order ${code} was queued to print again.`
++    );
++  }
++
++  async function onPairPrinter(event) {
++    event.currentTarget.disabled = true;
++    try {
++      orderView.pairing = await ownerApi.createPrintPairing(orderView.shop.id);
++      renderOrders();
++    } catch (err) {
++      renderOrders({ error: messageFor(err) });
++    }
++  }
++
++  async function onRevokePrinter(event) {
++    const { agentId, agentName } = event.currentTarget.dataset;
++    if (!window.confirm(`Remove "${agentName}"? It stops printing until it is paired again.`)) return;
++    await runOrderChange(() => ownerApi.revokePrintAgent(agentId), `"${agentName}" was removed.`);
++  }
++
++  async function onAgentPrinterChange(event) {
++    const select = event.currentTarget;
++    select.disabled = true;
++    await runOrderChange(
++      () => ownerApi.setAgentPrinter(select.dataset.agentPrinter, select.value || null),
++      'The printer for that computer was saved.'
++    );
++  }
++
++  // The printing computers and the pairing box. Only the shop owner can pair, rename or remove them.
++  function printPanelHtml() {
++    const printing = orderView.printing;
++    if (!printing) {
++      return '<p class="muted small">Automatic printing status is not available right now.</p>';
++    }
++    const agents = printing.agents ?? [];
++    const notice = printingNotice({ agents, jobs: printing.jobs ?? [] });
++    const rows = agents.map((agent) => agentRowHtml(agent, printing.is_owner)).join('');
++    const pairing = orderView.pairing;
++    const pairingBox = pairing
++      ? `<div class="notice" data-pairing>
++           <p><strong>Pairing code: <span class="mono">${escapeHtml(pairing.code)}</span></strong>
++              Valid until ${escapeHtml(new Date(pairing.expires_at).toLocaleTimeString('en-IN', { timeStyle: 'short' }))}. Use it once.</p>
++           <p class="small">On the shop computer, open a terminal in the agent folder and run:</p>
++           <p class="mono small">qrquick-print-agent pair ${escapeHtml(printAgentFunctionUrl(config.supabaseUrl))} ${escapeHtml(pairing.code)}</p>
++         </div>`
++      : '';
++    return `
++      <section class="print-panel">
++        <strong>Printing computers</strong>
++        ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
++        ${rows || '<p class="muted small">No computer is connected for printing yet.</p>'}
++        ${printing.is_owner
++          ? '<div class="actions"><button type="button" data-print-action="pair">Connect a printing computer</button></div>'
++          : ''}
++        ${pairingBox}
++      </section>`;
++  }
++
++  function agentRowHtml(agent, isOwner) {
++    const options = (agent.printers ?? [])
++      .map(
++        (printer) =>
++          `<option value="${escapeHtml(printer.name)}"${printer.name === agent.chosen_printer ? ' selected' : ''}>` +
++          `${escapeHtml(printerOptionLabel(printer))}</option>`
++      )
++      .join('');
++    const controls = isOwner
++      ? `<label class="small">Printer
++           <select data-agent-printer="${escapeHtml(agent.id)}">
++             <option value="">Use this computer's default</option>
++             ${options}
++           </select>
++         </label>
++         <button type="button" class="link danger" data-print-action="revoke"
++                 data-agent-id="${escapeHtml(agent.id)}" data-agent-name="${escapeHtml(agent.name)}">Remove</button>`
++      : '';
++    return `<div class="agent-row">
++        <span><strong>${escapeHtml(agent.name)}</strong> · ${escapeHtml(agentStatusLabel(agent))}</span>
++        ${controls}
++      </div>`;
++  }
++
++  // The job status under one order item, with "Print again" when a retry is allowed.
++  function jobLineHtml(order, item) {
++    const job = orderView.jobsByItem.get(item.id);
++    if (!job) return '';
++    const failure = printFailureText(job);
++    const retry = retryOptions(job);
++    const again = retry
++      ? `<button type="button" class="link" data-retry-job="${escapeHtml(job.id)}"
++                 data-retry-confirm="${retry.confirmMayHavePrinted}" data-retry-warning="${escapeHtml(retry.warning)}"
++                 data-code="${escapeHtml(order.tracking_code)}">Print again</button>`
++      : '';
++    return `<span class="job-line small">${escapeHtml(printJobLabel(job.status))}` +
++      `${failure ? `: ${escapeHtml(failure)}` : ''} ${again}</span>`;
++  }
++
+   // Asks for a five-minute link to the file and opens it in a new tab.
+   // The link is only made after the server confirms this owner's shop.
+   async function onFileLink(event) {
+diff --git a/web/styles.css b/web/styles.css
+index dee41b8..a6d41bf 100644
+--- a/web/styles.css
++++ b/web/styles.css
+@@ -199,6 +199,10 @@ h3 { font-size: 1rem; margin: 18px 0 10px; }
+ .order-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+ .order { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 6px; }
+ .order p { margin: 0; }
++.job-line { display: block; color: var(--muted, #555); }
++.print-panel { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
++.agent-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
++.agent-row label { display: inline-flex; gap: 6px; align-items: center; }
+ .plain { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 4px; font-size: 0.95rem; }
+ .plain li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+ .file-line { flex-basis: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+diff --git a/web/tests/orders.test.js b/web/tests/orders.test.js
+index 3f6d135..7709822 100644
+--- a/web/tests/orders.test.js
++++ b/web/tests/orders.test.js
+@@ -128,7 +128,7 @@ test('listOrders reads the shop orders with their items, newest first', async ()
+   assert.equal(calls[0].init.method, 'GET');
+   assert.equal(calls[0].init.headers.Authorization, 'Bearer owner-token');
+   assert.match(calls[0].url, /\/rest\/v1\/orders\?shop_id=eq\.shop-1&select=/);
+-  assert.match(calls[0].url, /order_items\(service_name,/);
++  assert.match(calls[0].url, /order_items\(id,service_name,/);
+   assert.match(calls[0].url, /order=created_at\.desc&limit=100$/);
+ });
+ 

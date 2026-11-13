@@ -1,0 +1,138 @@
+--- a/STAGE7_DECISIONS.md
++++ b/STAGE7_DECISIONS.md
+@@ -1,7 +1,7 @@
+ # Stage 7 decisions: draft for owner review
+ 
+ **Status:** DRAFT PROPOSAL. This file is not an approval of any business, legal, tax, pricing, or technical decision.
+-**Date:** 2026-10-31 (last updated). Final documentation pass 2026-10-30, register and checks 2026-10-31, consistency correction 2026-10-31: corrections are in §13, the decision register in §14, the roadmap in §15 and the exit checklist and verdict in §16. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
++**Date:** 2026-10-31 (last updated). Final documentation pass 2026-10-30, register and checks 2026-10-31, consistency correction 2026-10-31, four-issue resolution 2026-10-31: corrections are in §13, the decision register in §14, the roadmap in §15 and the exit checklist and verdict in §16. Corrected 2026-10-29 after the read-only audit and a targeted correction pass. Corrections are listed in §13. Admin-grant and manual licence design added 2026-10-29 (§12A). Stage 7 decision record (A–L, M1–M8), state-machine corrections, and R1–R19 findings added 2026-10-29 (§12B). Where §12A and §12B differ, §12B governs.
+ **Worktree:** `/home/claude/joyyxh/ps-qr-stage7`, branch `stage7-payments`, base `origin/main` at `717717b`
+ **Committed:** No. Untracked draft.
+ 
+@@ -349,7 +349,7 @@
+ 6. **Refunds.** Proposal: full refund within 7 days. After that, only for duplicate charges or a QRquick outage. QRquick absorbs the processor fee: ₹35.38 per year on a ₹1,499 card payment at 2.36%, or ₹29.98 at the derived 2.00%. Each Stripe dispute costs ₹1,000 (§3, Stripe pricing row). That is Stripe's dispute fee. Pausing the licence during a dispute does not itself cost ₹1,000. **PENDING OWNER APPROVAL. Lawyer review required.**
+ 7. **Expiry behaviour.** *Partly superseded 2026-10-29 (§12B): decision A (printing only, no order blocking), B (queued jobs held), C (no retries while inactive).* Original proposal: no new customer orders. In-flight paid orders finish. The print agent claims no new jobs. Owners keep read and CSV export. **Licence expiry does not itself delete data.** Order files follow the two retention rules in §5C. Unclaimed files expire one day after upload. Claimed files are removed 30 days after the order is completed, cancelled or rejected, subject to the purge exclusions. The purge code is in the repository. Its live deployment is **unverified** (§5C). Whether licence expiry should also change the deletion schedule is a separate decision. **PENDING OWNER APPROVAL.**
+ 8. **Existing shops.** Proposal: free for 12 months from launch, with 30 days' written notice before the first charge. Effect as drafted: no licence revenue from these shops in year one. Decision 8 does not say whether the paid term is extended. The illustrations assume it is not, so that revenue is **forgone**, not deferred (§5B). Existing-shop count (N): [OWNER TO PROVIDE]. Illustration at N = 100 (arithmetic only): year-one net −₹65,700 on Free (E ≤ 1.5) or −₹88,500 on Pro (E > 1.5), against +₹57,796 or +₹34,996 if all pay from month one. Accrual break-even month 26 (Free) or 43 (Pro). Cash turns positive in month 13 under annual receipts. **PENDING OWNER APPROVAL.**
+-9. **Processor.** Options: Stripe, only if an active account or invite exists; Razorpay, only after its India signup is verified; defer. Neither is confirmed available. Every revenue projection in §8 assumes a working channel. **PENDING OWNER APPROVAL.**
++9. **Processor.** Options: Stripe, only if an active account or invite exists; Razorpay, only after its India signup is verified; defer. Neither is confirmed available. Every revenue projection in §8 assumes a working channel. **DEFERRED (§14.6 decision 9).** The gateway is not reopened, and nothing in this section is approved. Reopening needs a new owner decision. The collection-channel answer (item 4) is separate, and it is still needed before pricing.
+ 10. **Stage 6 merge order.** The item is named precisely: branch `stage6-simulated-printer`, commit `885d28b` ("Stage 6: offline simulated printing for the local print agent"). It exists locally and as `origin/stage6-simulated-printer`. It is not an ancestor of `origin/main` (717717b). The base print agent, migration 0010 and the print-agent function are already on `origin/main` and are not part of this item. Proposal: the owner decides whether this branch is merged before Stage 7 is rebased. Not merged by me. **RECOMMENDED; owner decision pending** (§14, item 20).
+ 11. **Advisers.** Proposal: engage an Indian CA and lawyer before any payment launch. Scope includes GST route, input credit, reverse charge, TDS, DPDP, refunds, and consumer protection. **PENDING OWNER APPROVAL.**
+ 12. **Premium features.** Proposal: none for now. Options: name the features to build first. **PENDING OWNER APPROVAL.**
+@@ -362,7 +362,7 @@
+ 2. **Processor access:** Stripe is invite-only for new Indian businesses. Razorpay India signup is unverified.
+ 3. **Tax route:** registered or unregistered, plus the GST classification, input credit, reverse charge, and any TDS treatment. A CA must decide.
+ 4. **Invoicing:** the repo has no GST invoice code or numbering (from earlier review; not re-checked in the correction pass). Needed if registered.
+-5. **Phase 2 dependencies:** the following owner decisions drive Phase 2 code where they apply. **Decision 4** (GST route) affects invoicing and tax fields. **Decision 7** (expiry) affects licence gates and deletion. **Decision 9** (processor) affects the integration design. **Decision 12** (premium features) affects any tier logic. **PENDING OWNER APPROVAL** for each.
++5. **Phase 2 dependencies:** the following owner decisions drive Phase 2 code where they apply. **Decision 4** (GST route) affects invoicing and tax fields. **Decision 7** (expiry) affects licence gates and deletion. **Decision 9** (processor) affects the integration design. **Decision 12** (premium features) affects any tier logic. **PENDING OWNER APPROVAL** for each, except decision 9, which is DEFERRED (§14.6).
+ 6. **Legal terms, refunds, and DPDP obligations:** a lawyer must review them. DPDP applicability to customer files is not analysed (§4).
+ 7. **Settlement account:** processors require a bank account in the entity's name. Unknown.
+ 8. **Data location:** README lines 32–33 state `ap-south-1`. This is not checked against the live project. Availability of `ap-south-1` for new projects is unconfirmed.
+@@ -610,7 +610,7 @@
+ ### 12B.1 Status key
+ 
+ - **APPROVED:** owner direction for design and planning. Implementation still needs its own gate.
+-- **APPROVED, CONDITIONAL:** approved subject to the stated condition.
++- **APPROVED, CONDITIONAL:** approved subject to the stated condition. Its register status in §14.1 is not DECIDED while the condition is open.
+ - **BLOCKED:** cannot proceed until the named condition is met.
+ - **REVIEW REQUIRED:** a separate diff or legal review is needed before implementation.
+ - **PROPOSAL:** recorded for review. Not approved for implementation.
+@@ -825,6 +825,18 @@
+ 
+ ## 13. Revision log
+ 
++### Four-issue resolution (2026-10-31)
++
++| Item | Change | Where applied |
++|---|---|---|
++| Item 2 closure | Item 2 is no longer a Stage 7 closure requirement by default. No 7F build gate depends on it, and group D (safe to defer) is kept. Proposed for owner confirmation. It is a prerequisite of enabling only if C-3 holds enforcement back. §16.1(e) states the change, so no requirement is removed silently | §14.2 items 1, 2; §14.3 C-3; §15.3 gate 7F; §16.1(e); §16 Q6 |
++| Items 1, 23 and 24 closure | Still closure requirements. §16.1(e) states what "closed" means for each. No requirement is relaxed | §16.1(e) |
++| C-1, C-3, C-6 and item 2 | §15.1 has a table of which gates need each answer and how each one closes. C-1 comes before the owner's C-3 decision (item 1), so the 7F build now names "C-1 answered, C-3 decided". Item 11 is needed before enabling only, as §15.3 already said | §15.1; §15.3 gate 7F; §16 Q6 |
++| Decision 9 | §9 item 9 changed from PENDING OWNER APPROVAL to DEFERRED (§14.6 decision 9). The gateway is not reopened, and nothing is approved. The Phase 2 dependencies item now matches. Status unchanged | §9 item 9; §10 item 5 |
++| Decision B | Register status changed from DECIDED to EXTERNAL BLOCKER, because its condition (item 1) is open. §14.0 says a conditional approval is not DECIDED while its condition is open. Decision E stays DECIDED, since it is an unconditional design approval | §14.0; §14.1 row B; §12B.1 legend |
++| Counts and verdict | No item status changed. §14.2 counts are unchanged: 10 RECOMMENDED, 17 EXTERNAL BLOCKER, 4 IMPLEMENTATION GATE, 4 DEFERRED and 0 DECIDED (total 35). Verdict unchanged: READY FOR FINAL OWNER REVIEW; NOT APPROVED | §14.2; §16.2 |
++| Known mismatch, not changed | §9 item 5 (trial) still says PENDING OWNER APPROVAL while decision 5 is DEFERRED. For the owner to resolve | §9 item 5 (flagged only) |
++
+ ### Consistency correction (2026-10-31)
+ 
+ | Item | Change | Where applied |
+@@ -984,7 +996,7 @@
+ 
+ ### 14.0 Status key and rules
+ 
+-- **DECIDED:** approved by the owner in this file (§12B.2 or §12B.3). Any implementation still needs its own gate.
++- **DECIDED:** approved by the owner in this file (§12B.2 or §12B.3) with no open condition. Any implementation still needs its own gate. A conditional approval (APPROVED, CONDITIONAL in §14.1) is not DECIDED while its condition is open. Its register status follows the open condition.
+ - **RECOMMENDED:** a proposed default that the owner can confirm or change by written answer.
+ - **DEFERRED:** postponed on purpose. The trigger for reopening is given.
+ - **EXTERNAL BLOCKER:** the next step needs an outside party: a CA, a lawyer, a processor, the production owner, or evidence from a live system.
+@@ -1009,7 +1021,7 @@
+ | ID | Recorded in §12B.2 | Register status | Note |
+ |---|---|---|---|
+ | A | APPROVED | DECIDED | Printing-only enforcement. The build is gate 7F. |
+-| B | APPROVED, CONDITIONAL on C-1 and C-3 | DECIDED | The condition is open: item 1. |
++| B | APPROVED, CONDITIONAL on C-1 and C-3 | EXTERNAL BLOCKER | Approved subject to C-1 and C-3. The condition is open (item 1), so the status is not DECIDED. |
+ | C | APPROVED | DECIDED | Retries blocked while inactive. The build is gate 7F. |
+ | D | APPROVED | DECIDED | Minimal owner status. The build is gates 7C and 7E. |
+ | E | APPROVED for design; ENABLING BLOCKED | DECIDED | Design only. Enabling is open under item 11. |
+@@ -1027,8 +1039,8 @@
+ 
+ | No. | Item and references | Status | Group | Open parts and who acts | Blocks |
+ |---|---|---|---|---|---|
+-| 1 | Held-job file retention; C-1, C-3; M1 file effect (§12B.6, §12B.9) | EXTERNAL BLOCKER | none listed | A held paid order that stays in `printing` never reaches a terminal status, so its file is not purged (0010 lines 795–798). A lawyer reviews when such a file may be released. The owner then chooses the C-1 option and decides C-3 (accept held files as an interim, or hold enforcement back). | M1; held-job enforcement in 7F. Not 7B. |
+-| 2 | Hold start and scheduler; C-2 (§12B.6) | RECOMMENDED | B, D | The owner chooses the hold start. Option (b), the time the shop left ACTIVE with a stored marker, is recommended. The purge scheduler exists (§5C), but it does not time out held jobs. A marker, timeout code or new scheduled job needs its own gate (§15.3). | M1 only. |
++| 1 | Held-job file retention; C-1, C-3; M1 file effect (§12B.6, §12B.9) | EXTERNAL BLOCKER | none listed | A held paid order that stays in `printing` never reaches a terminal status, so its file is not purged (0010 lines 795–798). A lawyer reviews when such a file may be released. The owner then chooses the C-1 option and decides C-3 (accept held files as an interim, or hold enforcement back). | M1; the 7F build (C-1 answered, C-3 decided). Enabling needs M1 if C-3 holds enforcement back. Not 7B. Stage 7 closure: §16.1(e). |
++| 2 | Hold start and scheduler; C-2 (§12B.6) | RECOMMENDED | B, D | The owner chooses the hold start. Option (b), the time the shop left ACTIVE with a stored marker, is recommended. The purge scheduler exists (§5C), but it does not time out held jobs. A marker, timeout code or new scheduled job needs its own gate (§15.3). | M1. Enabling only if C-3 holds enforcement back. Stage 7 closure: deferred by default (§16.1(e)), for owner confirmation. |
+ | 3 | Paid-term stacking; C-4 (M4, J) | RECOMMENDED | A | The owner confirms stacking, so paid terms do not overlap. | Paid path only (M5). |
+ | 4 | Pricing, minimum payment, tax treatment, paid path and the 0011 paid-table scope; I, M5, C-5, C-13 (§7, §12B.2) | EXTERNAL BLOCKER | A, C, D, E | Price, minimum and tax treatment need two answers first: the CA's tax answer (item 18), and the owner's collection-channel answer, either manual collection or a named processor. Decision 9 (gateway) stays DEFERRED, and integration (item 17) is not needed. If a named processor is chosen, its eligibility evidence and fee basis are needed before pricing. The exclusion of `paid_verified` and `licence_payments` from 0011 (C-5) is recommended. It is the only part of this item that gates 7B. See the dependency note below the table. | Paid coverage and any published price. 7B only through C-5. |
+ | 5 | Admin identity, MFA and the Auth UUID (decisions 13, 14; C-6, C-15; §10 items 12–13; §12A.3) | EXTERNAL BLOCKER | A, B, E | The production owner supplies the owner's Auth user UUID from their own account. It is never inferred. The production owner also records the MFA status on the Supabase account. One owner admin (decision 13) and `aal2` for admin RPCs (decision 14) are recommended. `aal2` behaviour needs staging evidence (S-3). | 7A; the bootstrap row; 7C to 7D. |
+@@ -1086,7 +1098,7 @@
+ |---|---|---|---|
+ | C-1 | EXTERNAL BLOCKER | 1 | M1 against the purge rule. A lawyer reviews a release rule. The owner chooses an option. |
+ | C-2 | RECOMMENDED | 2 | The hold-start choice. The premise is corrected (§5C): a scheduler exists for the purge, not for held-job timeouts. |
+-| C-3 | RECOMMENDED | 1 | The owner decides whether held files are accepted as an interim, or enforcement is held back. |
++| C-3 | RECOMMENDED | 1 | The owner decides whether held files are accepted as an interim, or enforcement is held back. Holding enforcement back makes M1 and item 2 prerequisites of enabling (§15.3). |
+ | C-4 | RECOMMENDED | 3 | Stacking. Applies only once the paid path is approved. |
+ | C-5 | RECOMMENDED | 4 | Exclude `paid_verified` and `licence_payments` from 0011. |
+ | C-6 | EXTERNAL BLOCKER | 5 | Admin accounts, MFA and the Auth UUID are unanswered. 7A cannot finish without the UUID and the MFA status. |
+@@ -1180,6 +1192,15 @@
+ 
+ Item 4's owner parts (collection channel, price and minimum) follow the CA's tax answer, as set out in the dependency note under §14.2. Until then they are not owner-confirmation items. Decision 3 and item 4 stay in the professional-advice row.
+ 
++**Which answers gate which step (C-1, C-3, C-6, item 2).** This table is the authority. The gate rows in §15.3 and the §16 Q6 answer agree with it.
++
++| Answer | Needed for | Not needed for | How it closes |
++|---|---|---|---|
++| C-6 (item 5): admin Auth user UUID, MFA status and admin accounts (decisions 13 to 15) | 7A; the bootstrap row; 7C and 7D | 7B schema design and the 7B staging run (the migration holds no UUID) | §16.1(c), production-owner checks |
++| C-1 (item 1): lawyer's review of the held-file release rule | Before the owner's C-3 decision, so before the 7F build. Also M1 implementation. Enabling needs it through C-3 | 7A to 7E; 7B | §16.1(e) |
++| C-3 (item 1): owner chooses held files accepted as an interim, or enforcement held back | 7F build; 7F enabling. Holding back also makes M1 and item 2 prerequisites of enabling | 7A to 7E; 7B | §16.1(e) |
++| Item 2 (C-2): hold start and scheduler | M1. Enabling only if C-3 holds enforcement back | 7A to 7F build | Deferred by default from Stage 7 closure (§16.1(e)), for owner confirmation |
++
+ ### 15.2 Staging options (for setup approval only)
+ 
+ - **Option A: local Supabase stack.** Needs Docker, the Supabase CLI and containers, each of which needs approval. `supabase init` would create `supabase/config.toml` (item 31).
+@@ -1195,7 +1216,7 @@
+ | 7C Admin RPCs and owner read RPC | Grant, extend, revoke (M2), replace; denial logging (M3); idempotency (R5); owner read (decision D) | 7B on staging; the lock map confirmed by a two-session test (item 33); the global denial ceiling accepted (item 15); the count-only limitation accepted (C-12); item 5; the decision 16 validation inputs (duration, backdating, lifetime owner-only, and maximum custom length, which may be "none", item 7) | Separate approval | Admin, privilege, concurrency and denial-cap tests | Revoke `EXECUTE` on the admin RPCs (needs a migration). This rollback changes no coverage row (§15.5) |
+ | 7D Admin UI, separate private deployment | Login, shop search, grant, extend, revoke, replace with confirmation, audit view; MFA enrolment if decision 14 requires it | 7C on staging; the hosting decision (item 6); the visibility check (item 6); item 5 | Separate approval | Browser smoke test on staging; static scan that no service key is in the bundle | Take the deployment down. No database change, and no coverage row changes (§15.5) |
+ | 7E Owner read-only status, web | Fields as in decision D; labels (item 13); display rule (item 8) | 7C; the label decision (item 13); the display rule (item 8) | Separate approval | Enforcement off returns no fields; enforcement on returns only the D fields; staff denied | Remove the owner status UI. Revoke `EXECUTE` on `shop_licence_status` only if the read RPC must be withdrawn (needs a migration). The rollback changes no coverage row and grants or revokes no licence (§15.5) |
+-| 7F Enforcement, printing only | Gates on approve, retry, claim and `mark_printing` (decisions A, B, C) | 7C and 7E; S-4 accepted (item 35); item 33 lock tests; item 25 tests of both signatures; item 32 kill switch approved; item 1 (C-3 decided); item 11 (existing-shop policy) before enabling | Separate approval to build, and a separate approval to enable | Printing and checkout tests (§12B.11) | A designed kill switch is needed (item 32). None exists yet |
++| 7F Enforcement, printing only | Gates on approve, retry, claim and `mark_printing` (decisions A, B, C) | 7C and 7E; S-4 accepted (item 35); item 33 lock tests; item 25 tests of both signatures; item 32 kill switch approved; item 1 for the build (C-1 answered, C-3 decided). Before enabling only: item 11 (existing-shop policy); M1 and item 2, if C-3 holds enforcement back | Separate approval to build, and a separate approval to enable | Printing and checkout tests (§12B.11) | A designed kill switch is needed (item 32). None exists yet |
+ 
+ **Owner inputs needed before the 7B schema can be designed.** Four inputs, and no others:
+ 
+@@ -1250,7 +1271,7 @@
+ | 3 | Is every open ID given one status? | YES | Items 1 to 35, groups A to E, decisions A to L and 1 to 20, M1 to M8, C-1 to C-15, S-1 to S-8 and R1 to R19 are each in §14. |
+ | 4 | Are external blockers identified with their outside party? | YES | The 17 EXTERNAL BLOCKER items in §14.2 name the party. The answers are not in the repository. |
+ | 5 | Are factual claims supported by repository evidence? | PARTLY | Repository facts are re-checked with line numbers (§2, §4, §5C, §12A.2, §12B.4 to §12B.9). Live state, README statements and external sources are labelled and not verified. |
+-| 6 | Is the implementation scope frozen? | NO | 7B waits on C-5, items 8 and 16, the basis-ranking confirmation under item 7, and a staging copy with 0010 applied. Item 26 is needed only before a production migration. 7F waits on 7C and 7E, and on items 1 (C-3), 11, 25, 32, 33 and S-4. |
++| 6 | Is the implementation scope frozen? | NO | 7B waits on C-5, items 8 and 16, the basis-ranking confirmation under item 7, and a staging copy with 0010 applied. Item 26 is needed only before a production migration. 7F build waits on 7C and 7E, on item 1 (C-1 answered, C-3 decided), and on items 25, 32, 33 and S-4. Before enabling only: item 11, and M1 and item 2 if C-3 holds enforcement back. |
+ | 7 | Are setup, staging, production and deployment permissions still separate? | YES | §15.2, §15.3 and §15.5. No approval exists for any of them. The main checkout and `stash@{0}` are untouched. |
+ | 8 | Are the Stage 7 closure criteria met? | NO | See §16.1. |
+ 
+@@ -1260,7 +1281,7 @@
+ b. Every numbered item in §14.2 is DECIDED or DEFERRED, or its outside input has been received, or its gate is approved and run.
+ c. The production-owner checks are recorded: items 5, 11, 25, 26, 27, 31 and 34. For the admin stages, also the item 6 visibility and plan check.
+ d. Each gate that is run has its test results recorded in this file and accepted by the owner.
+-e. Items 1, 2, 23 and 24 are closed (the M1, duplicate-print and refund-and-claim decisions).
++e. Items 1, 23 and 24 are closed. Item 1 closes when a lawyer has answered C-1 and the owner has decided C-3. Items 23 and 24 close when each fix has passed its diff review and tests under its own approval (§15.3). Item 24 also needs the owner's choice of R-a, R-b or R-c. Item 2 is not on this list. It is DEFERRED from Stage 7 closure by default, because no 7F build gate depends on it and group D is safe to defer. This deferral is proposed for owner confirmation. If C-3 holds enforcement back, M1 and item 2 become prerequisites of enabling, not of closure. Proposed reading, for owner confirmation: Stage 7 closure does not require enforcement to be enabled. Enabling is a separate 7F approval.
+ 
+ **Transition rule:** Stage 8 cannot begin until Stage 7's planning approval and criteria (a) to (e) are satisfied. This document does not define Stage 8 scope.
+ 

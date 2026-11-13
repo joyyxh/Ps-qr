@@ -1,0 +1,36 @@
+Add owner email-code registration and password setup
+
+Owner registration now asks for an email and password, then a one-time
+code sent by Supabase Auth. The password chosen at registration is saved
+to the account after the code is accepted, so later sign-in is email and
+password only. The confirmation link also saves the chosen password.
+
+- An unverified or unfinished confirmation never stores a session.
+- A failed password save keeps the owner signed out and can be retried.
+  An expired confirmation sends the owner to Forgot password.
+- Sign-in, password recovery and existing owner accounts are unchanged.
+  Customers still have no accounts.
+- Migration 0014 makes create_shop require a confirmed email. It is
+  written, not applied, and has a rollback. The Supabase "Confirm email"
+  setting is the real control. It is not verified on the live project and
+  is a release blocker.
+
+Stage 3 changes in this commit:
+
+- Migrations 0011 to 0013: service options and paper sizes; print
+  eligibility (refunded, cancelled or rejected orders do not print); the
+  order workflow (payment only after the owner accepts, paid orders cannot
+  be cancelled until refunded, cash timing removed).
+- Owner and customer web screens with their unit and browser tests, the
+  SQL suites and the scratch database runner.
+
+Not in this commit: the printing agent in agent/, including its
+uncommitted paper-size check.
+
+Tests were reused from earlier local runs: unit tests, the owner browser
+smoke against a mocked Supabase, and the SQL suites on a scratch database.
+Nothing was pushed, deployed, applied to a hosted project, or built as an
+APK.
+
+Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DxRqmb5mEMWYPJvm5FH5tt

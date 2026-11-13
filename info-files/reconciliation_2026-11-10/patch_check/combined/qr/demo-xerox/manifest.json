@@ -1,0 +1,12 @@
+{
+  "slug": "demo-xerox",
+  "shop_id": "bbbbbbbb-0000-0000-0000-000000000001",
+  "encodes": "http://localhost:5173/#/s/demo-xerox",
+  "sha256_of_url": "120afb8b894f08abf4980b01553e465f058406973941ae852596951e16528bbb",
+  "error_correction": "M",
+  "modules": 33,
+  "quiet_zone_modules": 4,
+  "self_check": "passed",
+  "created_at_utc": "2026-10-14T20:49:49+00:00",
+  "note": "Rename the slug or change the domain and the printed code stops working. Regenerate and reprint."
+}

@@ -1,0 +1,44 @@
+BEGIN
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+                             name                              | ok |                                              detail                                              
+---------------------------------------------------------------+----+--------------------------------------------------------------------------------------------------
+ S01 owner A reads own shop                                    | t  | count=1
+ S02 owner A cannot see owner B memberships                    | t  | count=0
+ S03 owner A sees inactive services of own shop                | t  | count=1
+ S04 owner A updates own shop details                          | t  | rows=1
+ S05 owner A cannot update shop B (silently 0 rows)            | t  | rows=0
+ S06 owner A cannot change the shop slug                       | t  | 42501: permission denied for table shops
+ S07 owner A opens or closes own shop                          | t  | rows=1
+ S08 owner A adds a service to own shop                        | t  | rows=1
+ S09 owner A cannot add a service to shop B                    | t  | 42501: new row violates row-level security policy for table "services"
+ S10 owner A cannot edit a service of shop B (silently 0 rows) | t  | rows=0
+ S11 owner A changes a price in own shop                       | t  | rows=1
+ S12 owner A cannot move a service into shop B                 | t  | 42501: new row violates row-level security policy for table "services"
+ S13 owner A cannot make themselves owner of shop B            | t  | 42501: new row violates row-level security policy for table "shop_memberships"
+ S14 a service needs at least one price                        | t  | 23514: new row for relation "services" violates check constraint "services_has_a_price"
+ S15 a price above Rs 1,000 is refused                         | t  | 23514: new row for relation "services" violates check constraint "services_bw_price_paise_check"
+ S16 a service name over 80 characters is refused              | t  | 23514: new row for relation "services" violates check constraint "services_name_check"
+ S17 an unknown charging unit is refused                       | t  | 23514: new row for relation "services" violates check constraint "services_pricing_unit_check"
+ S18 owner A cannot read orders of shop B                      | t  | count=0
+ S19 create_shop makes a new shop for owner A                  | t  | count=1
+ S20 a taken web address is refused                            | t  | 23505: duplicate key value violates unique constraint "shops_slug_key"
+ S21 a reserved web address is refused                         | t  | 23514: new row for relation "shops" violates check constraint "shops_slug_reserved"
+ S22 a badly formed web address is refused                     | t  | 23514: new row for relation "shops" violates check constraint "shops_slug_format"
+ S23 a blank shop name is refused                              | t  | 23514: new row for relation "shops" violates check constraint "shops_name_length"
+ S24 owner B cannot see memberships of owner A new shop        | t  | count=0
+ S25 owner B cannot change owner A new shop (silently 0 rows)  | t  | rows=0
+ S26 shop listing stays public by design                       | t  | count=1
+ S27 anonymous visitors cannot create shops                    | t  | 42501: permission denied for function create_shop
+ S28 anonymous visitors cannot see inactive services           | t  | count=0
+ S29 anonymous visitors see active services                    | t  | count=1
+ S30 anonymous visitors cannot change shops                    | t  | 42501: permission denied for table shops
+(30 rows)
+
+ROLLBACK

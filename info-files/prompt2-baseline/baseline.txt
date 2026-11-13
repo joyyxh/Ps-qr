@@ -1,0 +1,25 @@
+# Baseline recorded 2026-10-31T17:13:52+00:00 (read-only; no repo change)
+## Worktree /home/claude/joyyxh/ps-qr-stage7
+branch: stage7-payments
+HEAD: 637bc47ea1330636ae554990538ef07069ced4d6
+origin/stage7-payments local ref: ABSENT (remote-tracking ref not present locally)
+## git status
+## stage7-payments
+ M OWNER_DECISION_SHEET.md
+ M STAGE7_DECISIONS.md
+?? CLAUDE.md
+## git diff --stat
+ OWNER_DECISION_SHEET.md |  9 +++++----
+ STAGE7_DECISIONS.md     | 27 ++++++++++++++++++---------
+ 2 files changed, 23 insertions(+), 13 deletions(-)
+## stash list (sha, subject)
+b559dce5c72ec1f7b1fd4403a40486d9b8cd793a On main: stage1 local duplicate of printing work (disk backup: scratchpad stage1-backup)
+## sha256 of protected/preserved files
+fbe9804b11e70bddae6b6f35778c7581edd743fee51e6301f85f4dec1efbe3a9  OWNER_DECISION_SHEET.md
+045ee8feebe0fd6c9ad0f4cae2ddf49f49984463bee827d9e6debdb14767774c  STAGE7_DECISIONS.md
+2d8297eccff5d23e4d3ad37fd7f220bcc18977cfa846d57e7751b09288013641  CLAUDE.md
+## main checkout (read-only)
+## main...origin/main [ahead 1, behind 4]
+ M agent/README.md
+ M agent/src/worker.mjs
+ M agent/test/worker.test.mjs

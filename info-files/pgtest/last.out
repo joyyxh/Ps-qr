@@ -1,0 +1,2 @@
+psql: error: connection to server on socket "/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/pgtest/.s.PGSQL.54329" failed: No such file or directory
+	Is the server running locally and accepting connections on that socket?

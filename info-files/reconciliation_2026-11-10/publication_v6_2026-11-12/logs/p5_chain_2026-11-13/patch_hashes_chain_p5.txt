@@ -1,0 +1,5 @@
+0b51ad5e4065edbb8d1cd43fb1c291d7d6e0b01766e3102a715501d871da20a7  /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/reconciliation_2026-11-10/patches_v5_proposed_2026-11-11/P2_7B_7C_database_v5.patch
+cc56fd707ad09a7bbb09c44bd9bae8695b8c5ab21be74ce2ea6ee25d00942a43  /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/reconciliation_2026-11-10/patches_v3_2026-11-11/P3_7D_admin.patch
+f19cd2381a5eed65c604a62751855f7f995155da809820332f5f761f0f64be26  /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/reconciliation_2026-11-10/patches_v5_proposed_2026-11-11/U6_browser_smoke_and_layout.patch
+7119a05ca701d536cf073324cd4c13aa87ac375104430a10e0071d4298ab5c10  /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/reconciliation_2026-11-10/patches_v5_proposed_2026-11-11/P4_7E_web_v5.patch
+d1bb8fe3325bf194986db85980e662351957c49dd1c139f1f5e5dd5a722f813e  /tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/reconciliation_2026-11-10/7F_prepared_2026-11-12/P5_7F_agent_fail_closed.patch

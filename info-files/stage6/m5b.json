@@ -1,0 +1,1 @@
+[["if (args.length > 0) throw", "if (false && args.length > 0) throw"]]

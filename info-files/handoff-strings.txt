@@ -1,0 +1,48 @@
+Shop owners only
+Ordering from
+Track order
+Refresh
+Checking your payment
+Order received
+aria-current
+Ready for pickup
+Waiting approval
+Waiting for approval
+Ready for collection
+Approve and print
+Test print
+Confirm payment
+Discard
+Save changes
+Changes apply to new orders
+No orders yet
+Share your shop QR
+Only PDF, JPG
+not a QRquick shop
+20 MB
+10 MB
+deleted after printing
+Sending the order does not mean
+Orientation
+orientation
+Letter
+A3
+Photocop
+Show shop QR
+timeline
+breakdown
+file-line
+segmented
+stepper
+switch
+button.danger
+danger
+ghost
+Pay by UPI
+Pay cash
+Place order
+Review order
+Needs you now
+Copy
+Manrope
+Inter

@@ -1,0 +1,18 @@
+FAIL  local: address field shows the QR address  (https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+FAIL  local: warning shown only for a local address  ([])
+PASS  local: code is drawn on the page
+FAIL  local: on-screen code scans to the shop address  (decoded=NONE)
+FAIL  local: download is named for the shop  (qrquick-demo-xerox-qr.png)
+FAIL  local: downloaded PNG scans to the shop address  (decoded=https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  local: no horizontal scroll at phone width  (overflow=0px)
+PASS  local: no JavaScript errors
+FAIL  published: address field shows the QR address  (https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  published: warning shown only for a local address  ([])
+PASS  published: code is drawn on the page
+FAIL  published: on-screen code scans to the shop address  (decoded=NONE)
+FAIL  published: download is named for the shop  (qrquick-demo-xerox-qr.png)
+FAIL  published: downloaded PNG scans to the shop address  (decoded=https://joyyxh.github.io/Ps-qr/#/s/demo-xerox)
+PASS  published: no horizontal scroll at phone width  (overflow=0px)
+PASS  published: no JavaScript errors
+
+7 of 16 checks passed.

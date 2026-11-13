@@ -1,0 +1,10 @@
+routine_name | grantee | privilege_type
+admin_search_shops | authenticated | EXECUTE
+admin_shop_audit | authenticated | EXECUTE
+admin_shop_licence | authenticated | EXECUTE
+licence_admin_extend | authenticated | EXECUTE
+licence_admin_grant | authenticated | EXECUTE
+licence_admin_replace | authenticated | EXECUTE
+licence_admin_revoke | authenticated | EXECUTE
+shop_licence_status | authenticated | EXECUTE
+(8 rows)

@@ -1,0 +1,126 @@
+diff --git a/agent/README.md b/agent/README.md
+index 674329d..e0d2247 100644
+--- a/agent/README.md
++++ b/agent/README.md
+@@ -57,8 +57,12 @@ node bin/qrquick-print-agent.mjs run
+ - `test-print` — prints **one** test page on the chosen printer. This uses paper.
+ - `run` — keeps printing approved orders. Leave it running. Ctrl+C stops it safely.
+ 
+-The agent works on A4 paper only, because the order does not yet record a paper size.
+-A printer with no A4 option will refuse every order, and the owner sees why.
++Each order carries the paper size the customer chose (A4, A3 or Letter). The agent selects it
++on Linux/CUPS when the printer lists that size. On Windows the agent cannot read or choose the
++tray size yet, so the server refuses A3 and Letter orders for any shop with a Windows computer before
++the customer is charged, and customers are shown only A4 there. The agent still refuses a non-A4 job it
++cannot print, as a second check. A printer that cannot do the chosen size refuses the order, and the
++owner sees why. Owners should switch off paper sizes the printer cannot print.
+ 
+ ### Keep it running
+ 
+@@ -129,6 +133,8 @@ Until items 3 to 5 pass, do not describe automatic printing as working.
+ - Linux: colour and duplex use the printer's own CUPS options (`ColorModel`, `Duplex` or
+   `sides`). A colour printer with no black-and-white option may print in colour for
+   black-and-white orders; the agent cannot force a mode the printer does not offer.
+-- Paper size is A4 only. Orientation, page ranges, fit-to-page and cropping are not implemented.
++- Paper size: A4 always works. A3 and Letter work only where the printer system lists that size (CUPS
++  `PageSize`); on Windows they are refused, not printed on the default tray. Orientation, page
++  ranges, fit-to-page and cropping are not implemented.
+ - No printing confirmation: the agent knows the job was accepted by the printing system, not
+   that paper came out.
+diff --git a/agent/src/worker.mjs b/agent/src/worker.mjs
+index b6899ed..a80d748 100644
+--- a/agent/src/worker.mjs
++++ b/agent/src/worker.mjs
+@@ -82,7 +82,8 @@ export function checkSettings(settings, printer) {
+       message: `This order is double-sided, but "${printer.name}" cannot print on both sides.`,
+     };
+   }
+-  if (Array.isArray(printer.papers) && printer.papers.length > 0) {
++  const knownPapers = Array.isArray(printer.papers) && printer.papers.length > 0;
++  if (knownPapers) {
+     const supported = printer.papers.some((p) => p.toLowerCase() === settings.paper.toLowerCase());
+     if (!supported) {
+       return {
+@@ -90,6 +91,14 @@ export function checkSettings(settings, printer) {
+         message: `${settings.paper} paper is not supported by "${printer.name}".`,
+       };
+     }
++  } else if (settings.paper.toLowerCase() !== 'a4') {
++    // The adapter could not read the printer's paper list (Windows never reports one), so the agent
++    // cannot select a non-A4 tray. Refuse rather than print on the default tray while the customer
++    // was charged for another size. A4 is still allowed, as it always was.
++    return {
++      code: 'unsupported_setting',
++      message: `QRquick cannot choose ${settings.paper} paper on "${printer.name}" from this computer. Ask the shop to print this order on A4 paper.`,
++    };
+   }
+   return null;
+ }
+@@ -237,6 +246,17 @@ export function createWorker({
+     let toPrint = bytes;
+     let extension = type === 'jpeg' ? 'jpg' : type;
+     if (type !== 'pdf' && !adapter.acceptsImages) {
++      // The picture is wrapped on one A4 page, so it cannot honour another paper size. Refuse
++      // rather than print A4 for a customer who chose A3 or Letter.
++      if (settings.paper.toLowerCase() !== 'a4') {
++        await report(
++          jobRef,
++          'failed',
++          'unsupported_setting',
++          `Picture files print on A4 paper only. This order is for ${settings.paper}; ask the customer to send a PDF.`,
++        );
++        return;
++      }
+       try {
+         toPrint = imageToPdf(bytes);
+         extension = 'pdf';
+diff --git a/agent/test/worker.test.mjs b/agent/test/worker.test.mjs
+index e6a9ef3..fdfd2c0 100644
+--- a/agent/test/worker.test.mjs
++++ b/agent/test/worker.test.mjs
+@@ -186,6 +186,21 @@ test('an unknown file type is refused and nothing is printed', async (t) => {
+   assert.equal(h.reports[0].result.errorCode, 'file_type_unknown');
+ });
+ 
++test('a picture order on A3 or Letter fails before anything is sent, because pictures are wrapped on A4 only', async (t) => {
++  // The printer lists A3 and Letter, so checkSettings passes and the picture rule is what refuses the job.
++  for (const paper of ['A3', 'Letter']) {
++    const h = await harness(t, {
++      printers: [{ ...OFFICE, papers: ['A4', 'A3', 'Letter'] }],
++      acceptsImages: false,
++      bytes: JPEG,
++    });
++    await h.worker.processJob(job({ size_bytes: JPEG.length, settings: { copies: 1, colour: false, duplex: false, paper } }));
++    assert.deepEqual(h.events, ['failed'], paper);
++    assert.equal(h.reports[0].result.errorCode, 'unsupported_setting', paper);
++    assert.match(h.reports[0].result.errorMessage, new RegExp(`for ${paper};`), paper);
++  }
++});
++
+ test('a JPEG is wrapped in a PDF for printers that only accept PDF', async (t) => {
+   let seenBytes = null;
+   const h = await harness(t, {
+@@ -324,6 +339,23 @@ test('checkSettings refuses what the printer cannot do, and allows what it can',
+   assert.equal(checkSettings(simplex, { ...OFFICE, capabilitiesKnown: false }), null);
+ });
+ 
++test('checkSettings refuses A3 or Letter when the printer paper list is unknown (Windows), but still allows A4', () => {
++  // Windows reports papers: null. A non-A4 job would print on the default tray while the customer was charged for the size.
++  const windows = { ...OFFICE, papers: null };
++  const a4 = { copies: 1, colour: false, duplex: false, paper: 'A4' };
++  assert.equal(checkSettings(a4, windows), null);
++  assert.equal(checkSettings({ ...a4, paper: 'a4' }, windows), null);
++  for (const paper of ['A3', 'Letter']) {
++    const refusal = checkSettings({ ...a4, paper }, windows);
++    assert.equal(refusal.code, 'unsupported_setting');
++    assert.match(refusal.message, new RegExp(`${paper} paper`));
++  }
++  // An empty list is unknown too, not "supports nothing".
++  assert.equal(checkSettings({ ...a4, paper: 'A3' }, { ...OFFICE, papers: [] }).code, 'unsupported_setting');
++  // A printer that reports a list still decides by that list.
++  assert.equal(checkSettings({ ...a4, paper: 'A3' }, { ...OFFICE, papers: ['A3', 'A4'] }), null);
++});
++
+ test('choosePrinter prefers the order, then this computer\'s fallback, then the system default', () => {
+   const list = [OFFICE, { ...OFFICE, name: 'Front', isDefault: false }];
+   assert.equal(choosePrinter({ printers: list, wanted: 'Front', configured: 'Office' }).name, 'Front');

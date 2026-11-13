@@ -1,0 +1,10 @@
+PASS  features card lists all 8 features
+PASS  colour and double-sided start on, the rest off  (["colour_printing","double_sided"])
+PASS  save sends every feature as yes or no  ({"p_shop_id":"bbbbbbbb-0000-0000-0000-000000000001","p_features":{"colour_printing":false,"double_sided":false,"photocopy":false,"scanning":false,"spiral_binding":false,"lamination":false,"passport_photos":false,"stapling":true}})
+PASS  save carries the owner token and this shop
+PASS  colour and double-sided saved as no, stapling as yes
+PASS  no payment QR yet
+PASS  a text file is refused before any request
+FAIL  run stopped: ENOENT: no such file or directory, open '/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/reconciliation_2026-11-10/logs_2026-11-11/browser_base/png_rerun/qr-local-download.png'
+
+7 of 7 checks passed.

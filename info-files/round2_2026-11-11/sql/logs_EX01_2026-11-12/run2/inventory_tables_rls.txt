@@ -1,0 +1,25 @@
+relname | relrowsecurity | relforcerowsecurity
+licence_audit_log | t | f
+licence_audit_log_pkey | f | f
+licence_audit_log_shop_created_id_idx | f | f
+licence_audit_log_shop_created_idx | f | f
+licence_config | t | f
+licence_config_pkey | f | f
+licence_coverages | t | f
+licence_coverages_pkey | f | f
+licence_coverages_request_id_key | f | f
+licence_coverages_shop_start_idx | f | f
+licence_denial_windows | t | f
+licence_denial_windows_actor_hour | f | f
+licence_denial_windows_global_hour | f | f
+licence_denial_windows_id_seq | f | f
+licence_denial_windows_pkey | f | f
+licence_denials | t | f
+licence_denials_actor_time | f | f
+licence_denials_pkey | f | f
+licence_requests | t | f
+licence_requests_pkey | f | f
+platform_admins | t | f
+shop_licence_meta | t | f
+shop_licence_meta_pkey | f | f
+(23 rows)

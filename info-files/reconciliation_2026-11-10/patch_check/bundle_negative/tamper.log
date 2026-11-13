@@ -1,0 +1,4 @@
+FAIL checksum mismatch: ./src/qr.js
+checksums: 14 listed, 14 files on disk
+config: empty (not configured), service key: false
+RESULT: FAIL

@@ -1,0 +1,38 @@
+BEGIN
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+                                           name                                            | ok |                                                                                                                                                                                                                             detail                                                                                                                                                                                                                             
+-------------------------------------------------------------------------------------------+----+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ F01 customer-files bucket is private, 10 MB, PDF/JPEG/PNG only                            | t  | checked
+ F02 anon cannot read customer_files                                                       | t  | 42501: permission denied for table customer_files
+ F03 anon cannot add a customer file                                                       | t  | 42501: permission denied for table customer_files
+ F04 anon sees no stored objects in customer-files                                         | t  | visible=0
+ F05 an owner cannot read customer_files directly                                          | t  | 42501: permission denied for table customer_files
+ F06 an owner cannot change a customer file                                                | t  | 42501: permission denied for table customer_files
+ F07 an owner sees no stored objects in customer-files                                     | t  | visible=0
+ F08 the server page count prices the order (3 x 2 x 200 = 1200) and the file name is kept | t  | {"items": [{"colour": false, "copies": 2, "duplex": false, "file_id": "51594cea-3876-4deb-a1f4-6941d014461f", "file_name": "notes.pdf", "page_count": 3, "service_id": "cccccccc-0000-0000-0000-000000000001", "amount_paise": 1200, "pricing_unit": "per_side", "service_name": "Document printing", "billable_units": 6, "unit_price_paise": 200}], "status": "pending", "shop_name": "Demo Xerox Centre", "total_paise": 1200, "tracking_code": "9ZSM4NCG"}
+ F09 the file is claimed by the order it was used in                                       | t  | checked
+ F10 quote prices from the 5-page file (1000) and claims nothing                           | t  | {"items": [{"colour": false, "copies": 1, "duplex": false, "file_id": "774cdec9-d0c6-433e-8edc-8c1b8ef97d97", "file_name": "slides.pdf", "page_count": 5, "service_id": "cccccccc-0000-0000-0000-000000000001", "amount_paise": 1000, "pricing_unit": "per_side", "service_name": "Document printing", "billable_units": 5, "unit_price_paise": 200}], "shop_name": "Demo Xerox Centre", "total_paise": 1000}
+ F11 a claimed file cannot be ordered again                                                | t  | P0002: file not found or no longer available
+ F12 the same file cannot be used twice in one order                                       | t  | 22023: each file can be used once per order
+ F13 an item without an uploaded file is refused                                           | t  | 22023: each item needs an uploaded file
+ F14 an expired file cannot be ordered                                                     | t  | P0002: file not found or no longer available
+ F15 a file from another shop cannot be used                                               | t  | P0002: file not found or no longer available
+ F16 a refused multi-item order is rejected                                                | t  | P0002: file not found or no longer available
+ F16b no order was written and the first file is still free                                | t  | orders=0 first file free=true
+ F17 a file cannot back a second order item                                                | t  | 23505: duplicate key value violates unique constraint "order_items_file_unique"
+ F18 a file name over 120 characters is refused                                            | t  | 23514: new row for relation "customer_files" violates check constraint "customer_files_original_name_check"
+ F19 only PDF, JPEG and PNG can be stored                                                  | t  | 23514: new row for relation "customer_files" violates check constraint "customer_files_mime_type_check"
+ F20 owner A sees the file name on own order item                                          | t  | count=1
+ F21 owner B cannot see demo-xerox file names                                              | t  | count=0
+ F22 a fresh unclaimed file quotes normally (1 x 200 = 200)                                | t  | {"items": [{"colour": false, "copies": 1, "duplex": false, "file_id": "e5db28d3-9cff-47a7-9d69-80d2b6567f43", "file_name": "fresh.pdf", "page_count": 1, "service_id": "cccccccc-0000-0000-0000-000000000001", "amount_paise": 200, "pricing_unit": "per_side", "service_name": "Document printing", "billable_units": 1, "unit_price_paise": 200}], "shop_name": "Demo Xerox Centre", "total_paise": 200}
+(23 rows)
+
+ROLLBACK

@@ -1,0 +1,6 @@
+FAIL  run stopped: locator.waitFor: Timeout 8000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-action="download-qr"]') to be visible[22m
+
+
+0 of 0 checks passed.

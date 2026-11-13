@@ -1,0 +1,188 @@
+TAP version 13
+# Subtest: run sends the saved token and printer list to the saved address, stops at once on 401, and prints nothing
+ok 1 - run sends the saved token and printer list to the saved address, stops at once on 401, and prints nothing
+  ---
+  duration_ms: 79.642243
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer is refused before the saved config is read, so nothing starts
+ok 2 - run --simulated-printer is refused before the saved config is read, so nothing starts
+  ---
+  duration_ms: 12.301929
+  type: 'test'
+  ...
+# Subtest: a fixture with one unpaid job refuses the whole file, so nothing is simulated
+ok 3 - a fixture with one unpaid job refuses the whole file, so nothing is simulated
+  ---
+  duration_ms: 18.988461
+  type: 'test'
+  ...
+# Subtest: only a literal approved and paid order can be simulated
+ok 4 - only a literal approved and paid order can be simulated
+  ---
+  duration_ms: 6.986519
+  type: 'test'
+  ...
+# Subtest: a file outside the fixture folder is refused
+ok 5 - a file outside the fixture folder is refused
+  ---
+  duration_ms: 5.4742
+  type: 'test'
+  ...
+# Subtest: job ids, states and attempt numbers are checked, and a repeated job id is refused
+ok 6 - job ids, states and attempt numbers are checked, and a repeated job id is refused
+  ---
+  duration_ms: 6.733548
+  type: 'test'
+  ...
+# Subtest: a link inside the fixture folder that points outside it is refused before anything runs
+ok 7 - a link inside the fixture folder that points outside it is refused before anything runs
+  ---
+  duration_ms: 7.844202
+  type: 'test'
+  ...
+# Subtest: simulate refuses a fixture whose link leaves the folder, and starts nothing
+ok 8 - simulate refuses a fixture whose link leaves the folder, and starts nothing
+  ---
+  duration_ms: 13.743972
+  type: 'test'
+  ...
+# Subtest: a link that stays inside the fixture folder is still simulated
+ok 9 - a link that stays inside the fixture folder is still simulated
+  ---
+  duration_ms: 39.639054
+  type: 'test'
+  ...
+# Subtest: a file replaced by a link to outside after the check is refused when it is read
+not ok 10 - a file replaced by a link to outside after the check is refused when it is read
+  ---
+  duration_ms: 24.383957
+  type: 'test'
+  location: '/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/mutants2/C_no_read_time_link_check/agent/test/simulation.test.mjs:152:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    'sent' !== 'failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'failed'
+  actual: 'sent'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/mutants2/C_no_read_time_link_check/agent/test/simulation.test.mjs:159:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+ok 11 - a simulated job is never sent to QRquick: no network call is made and the job ends as simulated
+  ---
+  duration_ms: 40.557437
+  type: 'test'
+  ...
+# Subtest: the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+ok 12 - the steps run in order: claim, printing, then the finish, and every line says SIMULATED
+  ---
+  duration_ms: 17.691692
+  type: 'test'
+  ...
+# Subtest: printing and needs-check jobs are never claimed or printed again
+ok 13 - printing and needs-check jobs are never claimed or printed again
+  ---
+  duration_ms: 20.537522
+  type: 'test'
+  ...
+# Subtest: settings the simulated printer cannot do are refused before anything is simulated
+ok 14 - settings the simulated printer cannot do are refused before anything is simulated
+  ---
+  duration_ms: 8.571403
+  type: 'test'
+  ...
+# Subtest: an unknown file type is refused and nothing is simulated
+ok 15 - an unknown file type is refused and nothing is simulated
+  ---
+  duration_ms: 9.398411
+  type: 'test'
+  ...
+# Subtest: a picture is wrapped in a PDF and then simulated
+ok 16 - a picture is wrapped in a PDF and then simulated
+  ---
+  duration_ms: 29.951081
+  type: 'test'
+  ...
+# Subtest: a file whose size does not match what was ordered is refused
+ok 17 - a file whose size does not match what was ordered is refused
+  ---
+  duration_ms: 8.332008
+  type: 'test'
+  ...
+# Subtest: a missing file is reported as a failed download, and nothing is simulated
+ok 18 - a missing file is reported as a failed download, and nothing is simulated
+  ---
+  duration_ms: 6.099393
+  type: 'test'
+  ...
+# Subtest: the in-memory server refuses a result that would skip the printing step
+ok 19 - the in-memory server refuses a result that would skip the printing step
+  ---
+  duration_ms: 1.231796
+  type: 'test'
+  ...
+# Subtest: the in-memory server keeps the job rules that migration 0010 states
+ok 20 - the in-memory server keeps the job rules that migration 0010 states
+  ---
+  duration_ms: 0.856449
+  type: 'test'
+  ...
+# Subtest: a server that never runs out of jobs stops at the safety limit instead of hanging
+ok 21 - a server that never runs out of jobs stops at the safety limit instead of hanging
+  ---
+  duration_ms: 6.795421
+  type: 'test'
+  ...
+# Subtest: run --simulated-printer is refused before any request, even against a localhost server
+ok 22 - run --simulated-printer is refused before any request, even against a localhost server
+  ---
+  duration_ms: 5.708887
+  type: 'test'
+  ...
+# Subtest: run refuses an unknown option before any request
+ok 23 - run refuses an unknown option before any request
+  ---
+  duration_ms: 4.400652
+  type: 'test'
+  ...
+# Subtest: simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+ok 24 - simulate with no file runs the built-in scenario offline, needs no pairing, and sends nothing
+  ---
+  duration_ms: 18.706906
+  type: 'test'
+  ...
+# Subtest: simulate with a fixture file runs it offline and prints a summary
+ok 25 - simulate with a fixture file runs it offline and prints a summary
+  ---
+  duration_ms: 24.114897
+  type: 'test'
+  ...
+# Subtest: simulate with an unpaid job in the file stops before anything starts
+ok 26 - simulate with an unpaid job in the file stops before anything starts
+  ---
+  duration_ms: 8.078036
+  type: 'test'
+  ...
+# Subtest: simulate refuses extra arguments and a file that does not exist
+ok 27 - simulate refuses extra arguments and a file that does not exist
+  ---
+  duration_ms: 3.460974
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 26
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 729.01217

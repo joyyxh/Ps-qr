@@ -1,0 +1,1 @@
+psql:/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/round3_2026-11-12/dmig_option_b/scratch_order_check/chainA_0012_print_eligibility.sql:90: NOTICE:  trigger "orders_cancel_unprintable_jobs" for relation "public.orders" does not exist, skipping
