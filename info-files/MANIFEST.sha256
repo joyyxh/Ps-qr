@@ -26,6 +26,7 @@ de35d712d30c6226d6f1ac4a131ca90a6976903b13a9c51c6609b85395a00765  ./OWNER_DECISI
 675d168b575e013ee332b4879a61f8bd4f5d16602b9b6ac45b6b8197a8882774  ./OWNER_DECISION_SHEET.decision1-2026-10-31.diff
 08b73a78b05a134cd0413858066188afe9e4c5fe0b0dd1dec117b9e951a3a7e6  ./OWNER_DECISION_SHEET.new-file-2026-10-31.diff
 3c94153050d324f7f7e1d2a18025ab4bffdd299bb0e7f167fe23a6318614d1dc  ./OWNER_DECISION_SHEET.owner-instructions-2026-10-31.diff
+30ba2f132e0a87b7f317feaf8abcb59b8a4d6b725f8c79b1cf2ac97e583ae1d4  ./README.md
 5798507f00d29c042d433364f9e0533fd0a61c924817a92449524627b716dd55  ./STAGE7F_C1_GATES.md
 3b5bdda76da1dd7d9721a3f02ea1a497011c05d695c81a986c72874dbc963034  ./STAGE7F_ITEM32_KILL_SWITCH.md
 a80f8db18216cb849beabc4bb6514c44a5592af37f252e48358d435c9b19741f  ./STAGE7F_ITEM33_PLAN.md
@@ -86,6 +87,7 @@ e47845425cde174379a4917a4f1fe81614c6acfd5ae7fd017ed40180a35d5a87  ./auth-patch/v
 2af82c827b89a2a9e26aa7af057e0ec885f44900b7232fe605089eb99a24e9a4  ./auth-patch/verify/added-owner-registration.test.js.txt
 b249ea6ec83d4554c8df1ea45b91e6ca7ef79e51ba792085a5b0bc1a113ec073  ./auth-patch/verify/added-owner.js.txt
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./auth-patch/verify/applied/LICENSE.txt
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./auth-patch/verify/applied/README.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./auth-patch/verify/applied/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./auth-patch/verify/applied/docs/PRINTING_STATUS.md
 47497b3b2df42b68e12207a0734c4854c8bd7b9bce2ce7b4b5c5f99c9b799b4b  ./auth-patch/verify/applied/plan.md
@@ -108,6 +110,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./auth-patch/v
 700ad4fc955a6e9db95d3211fdeb89fd695be6a578fb3b6c0511dc2fbb6b20eb  ./auth-patch/verify/applied/supabase/tests/stage7_stats_tests.sql
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./auth-patch/verify/applied/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./auth-patch/verify/base/LICENSE.txt
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./auth-patch/verify/base/README.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./auth-patch/verify/base/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./auth-patch/verify/base/docs/PRINTING_STATUS.md
 47497b3b2df42b68e12207a0734c4854c8bd7b9bce2ce7b4b5c5f99c9b799b4b  ./auth-patch/verify/base/plan.md
@@ -130,6 +133,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./auth-patch/v
 700ad4fc955a6e9db95d3211fdeb89fd695be6a578fb3b6c0511dc2fbb6b20eb  ./auth-patch/verify/base/supabase/tests/stage7_stats_tests.sql
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./auth-patch/verify/base/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./auth-patch/verify/base2/LICENSE.txt
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./auth-patch/verify/base2/README.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./auth-patch/verify/base2/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./auth-patch/verify/base2/docs/PRINTING_STATUS.md
 47497b3b2df42b68e12207a0734c4854c8bd7b9bce2ce7b4b5c5f99c9b799b4b  ./auth-patch/verify/base2/plan.md
@@ -154,6 +158,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./auth-patch/v
 dc6edcb64b67917369f5cb426262a960691d90966b853e2a69a1c9947d4760a4  ./auth-patch/verify/endpoints-applied.txt
 dc6edcb64b67917369f5cb426262a960691d90966b853e2a69a1c9947d4760a4  ./auth-patch/verify/endpoints-base.txt
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./auth-patch/verify/final/LICENSE.txt
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./auth-patch/verify/final/README.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./auth-patch/verify/final/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./auth-patch/verify/final/docs/PRINTING_STATUS.md
 47497b3b2df42b68e12207a0734c4854c8bd7b9bce2ce7b4b5c5f99c9b799b4b  ./auth-patch/verify/final/plan.md
@@ -176,6 +181,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./auth-patch/v
 700ad4fc955a6e9db95d3211fdeb89fd695be6a578fb3b6c0511dc2fbb6b20eb  ./auth-patch/verify/final/supabase/tests/stage7_stats_tests.sql
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./auth-patch/verify/final/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./auth-patch/verify/gnu/base/LICENSE.txt
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./auth-patch/verify/gnu/base/README.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./auth-patch/verify/gnu/base/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./auth-patch/verify/gnu/base/docs/PRINTING_STATUS.md
 47497b3b2df42b68e12207a0734c4854c8bd7b9bce2ce7b4b5c5f99c9b799b4b  ./auth-patch/verify/gnu/base/plan.md
@@ -204,9 +210,13 @@ c1a9b96ad40da8f9e7468d6f1f8043cfa39344fd92b4119a87f29f087eb12e66  ./bak-0012.sql
 cd08233ce909d02a7d918238a72f759b275d301fb16dce4d5ad628232c067a73  ./baseline-http.log
 698f16ea055eb8b2d4a8dd58f2e0efe68f1cc07400e7cdbdbb95bcc8a88b428b  ./baseline-owner-smoke.out
 6aadc5074b030d7340ae3192a743678a7b3d1abbc3c072d9b9e126be7d0f343e  ./baseline-stats-smoke.out
+9c982d708bdc63b2a5fcdf9deabb9834d56652307e564647a3f50c91545e3374  ./before-step/README.md
+db24e419f43c4e6ebec61ff6626650a30958803f8832aacd7c4a4133c8dbe5df  ./before-step/agent/README.md
 dba08e1021421820aa0b16eba9d8533bcd3d3387724c4e4b21ffcc68755c989e  ./before-step/docs/PRINTING_STATUS.md
 af06f8e06480df5be693759ccd833aa24b9e1aac0bfaf760373dc827300fd7fa  ./before-step/main.sha256
 c634ff252cf5a6183e557d027663d64ae20f9dd087022df978f03b118214e258  ./before-step/worktree.sha256
+9c982d708bdc63b2a5fcdf9deabb9834d56652307e564647a3f50c91545e3374  ./before-step2/README.md
+18b73682c77a28c72bfa8b68f03ac52fa0b17ae48a73d0fd14565e0692d4529c  ./before-step2/agent/README.md
 f96c0bc2c6b83768c21a9aa87a6d8ce5609ba089e7462df26b23e482d0ad8ad8  ./before-step2/docs/PRINTING_STATUS.md
 6f5f18deed00a99a25cc8f5ef594bcfa23001b0ec4487a1ffc56ff1049de90f5  ./bw-targeted.txt
 9d7ad49f7dbda113850c4f22399de12d259db614000d5193e1a6147444693131  ./chainA-owner.js.txt
@@ -276,6 +286,7 @@ b1886514b8db81a9a07cec159a0d011663172ff50caeb410217bea5471e37e07  ./mut-claim/su
 0e91aaf02b2d6ca34fe8448e65ab1d69f7e1485fe30f546525a7f6a305752d33  ./mut-claim/supabase/migrations/0012_print_eligibility.sql
 c44d8eda2d14c0446d369fe2c3647690e4a0d393054997baa756dd8d84314a45  ./mut-claim/supabase/rollbacks/0011_service_options.down.sql
 a50f0aa9081755c904ccd27cfb2d614dd9e8ad349d15f1d0eeafda6cc0340f2f  ./mut-claim/supabase/rollbacks/0012_print_eligibility.down.sql
+eb17d97d91f6d16451c8c59bc044db221a1564262e8e745e5ccb32c165441929  ./mut-claim/supabase/tests/README.md
 a3f87cdebd2e00eec36b50e6c6fa3459c33c8436340cf2d6d65aa08478b4c6e5  ./mut-claim/supabase/tests/paper_sizes_tests.sql
 114d93fd1f1521c45f6f8fabc0ac5f39212a325437a2db76f5371e147abf9817  ./mut-claim/supabase/tests/print_eligibility_tests.sql
 10c36e798e0be57f6198f95f3631ce3823d51847e72f016ecebf5422c2eae648  ./mut-claim/supabase/tests/scratch/stubs.sql
@@ -302,6 +313,7 @@ b1886514b8db81a9a07cec159a0d011663172ff50caeb410217bea5471e37e07  ./mut-trigger/
 1522e94bb5540e2dd35e60914fdf98683ab0930abf9875c718b38499ca6bc0bf  ./mut-trigger/supabase/migrations/0012_print_eligibility.sql
 c44d8eda2d14c0446d369fe2c3647690e4a0d393054997baa756dd8d84314a45  ./mut-trigger/supabase/rollbacks/0011_service_options.down.sql
 a50f0aa9081755c904ccd27cfb2d614dd9e8ad349d15f1d0eeafda6cc0340f2f  ./mut-trigger/supabase/rollbacks/0012_print_eligibility.down.sql
+eb17d97d91f6d16451c8c59bc044db221a1564262e8e745e5ccb32c165441929  ./mut-trigger/supabase/tests/README.md
 a3f87cdebd2e00eec36b50e6c6fa3459c33c8436340cf2d6d65aa08478b4c6e5  ./mut-trigger/supabase/tests/paper_sizes_tests.sql
 114d93fd1f1521c45f6f8fabc0ac5f39212a325437a2db76f5371e147abf9817  ./mut-trigger/supabase/tests/print_eligibility_tests.sql
 10c36e798e0be57f6198f95f3631ce3823d51847e72f016ecebf5422c2eae648  ./mut-trigger/supabase/tests/scratch/stubs.sql
@@ -450,6 +462,7 @@ b2df37224b0628c1949e6e7865f3f4c90b1fcb87e32c05777a8af074f7741468  ./p5_chain_202
 3701bdd33cb74f3950409fff8f3ed8947ea16ae7d954d9bf3c1d653bbcd90f0d  ./p5_chain_2026-11-13/logs/web_npm_test_chain_p5.log
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./p5_chain_2026-11-13/tree/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./p5_chain_2026-11-13/tree/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./p5_chain_2026-11-13/tree/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./p5_chain_2026-11-13/tree/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./p5_chain_2026-11-13/tree/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./p5_chain_2026-11-13/tree/docs/PRINTING_STATUS.md
@@ -546,6 +559,7 @@ a4798d22342c14b4529cfb77c0488248167e3dbbf09f98e662d4ffce8583adb6  ./reconciliati
 f68e30070d350be711cdb4ec3e7aa0e2fb9f54f12d8b801efb4c7da4a89e5179  ./reconciliation_2026-11-10/13_cleanup_workflow_diagnosis.md
 e0da9158341837ad4259b2bbb5acd49f1863d34f1615ff7eced479a8a2ce2105  ./reconciliation_2026-11-10/7F_prepared_2026-11-12/GATE_REGISTER.md
 d1bb8fe3325bf194986db85980e662351957c49dd1c139f1f5e5dd5a722f813e  ./reconciliation_2026-11-10/7F_prepared_2026-11-12/P5_7F_agent_fail_closed.patch
+330d69655f03479b543198c1ace8922d8a7ed074101fadcf802558dc5be84dd7  ./reconciliation_2026-11-10/7F_prepared_2026-11-12/README.md
 ecb5131f6e164f156ddb65a4b5bf8d76b9018fe03df7962378983ab0b1ea0d6f  ./reconciliation_2026-11-10/RELEASE_READINESS_2026-11-13.md
 4be814ea0bfb9f70c973585c5f7ce9ddc19dd8bb4a2f58ec49625c3fc4a44a1f  ./reconciliation_2026-11-10/STAGE8_AND_F17_CHECK_2026-11-13.md
 f2a5f00fb0505888a2613855d337b13695b6c103fb5353e73e5968ed85bf6eaa  ./reconciliation_2026-11-10/base_0010.sql
@@ -577,6 +591,7 @@ d8ffeba95537b34071fd13900d834518501a999e792b23dc0c19fb5027cc28f2  ./reconciliati
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./reconciliation_2026-11-10/ci_cleanup_2026-11-12/gh_err.txt
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/ci_cleanup_2026-11-12/scratch_tree/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/ci_cleanup_2026-11-12/scratch_tree/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/ci_cleanup_2026-11-12/scratch_tree/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/ci_cleanup_2026-11-12/scratch_tree/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/ci_cleanup_2026-11-12/scratch_tree/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/ci_cleanup_2026-11-12/scratch_tree/docs/PRINTING_STATUS.md
@@ -688,6 +703,7 @@ c98b34ce3f25a857190606cb62ae623d4c33dcd3774241745deac0ad2bbb8755  ./reconciliati
 1601d85e8fbdf336f2efb452c62ffbf74cf3639cc7c9e7a8df850f238d9f64d8  ./reconciliation_2026-11-10/p1s_build/P1s_governance_sanitized.patch
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/p1s_verify/alone/LICENSE.txt
 1f16a25a400303b7f9a9f36950a91ff9038fc4a7ceaeb32bdf5dc6fea63da49c  ./reconciliation_2026-11-10/p1s_verify/alone/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/p1s_verify/alone/README.md
 5283071f511e222598d9f45e3a83551214c3c00d945d46dc2bc491628b9574ca  ./reconciliation_2026-11-10/p1s_verify/alone/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/p1s_verify/alone/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/p1s_verify/alone/docs/PRINTING_STATUS.md
@@ -712,6 +728,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/p1s_verify/alone/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/p1s_verify/combo/LICENSE.txt
 1f16a25a400303b7f9a9f36950a91ff9038fc4a7ceaeb32bdf5dc6fea63da49c  ./reconciliation_2026-11-10/p1s_verify/combo/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/p1s_verify/combo/README.md
 5283071f511e222598d9f45e3a83551214c3c00d945d46dc2bc491628b9574ca  ./reconciliation_2026-11-10/p1s_verify/combo/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/p1s_verify/combo/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/p1s_verify/combo/docs/PRINTING_STATUS.md
@@ -752,6 +769,7 @@ ee951a00e73d744e43918e9c34c95403ba5822b96573bbd86c930f5f53e1efe0  ./reconciliati
 331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1  ./reconciliation_2026-11-10/patch_check/bundle_negative/tamper/robots.txt
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/combined/LICENSE.txt
 1f16a25a400303b7f9a9f36950a91ff9038fc4a7ceaeb32bdf5dc6fea63da49c  ./reconciliation_2026-11-10/patch_check/combined/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/combined/README.md
 abbd49a01a64747f460d2fe47c14bfd88f70c5152d0345ce34a53e0bf658cf13  ./reconciliation_2026-11-10/patch_check/combined/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/combined/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/combined/docs/PRINTING_STATUS.md
@@ -783,6 +801,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/combined/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/combined_v5/order1/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/combined_v5/order1/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/combined_v5/order1/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/combined_v5/order1/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/combined_v5/order1/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/combined_v5/order1/docs/PRINTING_STATUS.md
@@ -814,6 +833,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/combined_v5/order1/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/docs/PRINTING_STATUS.md
@@ -844,6 +864,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 700ad4fc955a6e9db95d3211fdeb89fd695be6a578fb3b6c0511dc2fbb6b20eb  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/supabase/tests/stage7_stats_tests.sql
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/combined_v5/order2/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/main_717717b/LICENSE.txt
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/main_717717b/README.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/main_717717b/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/main_717717b/docs/PRINTING_STATUS.md
 47497b3b2df42b68e12207a0734c4854c8bd7b9bce2ce7b4b5c5f99c9b799b4b  ./reconciliation_2026-11-10/patch_check/main_717717b/plan.md
@@ -867,6 +888,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/main_717717b/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix/M1_P3_only/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix/M1_P3_only/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix/M1_P3_only/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix/M1_P3_only/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix/M1_P3_only/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix/M1_P3_only/docs/PRINTING_STATUS.md
@@ -891,6 +913,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix/M1_P3_only/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix/M2_P4_only/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix/M2_P4_only/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix/M2_P4_only/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix/M2_P4_only/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix/M2_P4_only/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix/M2_P4_only/docs/PRINTING_STATUS.md
@@ -916,6 +939,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix/M2_P4_only/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix/M3_P2_P3/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix/M3_P2_P3/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix/M3_P2_P3/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix/M3_P2_P3/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix/M3_P2_P3/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix/M3_P2_P3/docs/PRINTING_STATUS.md
@@ -946,6 +970,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix/M3_P2_P3/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix/M4_P2_P4/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix/M4_P2_P4/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix/M4_P2_P4/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix/M4_P2_P4/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix/M4_P2_P4/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix/M4_P2_P4/docs/PRINTING_STATUS.md
@@ -977,6 +1002,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix/M4_P2_P4/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix/M5_P3_P4/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix/M5_P3_P4/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix/M5_P3_P4/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix/M5_P3_P4/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix/M5_P3_P4/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix/M5_P3_P4/docs/PRINTING_STATUS.md
@@ -1002,6 +1028,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix/M5_P3_P4/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix/M6_P1_P2_P3_P4/LICENSE.txt
 1f16a25a400303b7f9a9f36950a91ff9038fc4a7ceaeb32bdf5dc6fea63da49c  ./reconciliation_2026-11-10/patch_check/matrix/M6_P1_P2_P3_P4/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix/M6_P1_P2_P3_P4/README.md
 abbd49a01a64747f460d2fe47c14bfd88f70c5152d0345ce34a53e0bf658cf13  ./reconciliation_2026-11-10/patch_check/matrix/M6_P1_P2_P3_P4/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix/M6_P1_P2_P3_P4/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix/M6_P1_P2_P3_P4/docs/PRINTING_STATUS.md
@@ -1033,6 +1060,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix/M6_P1_P2_P3_P4/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix/M7_P2_only/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix/M7_P2_only/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix/M7_P2_only/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix/M7_P2_only/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix/M7_P2_only/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix/M7_P2_only/docs/PRINTING_STATUS.md
@@ -1057,6 +1085,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix/M7_P2_only/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix_v3/M1_P3_only/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix_v3/M1_P3_only/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix_v3/M1_P3_only/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix_v3/M1_P3_only/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix_v3/M1_P3_only/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix_v3/M1_P3_only/docs/PRINTING_STATUS.md
@@ -1081,6 +1110,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix_v3/M1_P3_only/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix_v3/M2_P4_only/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix_v3/M2_P4_only/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix_v3/M2_P4_only/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix_v3/M2_P4_only/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix_v3/M2_P4_only/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix_v3/M2_P4_only/docs/PRINTING_STATUS.md
@@ -1106,6 +1136,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix_v3/M2_P4_only/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix_v3/M3_P2_P3/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix_v3/M3_P2_P3/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix_v3/M3_P2_P3/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix_v3/M3_P2_P3/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix_v3/M3_P2_P3/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix_v3/M3_P2_P3/docs/PRINTING_STATUS.md
@@ -1136,6 +1167,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix_v3/M3_P2_P3/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix_v3/M4_P2_P4/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix_v3/M4_P2_P4/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix_v3/M4_P2_P4/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix_v3/M4_P2_P4/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix_v3/M4_P2_P4/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix_v3/M4_P2_P4/docs/PRINTING_STATUS.md
@@ -1167,6 +1199,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix_v3/M4_P2_P4/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix_v3/M5_P3_P4/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix_v3/M5_P3_P4/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix_v3/M5_P3_P4/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix_v3/M5_P3_P4/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix_v3/M5_P3_P4/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix_v3/M5_P3_P4/docs/PRINTING_STATUS.md
@@ -1192,6 +1225,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix_v3/M5_P3_P4/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix_v3/M6_P1_P2_P3_P4/LICENSE.txt
 1f16a25a400303b7f9a9f36950a91ff9038fc4a7ceaeb32bdf5dc6fea63da49c  ./reconciliation_2026-11-10/patch_check/matrix_v3/M6_P1_P2_P3_P4/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix_v3/M6_P1_P2_P3_P4/README.md
 abbd49a01a64747f460d2fe47c14bfd88f70c5152d0345ce34a53e0bf658cf13  ./reconciliation_2026-11-10/patch_check/matrix_v3/M6_P1_P2_P3_P4/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix_v3/M6_P1_P2_P3_P4/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix_v3/M6_P1_P2_P3_P4/docs/PRINTING_STATUS.md
@@ -1223,6 +1257,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/matrix_v3/M6_P1_P2_P3_P4/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/matrix_v3/M7_P2_only/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/matrix_v3/M7_P2_only/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/matrix_v3/M7_P2_only/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/matrix_v3/M7_P2_only/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/matrix_v3/M7_P2_only/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/matrix_v3/M7_P2_only/docs/PRINTING_STATUS.md
@@ -1249,6 +1284,7 @@ d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliati
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/p1s_check/base/STAGE7_DECISIONS.md
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/p1s_check/check/LICENSE.txt
 1f16a25a400303b7f9a9f36950a91ff9038fc4a7ceaeb32bdf5dc6fea63da49c  ./reconciliation_2026-11-10/patch_check/p1s_check/check/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/p1s_check/check/README.md
 b70a814a45cc118e5a128d3750d20ecf2feb1f9d012474d8863e39ab52518188  ./reconciliation_2026-11-10/patch_check/p1s_check/check/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/p1s_check/check/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/p1s_check/check/docs/PRINTING_STATUS.md
@@ -1273,6 +1309,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/p1s_check/check/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/p1s_check/combo/LICENSE.txt
 1f16a25a400303b7f9a9f36950a91ff9038fc4a7ceaeb32bdf5dc6fea63da49c  ./reconciliation_2026-11-10/patch_check/p1s_check/combo/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/p1s_check/combo/README.md
 b70a814a45cc118e5a128d3750d20ecf2feb1f9d012474d8863e39ab52518188  ./reconciliation_2026-11-10/patch_check/p1s_check/combo/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/p1s_check/combo/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/p1s_check/combo/docs/PRINTING_STATUS.md
@@ -1304,6 +1341,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/p1s_check/combo/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/p2v5_chain/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/p2v5_chain/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/p2v5_chain/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/p2v5_chain/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/p2v5_chain/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/p2v5_chain/docs/PRINTING_STATUS.md
@@ -1336,6 +1374,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 7119a05ca701d536cf073324cd4c13aa87ac375104430a10e0071d4298ab5c10  ./reconciliation_2026-11-10/patch_check/p4_v5_build/P4.patch
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/publication_v6_chain/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/publication_v6_chain/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/publication_v6_chain/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/publication_v6_chain/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/publication_v6_chain/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/publication_v6_chain/docs/PRINTING_STATUS.md
@@ -1367,6 +1406,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/publication_v6_chain/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/u6_verify/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/u6_verify/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/u6_verify/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/u6_verify/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/u6_verify/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/u6_verify/docs/PRINTING_STATUS.md
@@ -1391,6 +1431,7 @@ b96817274b6ab3318eaad7d4878fe3db7f6a4b4ada796f42460d08fa7100178f  ./reconciliati
 4e648b0157646bcdc35a9b6014e1c6d7d642cd6c898b3982286a0e04149e7e49  ./reconciliation_2026-11-10/patch_check/u6_verify/supabase/tests/stage8_print_tests.sql
 2724a201ef74aa11a3f5fff3492f4958c6321d25fc99d7755a23f8f73ac9570f  ./reconciliation_2026-11-10/patch_check/v5_final_order/LICENSE.txt
 d6fb5f8f5c715f6097df2186290bb588a609eb0c01f31f0ef6a67d7818c289aa  ./reconciliation_2026-11-10/patch_check/v5_final_order/OWNER_DECISION_SHEET.md
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/patch_check/v5_final_order/README.md
 01a29272c700b4a8173b9aba804ce48d6b1d2622e27adc4caad744da733a6bb6  ./reconciliation_2026-11-10/patch_check/v5_final_order/STAGE7_DECISIONS.md
 82a0e41d80142df2e9e11bb256cb6bebbdd3a6c314606ad2bdffbc6fabc37c91  ./reconciliation_2026-11-10/patch_check/v5_final_order/TODO.md
 639d118a097dbb36b0fabab14856abad3d9981bd616b2c3273f1a74cbdc87bf2  ./reconciliation_2026-11-10/patch_check/v5_final_order/docs/PRINTING_STATUS.md
@@ -1457,6 +1498,7 @@ ac32b84d8da969cec1cbcdd7332da0bfe3d47045b3bee4d44a2e2c0290b08116  ./reconciliati
 b94eca6e42969bc9f15a84d1e57b2bc9ea52e4f4a5e1e797fe9063e6e501fd14  ./reconciliation_2026-11-10/publication_docs_2026-11-11/11_proposed_changes_and_blockers.md
 6de0123381f338a761325b82e3a1065479f6ba2948e3280c38e64b6b5ffcb816  ./reconciliation_2026-11-10/publication_docs_2026-11-11/12_publication_units.md
 f68e30070d350be711cdb4ec3e7aa0e2fb9f54f12d8b801efb4c7da4a89e5179  ./reconciliation_2026-11-10/publication_docs_2026-11-11/13_cleanup_workflow_diagnosis.md
+cec30db31e65c8ad62e8eedc67d632f861236150c112a38eabbe3e3f1b66a604  ./reconciliation_2026-11-10/publication_docs_2026-11-11/README.md
 970470789dca9483a3f08caa6ba8b9ee78a4d10beb5fb667db89095a18c7a045  ./reconciliation_2026-11-10/publication_docs_2026-11-11/UNIT_FILES.sha256
 1983606113792e4a20a75ff25a22809c0ca1f1269e91188d324ae8742b385e69  ./reconciliation_2026-11-10/publication_docs_2026-11-11/logs_2026-11-10/admin_npm_test.log
 1d529a4dacd107aab46e372f2076ee365b2055d4879d50090f61454bb0b151d7  ./reconciliation_2026-11-10/publication_docs_2026-11-11/logs_2026-11-10/combined_admin_npm_test.log
@@ -1543,6 +1585,7 @@ de5f77e8c0233856006026fdf35feb4d6e2c6fa65c6e50ef8df3051142df7a6e  ./reconciliati
 995d5a2d4ce0e2545e102152bb7257f42df9ff21aaeddf4346a663e66043458a  ./reconciliation_2026-11-10/publication_v6_2026-11-12/logs/web_npm_test_chain.log
 9dba7efc34bac9372dff6d79a703ab0a940bfa99f385983f44144abfddec1c22  ./reconciliation_2026-11-10/publication_v6_2026-11-12/logs/web_npm_test_combined_order1.log
 fa8706228a50f3e5125371236bf91f1085e402ceba1cbdddc9ccf3b333d525a0  ./reconciliation_2026-11-10/readme_patch_build/README_proposal_717717b.patch
+6feebb9ae307dc259752a76469f8ac64b186b92e9c0c2e12032bc6f7addaf1d7  ./reconciliation_2026-11-10/readme_patch_build/check/README.md
 beeb60dd4d451aea68c117819b19848cde54419acea11f72f3d9807203da7c9d  ./recovery-pr1.log
 bcf4d5606ca32a1b076e27c339b5ff94f3d04efd64f70a0f1b10befbb8b47731  ./regress-http.log
 f30881aa50b08807474587bb25ffdf11215e775eaaa15e5eb3493a0f11775d88  ./renamed_2026-11-10_moved_aside/0015_licence_foundation.sql
@@ -1586,6 +1629,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./round2_2026-
 b74b4ebdf2c4931d672c66fa20900c7217af894b4653c7cbea8b9f49df2ac1db  ./round2_2026-11-11/verify/admin_npm_test.log
 480db54062c5e681b715756300628a49e49cdc59f64126de8105034c871bd6e5  ./round2_2026-11-11/verify/agent_npm_test.log
 a6c71145d053fff727b51100820baad4d4a5d94235282d80e5a9e9f5070e76df  ./round2_2026-11-11/verify/web_npm_test.log
+4ef97d827ed7637d454c65e593470559c0719ee3d5c4fddbc483cd0e349f4ff2  ./round3_2026-11-12/audit_handover_2026-11-13/README.md
 ecb5131f6e164f156ddb65a4b5bf8d76b9018fe03df7962378983ab0b1ea0d6f  ./round3_2026-11-12/audit_handover_2026-11-13/RELEASE_READINESS_2026-11-13.md
 06d13959e90481df87399addfac60e69fd79f2537d451921a6679895dc2f8fe9  ./round3_2026-11-12/audit_handover_2026-11-13/logs/EX01_RESULTS_2026-11-12.md
 f03721c332e83894d209ac4c68c3376a0d3a500fbada86ac7bba4e1edb2b9274  ./round3_2026-11-12/audit_handover_2026-11-13/logs/admin_tests_baseline_tree.log
@@ -1629,6 +1673,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./round3_2026-
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./round3_2026-11-12/audit_handover_2026-11-13/logs/scratch_order_check/licence_0016_licence_admin_rpcs.log
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./round3_2026-11-12/audit_handover_2026-11-13/logs/scratch_order_check/licence_0017_licence_admin_read_rpcs.log
 e0da9158341837ad4259b2bbb5acd49f1863d34f1615ff7eced479a8a2ce2105  ./round3_2026-11-12/audit_handover_2026-11-13/units/7F/GATE_REGISTER.md
+330d69655f03479b543198c1ace8922d8a7ed074101fadcf802558dc5be84dd7  ./round3_2026-11-12/audit_handover_2026-11-13/units/7F/README.md
 5e44f6980efab43d5d7fcb7d0cffe35641ca530b1b47b4fb5262bd7a54a3c168  ./round3_2026-11-12/audit_handover_2026-11-13/units/CI_STATUS.md
 0b51ad5e4065edbb8d1cd43fb1c291d7d6e0b01766e3102a715501d871da20a7  ./round3_2026-11-12/audit_handover_2026-11-13/units/P2_7B_7C_database_v5.patch
 7119a05ca701d536cf073324cd4c13aa87ac375104430a10e0071d4298ab5c10  ./round3_2026-11-12/audit_handover_2026-11-13/units/P4_7E_web_v5.patch
@@ -1638,6 +1683,7 @@ f19cd2381a5eed65c604a62751855f7f995155da809820332f5f761f0f64be26  ./round3_2026-
 aa7220676dc55cfedf407ebcce7077e089f0e919e90f4777ec42330d0d4d9dec  ./round3_2026-11-12/audit_handover_2026-11-13/units/dmig/CHANGE_SET_MECHANICAL_DRYRUN.patch
 cae13f47903ddcff86c36cb33354de7d4ef798f25ba06e7768879a14f03a4b55  ./round3_2026-11-12/audit_handover_2026-11-13/units/dmig/CHANGE_SET_OPTION_B.md
 51452c8905d896779c575463dc3eefe8b8fcb45421bb638e6eb7db5203ec0f06  ./round3_2026-11-12/audit_handover_2026-11-13/units/dmig/IMPACT_ANALYSIS.md
+8c55a2a0983153f1da043259c464383acfc4043257153a7eaf6b98f81e5a7193  ./round3_2026-11-12/audit_handover_2026-11-13/units/dmig/README.md
 40c23aba02822f8b7037749e26825ec771d74444921d099b2c5a82d2e0f30ec3  ./round3_2026-11-12/audit_handover_2026-11-13/units/dmig/RENUMBERING_MAP.md
 c2764a56698779a10733be4cbb3d1e491aba2d47c47f098e0142696fdf4a8038  ./round3_2026-11-12/audit_handover_2026-11-13/units/dmig/SCRATCH_ORDER_CHECK.md
 2b6a6047b272be46dfd971d7e049076e2d410761b8a7cdc78865aaae24a3edc6  ./round3_2026-11-12/audit_handover_2026-11-13/units/publication/DEPLOY.md
@@ -1648,6 +1694,7 @@ cae13f47903ddcff86c36cb33354de7d4ef798f25ba06e7768879a14f03a4b55  ./round3_2026-
 59aebb427f929780d445942969f3d8318e954182f4b761997f89d98bd33dff97  ./round3_2026-11-12/dmig_option_b/MANIFEST_baseline_hashes.txt
 aed0f86c261844e9bcade64f4aac61cb5c4ee58d8e4ec12e953388079929d1b1  ./round3_2026-11-12/dmig_option_b/MANIFEST_dryrun_artifacts.txt
 dcac4f12dfea4d551bc9b00103f57814b000b05226a2ef8ae7642124b0a651f9  ./round3_2026-11-12/dmig_option_b/MANIFEST_renumbered_hashes.txt
+8c55a2a0983153f1da043259c464383acfc4043257153a7eaf6b98f81e5a7193  ./round3_2026-11-12/dmig_option_b/README.md
 40c23aba02822f8b7037749e26825ec771d74444921d099b2c5a82d2e0f30ec3  ./round3_2026-11-12/dmig_option_b/RENUMBERING_MAP.md
 c2764a56698779a10733be4cbb3d1e491aba2d47c47f098e0142696fdf4a8038  ./round3_2026-11-12/dmig_option_b/SCRATCH_ORDER_CHECK.md
 d5f6754465382272af7bafcb12ccd5d819b7d1c9a7226b229a360da8b242f74e  ./round3_2026-11-12/dmig_option_b/chain_a_readonly/0011_service_options.sql
@@ -1747,6 +1794,7 @@ f8162e2316750cba0b820f95c942ef726680c887a02e32eabd6e66355920055f  ./snapshot_202
 d9618233522ca52dbd3d25fd3bb9c577f17675d395e27d89643ed0f48862027a  ./snapshot_2026-11-10/0012_licence_admin_rpcs.sql
 08e39d50f8e7e3649bc6641c7c0d4268c815211abfb97d72e88bf6800272bc10  ./snapshot_2026-11-10/0013_licence_admin_read_rpcs.sql
 ccf22cb58d0b2c873e3edf2320d56df25df6f0ff08e4415e1d780e617d4ff633  ./snapshot_2026-11-10/OWNER_DECISION_SHEET.md
+e084c7e872182672913fa8e320b81f40f03a9a03c429a01a9f654ebb7743f33e  ./snapshot_2026-11-10/README.md
 7c26411f984adcf1ba1aa39c473226be8b21ed700a56276e372f20bd560d64cf  ./snapshot_2026-11-10/SHA256SUMS.txt
 d83ba9ec814e9270f47d13f95fe2ce91d70c5f5d507e64cc455667bc85fbd60f  ./snapshot_2026-11-10/STAGE7C_OPERATIONS.md
 6820fb26995e91d6fa572db0acde6c43c0e2615e0ee0aebf94df7733d47d5b07  ./snapshot_2026-11-10/STAGE7F_ITEM32_KILL_SWITCH.md
@@ -1866,6 +1914,7 @@ aabe1af1d4ad63ac727eade7f17e38977595cbc877b384e794245a539e6d50cb  ./wf-customer-
 86e04f49069351f005cd4b35765e058d41cddd23d27efaad5331bc6b58498407  ./wf-customer-track-smoke.out
 ac8264b277e502e5348a81a3c1b971d70eaea03785388a234b142f7c0240e97d  ./wf-owner-smoke.out
 e35ddff7574f7d9dd43fc52545bad1e447f4d4bec6acb36dcdb862c2db276a3f  ./wf-stats-smoke.out
+cedb0f5244a8d28a5ca40817a87c61b2123bbe60ce859149240027516f928ed7  ./zip-check-2/README.md
 49f8200884843143fc7da48f6bca24a887e3899c775d54eca264560e5bce1217  ./zip-check-2/qr/demo-xerox/manifest.json
 7d9d5762b18a9f76d315c1e025a3c760c26b5fab07a5d8b0a826491f6d491531  ./zip-check-2/supabase/migrations/0001_stage1_foundation.sql
 f9a46a6fab2417ca263830ebbdebe726fdf70834e768154c86f5842f6415b3e8  ./zip-check-2/supabase/migrations/0002_services_public_policy_fix.sql
@@ -1879,6 +1928,7 @@ d750745e7375a9be2f19f229532494024dbb01b9c972d5277441846d08399022  ./zip-check-2/
 13157f00874e40270731fdf89c214d706cfc2577338bee76ffb000ace378303b  ./zip-check-2/supabase/tests/stage5_orders_tests.sql
 bb704f38038e5b86ab138093cc5b33b8a815b98ce85816399b945e12e653bfe0  ./zip-check-2/supabase/tests/stage6_features_tests.sql
 700ad4fc955a6e9db95d3211fdeb89fd695be6a578fb3b6c0511dc2fbb6b20eb  ./zip-check-2/supabase/tests/stage7_stats_tests.sql
+ce22ef9c1dd3af6ae6fa7416e8e5a921008ae207f32aa260ed8b81bb280a2357  ./zip-check/project/README.md
 49f8200884843143fc7da48f6bca24a887e3899c775d54eca264560e5bce1217  ./zip-check/project/qr/demo-xerox/manifest.json
 7d9d5762b18a9f76d315c1e025a3c760c26b5fab07a5d8b0a826491f6d491531  ./zip-check/project/supabase/migrations/0001_stage1_foundation.sql
 f9a46a6fab2417ca263830ebbdebe726fdf70834e768154c86f5842f6415b3e8  ./zip-check/project/supabase/migrations/0002_services_public_policy_fix.sql
