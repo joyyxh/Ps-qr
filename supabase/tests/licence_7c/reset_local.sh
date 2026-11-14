@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 
 export PGHOST="$SOCK" PGPORT="$PORT" PGUSER=postgres
 
-psql -X -d postgres -v ON_ERROR_STOP=1 -q -c "drop database if exists ${DB};" -c "create database ${DB};"
+psql -X -d postgres -v ON_ERROR_STOP=1 -q -c "drop database if exists ${DB};" -c "create database ${DB} encoding 'UTF8' template template0;"
 psql -X -d "$DB" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/tests/licence_7c/00_local_shims.sql"
 psql -X -d "$DB" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0015_licence_foundation.sql"
 psql -X -d "$DB" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/migrations/0016_licence_admin_rpcs.sql"

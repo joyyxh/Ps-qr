@@ -11,9 +11,9 @@ Status: approved by the owner on 2026-11-14 (D-MIG Option B). This file is the m
 | 0012 | `0012_print_eligibility.sql` (Chain A) | `37e4623` | Not on this branch |
 | 0013 | `0013_order_workflow.sql` (Chain A) | `37e4623` | Not on this branch |
 | 0014 | `0014_create_shop_confirmed_email.sql` (Chain A) | `37e4623` | Not on this branch |
-| 0015 | `0015_licence_foundation.sql` | was `0011_licence_foundation.sql` | Added |
-| 0016 | `0016_licence_admin_rpcs.sql` | was `0012_licence_admin_rpcs.sql` | Added |
-| 0017 | `0017_licence_admin_read_rpcs.sql` | was `0013_licence_admin_read_rpcs.sql` | Added |
+| 0015 | `0015_licence_foundation.sql` | was `0015_licence_foundation.sql` | Added |
+| 0016 | `0016_licence_admin_rpcs.sql` | was `0016_licence_admin_rpcs.sql` | Added |
+| 0017 | `0017_licence_admin_read_rpcs.sql` | was `0017_licence_admin_read_rpcs.sql` | Added |
 | 0018 | reserved for Stage 7F | none | Reserved. Added by this branch only if the 7F migration is included (see `docs/STAGE7F_IMPLEMENTATION.md`) |
 
 ## Rules
