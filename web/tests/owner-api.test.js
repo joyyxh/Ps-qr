@@ -173,3 +173,33 @@ test('the browser code never contains a service-role or secret key', () => {
     assert.doesNotMatch(text, /service_role|sb_secret_|SERVICE_ROLE/, `${file.pathname} must not hold a privileged key`);
   }
 });
+
+// Stage 7E: the owner licence read (mocked; the database check is in fixtures/licence-status-rpc.json).
+test('shopLicenceStatus calls the owner read RPC with the shop id and the owner token only', async () => {
+  const { calls, fetchImpl } = fakeFetch({ ok: true, active: false, no_expiry: false, access_end: null, next_start: null });
+  const api = createOwnerApi({ config, auth: signedIn, fetchImpl });
+
+  const reply = await api.shopLicenceStatus('shop-1');
+
+  assert.equal(reply.ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://example-project.supabase.co/rest/v1/rpc/shop_licence_status');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer owner-token');
+  assert.deepEqual(JSON.parse(calls[0].init.body), { p_shop_id: 'shop-1' });
+});
+
+test('shopLicenceStatus sends no request for a signed-out user', async () => {
+  const { calls, fetchImpl } = fakeFetch({});
+  const api = createOwnerApi({ config, auth: signedOut, fetchImpl });
+
+  await assert.rejects(api.shopLicenceStatus('shop-1'), (err) => err.status === 401);
+  assert.equal(calls.length, 0);
+});
+
+test('shopLicenceStatus surfaces a missing function as an error with its HTTP status', async () => {
+  const { fetchImpl } = fakeFetch({ code: 'PGRST202', message: 'Could not find the function' }, 404);
+  const api = createOwnerApi({ config, auth: signedIn, fetchImpl });
+
+  await assert.rejects(api.shopLicenceStatus('shop-1'), (err) => err.status === 404 && err.code === 'PGRST202');
+});

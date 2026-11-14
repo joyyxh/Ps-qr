@@ -48,6 +48,7 @@ import {
   retryOptions,
 } from './logic.js';
 import { createStatsPages } from './owner-stats.js';
+import { createLicencePages } from './owner-licence.js';
 import { PRINTER_RETRY_MS, browserVisibility, createOrderRefresher, printerRetryDue } from './order-refresh.js';
 import { qrCanvas, qrSvg } from './qr.js';
 
@@ -64,6 +65,10 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   let managed = null; // { shop, services } for the shop page on screen
   let orderView = null; // { shop, orders, showAll, printing, jobsByItem, pairing } for the orders page on screen
   const statsPages = createStatsPages({ app, ownerApi, messageFor });
+  // The licence view is off in the Android owner bundle (config.ownerApp is set by mobile/scripts/copy-web.mjs),
+  // because the Android view is deferred (STAGE7_DECISIONS.md item 13 / decision 19). Off means no button, no route and no request.
+  const licenceEnabled = config.ownerApp !== true;
+  const licencePages = createLicencePages({ app, ownerApi, enabled: licenceEnabled });
 
   // Automatic refresh of the orders page (order-refresh.js). The page is only redrawn when the data changed.
   let navigation = 0; // counts page changes, so a slow load cannot draw over a page the owner has left
@@ -142,6 +147,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   }
 
   async function signOut() {
+    licencePages.close(); // no licence data is kept after sign-out, and a check still running is dropped
     await auth.signOut();
     go([]);
   }
@@ -151,6 +157,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   async function render(parts = []) {
     navigation += 1;
     liveOrders.stop(); // leaving a page ends its automatic refresh
+    licencePages.close(); // leaving the licence page drops its data and any check still running
     current = parts;
     show('<p class="muted">Loading…</p>');
     const [page = '', value = '', section = ''] = parts;
@@ -632,6 +639,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     }
     if (section === 'orders') return renderOrdersFor(shop);
     if (section === 'stats') return statsPages.open(shop);
+    if (section === 'licence' && licenceEnabled) return licencePages.open(shop);
 
     const [services, catalog] = await Promise.all([
       ownerApi.listServices(shop.id),
@@ -700,7 +708,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
           ${shop.is_open ? 'Open for orders' : 'Closed. Customers can see prices but cannot order.'}
         </p>
         <p><a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/orders">Orders</a>
-           <a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/stats">Statistics</a></p>
+           <a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/stats">Statistics</a>
+           ${shop.role === 'owner' && licenceEnabled ? `<a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/licence">Licence</a>` : ''}</p>
         <p><button type="button" data-action="toggle-open" data-label="${shop.is_open ? 'Close shop' : 'Open shop'}">
           ${shop.is_open ? 'Close shop' : 'Open shop'}
         </button></p>

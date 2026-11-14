@@ -251,6 +251,16 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
       return rows[0];
     },
 
+    // ----- licence status (read only) -----
+
+    // The owner's view of the shop's licence (migration 0016). This is the only licence
+    // read the browser makes: it never queries the licence tables and has no write call.
+    // The database returns {ok:false, code:'forbidden'} unless the caller owns the shop,
+    // and {ok:true, active, no_expiry, access_end, next_start} otherwise (decision D).
+    shopLicenceStatus(shopId) {
+      return request('POST', 'rpc/shop_licence_status', { body: { p_shop_id: shopId } });
+    },
+
     // ----- automatic printing -----
 
     // The printing computers of this shop and its recent print jobs.
