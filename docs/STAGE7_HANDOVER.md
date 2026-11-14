@@ -35,7 +35,7 @@ Nothing here has been applied to a hosted database, deployed, merged into `main`
 | Browser `stats-smoke.cjs` | All checks passed |
 | Browser `licence-smoke.cjs` | 33 of 33 |
 
-Not run: GitHub Actions (no runner access from this session), staging (EX-02 not granted), hosted database checks, physical printer checks, the 7F lock tests (item 33), and the live signature tests (item 25).
+Not run: staging (EX-02 not granted), hosted database checks, physical printer checks, the 7F lock tests (item 33), and the live signature tests (item 25). GitHub Actions unit-test CI subsequently passed on 2026-11-14 (run 43603382278; agent, web and admin jobs all successful).
 
 ## Test harness changes (for owner review)
 
@@ -89,7 +89,7 @@ Enforcement stays OFF. The C-3 decision (enforcement held back) is recorded in Â
 
 ### 5. CI
 
-- `unit-tests.yml` runs the agent, web and admin unit tests. It has not yet run on GitHub. The first run is the check.
+- `unit-tests.yml` runs the agent, web and admin unit tests. GitHub Actions run [43603382278](https://github.com/joyyxh/Ps-qr/actions/runs/43603382278) completed successfully on 2026-11-14: all three jobs passed.
 - Not in CI: the browser smokes, the PostgreSQL licence suites, and any hosted check.
 
 ## Record conflicts found during this work
