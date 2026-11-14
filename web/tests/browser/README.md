@@ -1,9 +1,18 @@
 # Browser checks (headless Chromium, mocked backend)
 
-These scripts were run by hand against the web app at phone width (390 px).
-They are not part of `npm test`. Each one replaces Supabase with an in-memory
-mock using Playwright's `page.route`, so they check the screens and requests,
-not the live backend.
+These scripts check the web app at phone width (390 px). They are not part of `npm test`.
+Each one replaces Supabase with an in-memory mock using Playwright's `page.route`, so they check
+the screens and requests, not the live backend.
+
+They run in GitHub Actions, in `.github/workflows/stage7-tests.yml`:
+
+- job `browser-smokes`: `owner-smoke.cjs`, `qr-smoke.cjs`, `stats-smoke.cjs`, `licence-smoke.cjs` (must pass).
+- job `browser-features-open-check`: `features-smoke.cjs`. It has one known open check, below, so this
+  job shows as failed until the owner decides the wording. It is marked `continue-on-error`, so the
+  workflow run is not failed by it, and the red job row stays visible.
+
+`run_smokes.sh` starts both servers, runs the scripts you name, and exits non-zero if any script fails.
+It is the same command CI uses.
 
 Where each script expects the app:
 
@@ -20,6 +29,8 @@ sandbox paths. Apply the fix before running them.
 ## Last results
 
 Run on 2026-11-12 with the corrected scripts, headless Chromium through Playwright, mocked backend.
+Re-run on 2026-11-14 through `run_smokes.sh` with Playwright 1.63.0 and opencv-python-headless 5.0.0.93:
+the same counts. GitHub Actions results are listed in `docs/STAGE7_HANDOVER.md`.
 
 | Script | What it checks | Last result |
 |---|---|---|
@@ -61,7 +72,18 @@ an owner decision. The check is kept, not weakened, so the script exits 1 until 
 The payment QR upload in `features-smoke.cjs` uses a small image built into the script, so the
 scripts can run in any order.
 
-## Running
+## Running with one command (same as CI)
+
+```bash
+cd web
+tests/browser/run_smokes.sh owner-smoke.cjs qr-smoke.cjs stats-smoke.cjs licence-smoke.cjs
+tests/browser/run_smokes.sh features-smoke.cjs     # expected to exit 1 until the open check is decided
+```
+
+The script starts the servers on ports 5173 and 5174, runs each script, and stops the servers.
+Set `PLAYWRIGHT_MODULE` if Playwright is not on the default module path.
+
+## Running by hand
 
 ```bash
 cd web
