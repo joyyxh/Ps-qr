@@ -35,7 +35,7 @@ Nothing here has been applied to a hosted database, deployed, merged into `main`
 | Browser `stats-smoke.cjs` | All checks passed |
 | Browser `licence-smoke.cjs` | 33 of 33 |
 
-The same suites also ran in GitHub Actions on commit `a94cba2` (section 5). The features smoke there shows 22 of 24, not 23 of 24.
+The same suites also ran in GitHub Actions on commit `d3889e5` (section 5). The features smoke there shows 23 of 24: only the greyed-out wording check fails.
 
 Not run: staging (EX-02 not granted), hosted database checks, physical printer checks, the 7F lock tests (item 33), and the live signature tests (item 25). GitHub Actions unit-test CI subsequently passed on 2026-11-14 (run 43603382278; agent, web and admin jobs all successful).
 
@@ -81,8 +81,8 @@ Enforcement stays OFF. The C-3 decision (enforcement held back) is recorded in Â
 - **S-5**: physical printer runtime. The agent is tested with fake adapters only.
 - **RB-01 / C-6**: admin identity and MFA. **RB-02**: hosting. Deployment is blocked until these are decided.
 - **EX-15**: owner approval of the merge order and the PR to `main`. This PR is not merged.
-- **Greyed-out wording**: the features smoke check stays open (23 of 24 locally; 22 of 24 in CI).
-- **Phone-width check, CI only**: a second features smoke check fails in CI and passes locally (customer page, 3px overflow from `input#file-input`). A styling decision is needed (section 5).
+- **Greyed-out wording**: the features smoke check stays open (23 of 24 locally and in CI). Owner decision.
+- **Phone-width overflow** (customer page, upload input): fixed in `d3889e5` (section 5). It had failed only in CI. No owner decision is needed.
 - **D-R18-T2**: R18 test 2 expectation, pending.
 - **RB-11**: definition not located in the records.
 
@@ -96,23 +96,36 @@ Enforcement stays OFF. The C-3 decision (enforcement held back) is recorded in Â
 - `unit-tests.yml` (unchanged): jobs `agent`, `web` and `admin` (`node --test` and `npm test`, Node 22). On commit `a94cba2`, push run [43605116842](https://github.com/joyyxh/Ps-qr/actions/runs/43605116842) and pull_request run [43605120293](https://github.com/joyyxh/Ps-qr/actions/runs/43605120293) both succeeded.
 - `stage7-tests.yml` (added in commit `a94cba2`): three jobs, run on push, pull_request and manual dispatch. It uses no hosted Supabase credentials, staging, production data or printer. The PostgreSQL service is a throwaway container for that job only.
 
-Results on `a94cba2`, from the GitHub API and the job logs, checked 2026-11-14:
+Results on `d3889e5` (current head), from the GitHub API and the job logs, checked 2026-11-14:
 
 | Job | What it runs | Versions | Result |
 |---|---|---|---|
 | `licence-postgres` | `supabase/tests/licence_7c/run_suites.sh 127.0.0.1 5432`. The combined migration chain (0001 to 0010, then 0015 to 0017) is reloaded before each suite. | `postgres:16` service (server 16.16); psql 18.6 client | success. `rpc_tests.py` 282 passed, 0 failed. `read_api_tests.py` 125 passed, 0 failed. `hash_vectors.py` 0 failures. |
 | `browser-smokes` | `web/tests/browser/run_smokes.sh owner-smoke.cjs qr-smoke.cjs stats-smoke.cjs licence-smoke.cjs` | Node 22; Python 3.13; Playwright 1.63.0; opencv-python-headless 5.0.0.93 | success. owner 39 of 39; qr 12 of 12; stats exit 0, no FAIL lines; licence 33 of 33. |
-| `browser-features-open-check` (`continue-on-error: true`) | `web/tests/browser/run_smokes.sh features-smoke.cjs` | as above | job red, as designed: **22 of 24, exit 1**. |
+| `browser-features-open-check` (`continue-on-error: true`) | `web/tests/browser/run_smokes.sh features-smoke.cjs` | as above | job red, as designed: **23 of 24, exit 1**. The only FAIL is the greyed-out wording check. |
 
-Workflow runs for `a94cba2`:
+Workflow runs for `d3889e5`:
 
-- push: [43605116936](https://github.com/joyyxh/Ps-qr/actions/runs/43605116936). Workflow conclusion success. Its features job is red, and `continue-on-error` keeps the run green.
-- pull_request: [43605120287](https://github.com/joyyxh/Ps-qr/actions/runs/43605120287). Same results.
+- push: [43609029853](https://github.com/joyyxh/Ps-qr/actions/runs/43609029853). Workflow conclusion success. Its features job is red, and `continue-on-error` keeps the run green.
+- pull_request: [43609036187](https://github.com/joyyxh/Ps-qr/actions/runs/43609036187). Same results.
+- Unit tests: push [43609029899](https://github.com/joyyxh/Ps-qr/actions/runs/43609029899) and pull_request [43609036182](https://github.com/joyyxh/Ps-qr/actions/runs/43609036182), both success.
 
-**Features smoke in CI: 22 of 24, not 23 of 24.**
+Earlier runs on `a94cba2` (push [43605116936](https://github.com/joyyxh/Ps-qr/actions/runs/43605116936), pull_request [43605120287](https://github.com/joyyxh/Ps-qr/actions/runs/43605120287)) showed the features smoke at 22 of 24. Those runs are kept as history.
 
-- FAIL "the greyed-out boxes say why". This is the known open check (owner wording decision). Unchanged.
-- FAIL "customer page has no horizontal scroll at phone width (overflow=3px)". This check passed on the developer machine. The CI diagnostic names `input#file-input` (`web/src/app.js`, line 278), which reaches 393px on a 390px viewport. The input has no CSS rule, so its width comes from the browser's default styling, which depends on the installed fonts. The font cause is likely but not verified. Product CSS was not changed and the check was not weakened. A decision is needed: style the input to fit 390px (a product layout change), or accept the failure.
+**Features smoke in CI: 23 of 24, exit 1.**
+
+- FAIL "the greyed-out boxes say why". The known open check (owner wording decision). Unchanged, and not marked as passed.
+- PASS "customer page has no horizontal scroll at phone width (overflow=0px)". This check failed in CI on `a94cba2` (overflow=3px) and is fixed in `d3889e5`.
+
+**Phone-width overflow: cause and fix (`d3889e5`, `web/styles.css` only).**
+
+- Cause: the rule `.upload-dropzone input { width:auto; }` (from the original redesign, commit `e9f726f`) sizes the customer file input to the browser's intrinsic width. Locally that width is 348px, and the dropzone is 308px wide. The input therefore ran to the 390px viewport edge (right edge exactly 390). On the CI runner the input was 3px wider, so the page overflowed by 3px. Measured here, the input width changes with the font (348px with the page font, 333px with a monospace font), so the margin depended on the installed fonts. The font changed only how wide the input was; the rule was the cause.
+- Fix: the dropzone grid uses `grid-template-columns: minmax(0,1fr)`, and the input has `max-width:100%`. The input is capped at the dropzone width in any font, and at 390px the icon and text are centred in the box.
+- Unchanged: at 1100px the dropzone is pixel-identical to before (checked by a screenshot byte comparison).
+- Rejected: removing the `width:auto` rule alone stretches the input across the whole box, which changes the desktop look. `max-width:100%` alone did not work, because the grid column still grew to the input's width.
+- Correction: an earlier version of this section said the input had no CSS rule and blamed the fonts. Both were wrong. The rule existed, and the fix is in the rule.
+
+**Workflow label note.** The step label and comments in `.github/workflows/stage7-tests.yml`, from commit `d811a23`, still say "two outstanding CI failures" and "22 of 24". They predate this fix and are left as committed. Update them to one outstanding check and 23 of 24 in the next workflow edit.
 
 Local only (no workflow or package script runs these):
 
