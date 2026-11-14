@@ -15,7 +15,7 @@ Nothing here has been applied to a hosted database, deployed, merged into `main`
 | Browser checks | Five Playwright scripts, with the greyed-out check kept open | `web/tests/browser/` |
 | P5 fail-closed agent | Prints only after an explicit server confirmation. Commit `a1a91f1` is kept unchanged and merged. | `agent/src/worker.mjs`, `agent/test/worker.test.mjs` |
 | Decision records | Replaced with the newer copies from the audit package (2026-11-09 wording and Stage 7F decisions ยง13C). Each has a dated renumbering note. Historical text is unchanged. | `OWNER_DECISION_SHEET.md`, `STAGE7_DECISIONS.md` |
-| CI | Runs the agent, web and admin unit tests on push and pull request | `.github/workflows/unit-tests.yml` |
+| CI | Runs the agent, web and admin unit tests, the PostgreSQL licence suites and the mocked browser checks, on push and pull request | `.github/workflows/unit-tests.yml`, `.github/workflows/stage7-tests.yml` |
 | Cleanup workflow | Schedule removed (reversible Option B). Manual run kept. | `.github/workflows/cleanup-files.yml` |
 
 ## Tests run (local, 2026-11-14, exact results)
@@ -34,6 +34,8 @@ Nothing here has been applied to a hosted database, deployed, merged into `main`
 | Browser `features-smoke.cjs` | **23 of 24.** The open check is "the greyed-out boxes say why". No approved wording exists (owner decision). The check is kept, not weakened. |
 | Browser `stats-smoke.cjs` | All checks passed |
 | Browser `licence-smoke.cjs` | 33 of 33 |
+
+The same suites also ran in GitHub Actions on commit `a94cba2` (section 5). The features smoke there shows 22 of 24, not 23 of 24.
 
 Not run: staging (EX-02 not granted), hosted database checks, physical printer checks, the 7F lock tests (item 33), and the live signature tests (item 25). GitHub Actions unit-test CI subsequently passed on 2026-11-14 (run 43603382278; agent, web and admin jobs all successful).
 
@@ -79,7 +81,8 @@ Enforcement stays OFF. The C-3 decision (enforcement held back) is recorded in ย
 - **S-5**: physical printer runtime. The agent is tested with fake adapters only.
 - **RB-01 / C-6**: admin identity and MFA. **RB-02**: hosting. Deployment is blocked until these are decided.
 - **EX-15**: owner approval of the merge order and the PR to `main`. This PR is not merged.
-- **Greyed-out wording**: the features smoke check stays open (23 of 24).
+- **Greyed-out wording**: the features smoke check stays open (23 of 24 locally; 22 of 24 in CI).
+- **Phone-width check, CI only**: a second features smoke check fails in CI and passes locally (customer page, 3px overflow from `input#file-input`). A styling decision is needed (section 5).
 - **D-R18-T2**: R18 test 2 expectation, pending.
 - **RB-11**: definition not located in the records.
 
@@ -90,8 +93,35 @@ Enforcement stays OFF. The C-3 decision (enforcement held back) is recorded in ย
 
 ### 5. CI
 
-- `unit-tests.yml` runs the agent, web and admin unit tests. GitHub Actions run [43603382278](https://github.com/joyyxh/Ps-qr/actions/runs/43603382278) completed successfully on 2026-11-14: all three jobs passed.
-- Not in CI: the browser smokes, the PostgreSQL licence suites, and any hosted check.
+- `unit-tests.yml` (unchanged): jobs `agent`, `web` and `admin` (`node --test` and `npm test`, Node 22). On commit `a94cba2`, push run [43605116842](https://github.com/joyyxh/Ps-qr/actions/runs/43605116842) and pull_request run [43605120293](https://github.com/joyyxh/Ps-qr/actions/runs/43605120293) both succeeded.
+- `stage7-tests.yml` (added in commit `a94cba2`): three jobs, run on push, pull_request and manual dispatch. It uses no hosted Supabase credentials, staging, production data or printer. The PostgreSQL service is a throwaway container for that job only.
+
+Results on `a94cba2`, from the GitHub API and the job logs, checked 2026-11-14:
+
+| Job | What it runs | Versions | Result |
+|---|---|---|---|
+| `licence-postgres` | `supabase/tests/licence_7c/run_suites.sh 127.0.0.1 5432`. The combined migration chain (0001 to 0010, then 0015 to 0017) is reloaded before each suite. | `postgres:16` service (server 16.16); psql 18.6 client | success. `rpc_tests.py` 282 passed, 0 failed. `read_api_tests.py` 125 passed, 0 failed. `hash_vectors.py` 0 failures. |
+| `browser-smokes` | `web/tests/browser/run_smokes.sh owner-smoke.cjs qr-smoke.cjs stats-smoke.cjs licence-smoke.cjs` | Node 22; Python 3.13; Playwright 1.63.0; opencv-python-headless 5.0.0.93 | success. owner 39 of 39; qr 12 of 12; stats exit 0, no FAIL lines; licence 33 of 33. |
+| `browser-features-open-check` (`continue-on-error: true`) | `web/tests/browser/run_smokes.sh features-smoke.cjs` | as above | job red, as designed: **22 of 24, exit 1**. |
+
+Workflow runs for `a94cba2`:
+
+- push: [43605116936](https://github.com/joyyxh/Ps-qr/actions/runs/43605116936). Workflow conclusion success. Its features job is red, and `continue-on-error` keeps the run green.
+- pull_request: [43605120287](https://github.com/joyyxh/Ps-qr/actions/runs/43605120287). Same results.
+
+**Features smoke in CI: 22 of 24, not 23 of 24.**
+
+- FAIL "the greyed-out boxes say why". This is the known open check (owner wording decision). Unchanged.
+- FAIL "customer page has no horizontal scroll at phone width (overflow=3px)". This check passed on the developer machine. The CI diagnostic names `input#file-input` (`web/src/app.js`, line 278), which reaches 393px on a 390px viewport. The input has no CSS rule, so its width comes from the browser's default styling, which depends on the installed fonts. The font cause is likely but not verified. Product CSS was not changed and the check was not weakened. A decision is needed: style the input to fit 390px (a product layout change), or accept the failure.
+
+Local only (no workflow or package script runs these):
+
+- The seven base suites `supabase/tests/stage1_isolation_tests.sql`, `stage3_owner_tests.sql` to `stage8_print_tests.sql` (there is no stage2 file), and `supabase/tests/upload_checks.test.js` and `print_agent_api_checks.test.js`.
+- `hash_vectors.py --update`. It rewrites the pinned oracle and must never run in CI.
+- Staging and hosted Supabase checks (EX-02 not granted).
+- Physical printer checks (S-5).
+- 7F lock tests (item 33) and live signature tests (item 25).
+- The fixed 2030 dates in `rpc_tests.py` and `hash_vectors.json` will need review before 2030.
 
 ## Record conflicts found during this work
 

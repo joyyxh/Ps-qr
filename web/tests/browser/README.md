@@ -45,6 +45,11 @@ the same counts. GitHub Actions results are listed in `docs/STAGE7_HANDOVER.md`.
 why they are unavailable. The product shows no reason text on those cards yet, and the wording is
 an owner decision. The check is kept, not weakened, so the script exits 1 until that decision is made.
 
+In GitHub Actions (run 43605116936, commit `a94cba2`) the same script showed 22 of 24. A second check
+also failed there: the customer page has 3px of horizontal scroll at 390 px (`input#file-input`). It
+passed on the developer machine, so the cause probably lies in the installed fonts (not verified). It
+is not weakened and not changed. See `docs/STAGE7_HANDOVER.md`, section 5.
+
 ## Environment variables
 
 | Variable | Used by | Meaning | Default |

@@ -5,7 +5,8 @@ name: Stage 7 database and browser tests
 #                                 database (combined chain: migrations 0001-0010, 0015-0017)
 #   browser-smokes                the mocked-backend browser checks that pass on this branch
 #                                 (owner, QR, statistics, licence)
-#   browser-features-open-check   features-smoke.cjs, which has one KNOWN OPEN CHECK (see below)
+#   browser-features-open-check   features-smoke.cjs: one KNOWN OPEN CHECK, and one more check that
+#                                 fails in CI only (see below)
 #
 # The unit-test jobs (agent, web, admin) stay in unit-tests.yml, unchanged.
 #
@@ -99,6 +100,11 @@ jobs:
     # KNOWN OPEN CHECK, not a regression. features-smoke.cjs has one check that cannot pass until
     # the owner decides the wording for the greyed-out Colour and Double-sided boxes: "the greyed-out
     # boxes say why". The check is kept, not weakened, so this job shows as failed.
+    #
+    # A second check fails in CI only: "customer page has no horizontal scroll at phone width"
+    # (overflow=3px; the diagnostic names input#file-input at 393px on a 390px viewport). It passed on
+    # the developer machine. Not changed and not weakened. Result on a94cba2: 22 of 24.
+    # See docs/STAGE7_HANDOVER.md, section 5.
     #
     # continue-on-error stops this one open check from failing the whole workflow run. The job
     # itself still shows a red result, so the failure stays visible. Remove this line once the owner
