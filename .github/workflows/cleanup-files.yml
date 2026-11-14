@@ -1,12 +1,17 @@
-name: Clean up expired customer files
+name: Clean up expired customer files (manual only)
 
-# Runs the cleanup-files edge function once a day (02:00 India time).
-# Needs two repository secrets:
-#   QRQUICK_CLEANUP_URL  the function URL, https://<project>.supabase.co/functions/v1/cleanup-files
-#   CLEANUP_SECRET       the same value as the function's CLEANUP_SECRET
+# Scheduled runs were disabled on 2026-11-14 under the cleanup decision (STAGE7_DECISIONS decision 4,
+# option R-D: cleanup stays disabled until legal review of C-1 and M1, and an owner-approved retention
+# policy exist). The daily schedule that failed 22 of 22 times (2026-10-21 to 2026-11-11) has been removed.
+# This is the reversible repository form of the owner-recommended Option B (gh workflow disable).
+# To restore the schedule exactly as it was, add back:
+#   schedule:
+#     - cron: "30 20 * * *"
+#
+# Manual runs still need two repository secrets: QRQUICK_CLEANUP_URL and CLEANUP_SECRET.
+# A run with either secret empty exits before it calls the function. A run with both secrets set
+# DELETES expired customer files. Do not run it without the owner's retention approval.
 on:
-  schedule:
-    - cron: "30 20 * * *"
   workflow_dispatch:
 
 permissions:

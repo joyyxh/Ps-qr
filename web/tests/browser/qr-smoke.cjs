@@ -2,7 +2,18 @@
 // Supabase is replaced by an in-memory mock (page.route), so this checks the
 // front end only: rendering, navigation, which token each call carries, and
 // escaping. It does not test the database (see supabase/tests).
-const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+const path = require('path');
+const os = require('os');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+// Output folder for screenshots and PNGs. Set QRQUICK_SMOKE_OUT to choose it.
+const OUT_DIR = process.env.QRQUICK_SMOKE_OUT || path.join(os.tmpdir(), 'qrquick-smoke');
+require('fs').mkdirSync(OUT_DIR, { recursive: true });
+// CHROMIUM_PATH names a Chromium binary. Unset, Playwright uses its own browser.
+const launchOptions = () => {
+  const options = { args: ['--no-sandbox'] };
+  if (process.env.CHROMIUM_PATH) options.executablePath = process.env.CHROMIUM_PATH;
+  return options;
+};
 
 const BASE = 'http://127.0.0.1:5173/';
 const SHOP_ID = 'bbbbbbbb-0000-0000-0000-000000000001';
@@ -271,13 +282,13 @@ async function waitText(page, text, timeout = 8000) {
 
 // ---- QR code checks: the on-screen code and the downloaded PNG must both scan ----
 const fs = require('fs');
-const DIR = '/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad';
+const DIR = OUT_DIR;
 const { execFileSync } = require('child_process');
-const WEB = '/home/claude/printnest/web';
+const WEB = process.env.QRQUICK_WEB_DIR || path.resolve(__dirname, '..', '..');
 const configSource = fs.readFileSync(`${WEB}/config.js`, 'utf8');
 
 function decode(file) {
-  return execFileSync('python3', ['-I', `${DIR}/decode-qr.py`, file], { encoding: 'utf8' }).trim();
+  return execFileSync('python3', ['-I', path.join(__dirname, 'decode-qr.py'), file], { encoding: 'utf8' }).trim();
 }
 
 function wire(page, problems) {
@@ -299,26 +310,34 @@ async function signIn(page) {
 }
 
 let browserRef = null;
+// The on-screen code is decoded from a screenshot, so it is taken at phone-screen density (2x).
+const SCREEN_DPR = Number(process.env.QR_SCREEN_DPR || 2);
 
-async function scenario(label, { publicBase = null, expectUrl, expectBanner }) {
-  const context = await browserRef.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+async function scenario(label, { publicBase = null, expectUrl, expectBanner, expectQr = true }) {
+  const context = await browserRef.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: SCREEN_DPR,
+    acceptDownloads: true,
+  });
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
   const problems = [];
   wire(page, problems);
   await page.route(/supabase\.co/, handleSupabase);
-  if (publicBase) {
+  if (publicBase !== null) {
+    // config.js ships with a published publicBaseUrl; replace whatever value it has.
     await page.route(/\/config\.js(\?.*)?$/, (route) =>
       route.fulfill({
         contentType: 'application/javascript',
-        body: configSource.replace("publicBaseUrl: ''", `publicBaseUrl: '${publicBase}'`),
+        body: configSource.replace(/publicBaseUrl: '[^']*'/, `publicBaseUrl: '${publicBase}'`),
       })
     );
   }
 
   await signIn(page);
   await page.goto(`${BASE}#/owner/shop/demo-xerox`);
-  await page.locator('[data-action="download-qr"]').waitFor();
+  // Wait for the address field: a local address shows a banner instead of the QR code.
+  await page.locator('input[readonly]').waitFor();
 
   const shown = await page.locator('input[readonly]').inputValue();
   check(`${label}: address field shows the QR address`, shown === expectUrl, shown);
@@ -331,12 +350,26 @@ async function scenario(label, { publicBase = null, expectUrl, expectBanner }) {
     JSON.stringify(banners)
   );
 
+  if (!expectQr) {
+    // Product rule (owner.js managerHtml): with a local address no QR is drawn and no download is offered.
+    check(
+      `${label}: no QR code and no download while the address is local`,
+      (await page.locator('.qr-box').count()) === 0 && (await page.locator('[data-action="download-qr"]').count()) === 0
+    );
+    check(`${label}: no JavaScript errors`, problems.length === 0, problems.join(' | '));
+    await context.close();
+    return;
+  }
+  await page.locator('[data-action="download-qr"]').waitFor();
+
   check(
     `${label}: code is drawn on the page`,
     (await page.locator('.qr-box svg rect').count()) === 1 && (await page.locator('.qr-box svg path').count()) === 1
   );
 
   const screenFile = `${DIR}/qr-${label}-screen.png`;
+  // Centre the code first: the fixed bottom navigation would otherwise cover its lower edge in the capture.
+  await page.locator('.qr-box').evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await page.locator('.qr-box').screenshot({ path: screenFile });
   const screenText = decode(screenFile);
   check(`${label}: on-screen code scans to the shop address`, screenText === expectUrl, `decoded=${screenText}`);
@@ -347,7 +380,7 @@ async function scenario(label, { publicBase = null, expectUrl, expectBanner }) {
   ]);
   check(
     `${label}: download is named for the shop`,
-    download.suggestedFilename() === 'printnest-demo-xerox-qr.png',
+    download.suggestedFilename() === 'qrquick-demo-xerox-qr.png',
     download.suggestedFilename()
   );
   const pngFile = `${DIR}/qr-${label}-download.png`;
@@ -364,12 +397,14 @@ async function scenario(label, { publicBase = null, expectUrl, expectBanner }) {
 }
 
 (async () => {
-  browserRef = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  browserRef = await chromium.launch(launchOptions());
   try {
     // A. Config left empty: the page's own address is used, and the owner is warned it is local.
     await scenario('local', {
+      publicBase: '',
       expectUrl: 'http://127.0.0.1:5173/#/s/demo-xerox',
       expectBanner: true,
+      expectQr: false,
     });
     // B. A published address set in config.js: the QR points there and no warning shows.
     await scenario('published', {

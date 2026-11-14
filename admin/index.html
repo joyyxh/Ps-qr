@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; connect-src 'self' https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>QRquick platform admin</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <div class="brand">QRquick <span>platform admin</span></div>
+    <div class="top-right">
+      <span id="whoami" class="muted" hidden></span>
+      <button type="button" id="sign-out" class="ghost" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <main id="main" class="wrap" tabindex="-1">
+    <p id="global-status" class="status" role="status" aria-live="polite"></p>
+
+    <section id="view-config" class="card" hidden>
+      <h1>Not configured</h1>
+      <p>This copy of the admin panel has no Supabase project set, so it sends no requests. A private deployment sets the values in <code>config.js</code>. Hosting is not yet approved.</p>
+    </section>
+
+    <section id="view-signin" class="card narrow" hidden>
+      <h1>Sign in</h1>
+      <p class="muted">Platform administrators only. Access is checked by the server on every action.</p>
+      <form id="signin-form" novalidate>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <p id="signin-error" class="error" role="alert" hidden></p>
+        <button type="submit" id="signin-submit">Sign in</button>
+      </form>
+    </section>
+
+    <section id="view-enrol" class="card narrow" hidden>
+      <h1>Set up the authenticator</h1>
+      <p>Two-step sign-in is required for admin actions. Scan this code with an authenticator app, or enter the key by hand, then enter the six-digit code below.</p>
+      <img id="enrol-qr" class="qr" alt="Authenticator setup code" hidden>
+      <p>Key for manual entry: <code id="enrol-secret" class="secret"></code></p>
+      <form id="totp-form-enrol" novalidate>
+        <div class="field">
+          <label for="totp-enrol">Six-digit code</label>
+          <input id="totp-enrol" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+        </div>
+        <p id="enrol-error" class="error" role="alert" hidden></p>
+        <button type="submit">Activate and continue</button>
+      </form>
+    </section>
+
+    <section id="view-totp" class="card narrow" hidden>
+      <h1>Enter your code</h1>
+      <p>Enter the current six-digit code from your authenticator app.</p>
+      <form id="totp-form" novalidate>
+        <div class="field">
+          <label for="totp-code">Six-digit code</label>
+          <input id="totp-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+        </div>
+        <p id="totp-error" class="error" role="alert" hidden></p>
+        <button type="submit">Continue</button>
+      </form>
+    </section>
+
+    <section id="view-dashboard" hidden>
+      <div class="grid">
+        <div class="stack">
+          <section class="card" aria-labelledby="shop-title">
+            <h1 id="shop-title" tabindex="-1">Shop</h1>
+            <p class="muted">Search for a shop and choose it. Its licence and audit history load from the server. Searching changes nothing.</p>
+            <form id="shop-search-form" role="search" novalidate>
+              <div class="field">
+                <label for="shop-query">Shop name, slug or ID</label>
+                <input id="shop-query" name="query" type="search" autocomplete="off" spellcheck="false" maxlength="80" aria-describedby="shop-query-hint">
+                <p class="hint" id="shop-query-hint">2 to 80 characters. Names and slugs match from the start. A full shop ID matches exactly.</p>
+                <p id="shop-search-error" class="error" role="alert" hidden></p>
+              </div>
+              <button type="submit" id="shop-search-submit">Search</button>
+            </form>
+            <p id="shop-search-status" class="hint" role="status" aria-live="polite"></p>
+            <ul id="shop-results" class="results" aria-label="Matching shops" hidden></ul>
+          </section>
+
+          <section id="licence-card" class="card" aria-labelledby="licence-title" hidden>
+            <h2 id="licence-title" tabindex="-1">Licence</h2>
+            <p id="licence-error" class="error" role="alert" hidden></p>
+            <dl id="licence-facts" class="kv"></dl>
+            <fieldset class="coverages">
+              <legend>Coverages</legend>
+              <p class="hint">Choose a coverage to revoke or replace. Only live and scheduled coverages are listed.</p>
+              <div id="coverage-list"></div>
+              <p id="coverage-empty" class="muted" hidden>This shop has no live or scheduled coverage.</p>
+              <p id="coverages-truncated" class="hint" hidden>More than 50 coverages exist. Only the first 50 are listed.</p>
+            </fieldset>
+            <div class="row">
+              <button type="button" class="ghost" id="licence-refresh">Refresh licence and history</button>
+            </div>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section class="card" aria-labelledby="actions-title">
+            <h2 id="actions-title">Change the licence</h2>
+            <p class="muted">Each change is one committed server action. You review it before it is sent. The server checks every field again.</p>
+
+            <form id="licence-form" novalidate>
+              <div class="field">
+                <label for="action">Action</label>
+                <select id="action" name="action">
+                  <option value="grant">Grant a licence</option>
+                  <option value="extend">Extend the current licence</option>
+                  <option value="revoke">Revoke a coverage</option>
+                  <option value="replace">Replace a coverage</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="shop_id">Shop ID</label>
+                <input id="shop_id" name="shop_id" autocomplete="off" spellcheck="false" readonly aria-describedby="shop_id-hint">
+                <p class="hint" id="shop_id-hint">Filled in when you choose a shop.</p>
+                <p class="error" data-error-for="shop_id" hidden></p>
+              </div>
+
+              <div class="field">
+                <label for="expected_state_version">Expected state version</label>
+                <input id="expected_state_version" name="expected_state_version" inputmode="numeric" autocomplete="off" readonly aria-describedby="version-hint">
+                <p class="hint" id="version-hint">Filled in from the licence view. The server refuses the change if the shop has changed since it was loaded.</p>
+                <p class="error" data-error-for="expected_state_version" hidden></p>
+              </div>
+
+              <div class="field" data-actions="revoke replace">
+                <label for="target_coverage_id">Coverage ID</label>
+                <input id="target_coverage_id" name="target_coverage_id" autocomplete="off" spellcheck="false" readonly aria-describedby="coverage-hint">
+                <p class="hint" id="coverage-hint">Chosen from the coverages list. Required for revoke and replace.</p>
+                <p class="error" data-error-for="target_coverage_id" hidden></p>
+              </div>
+
+              <div class="field" data-actions="grant replace">
+                <label for="grant_kind">Licence type</label>
+                <select id="grant_kind" name="grant_kind">
+                  <option value="one_month">One calendar month</option>
+                  <option value="one_year">One calendar year</option>
+                  <option value="custom">Custom dates</option>
+                  <option value="lifetime">Lifetime</option>
+                </select>
+                <p class="error" data-error-for="grant_kind" hidden></p>
+              </div>
+
+              <div class="field" data-actions="grant replace">
+                <label for="start">Start (optional)</label>
+                <input id="start" name="start" autocomplete="off" placeholder="2026-11-08 or 2026-11-08T10:00:00+05:30">
+                <p class="error" data-error-for="start" hidden></p>
+              </div>
+
+              <div class="field" data-actions="grant replace">
+                <label for="end">End (optional)</label>
+                <input id="end" name="end" autocomplete="off" placeholder="2027-01-01">
+                <p class="error" data-error-for="end" hidden></p>
+              </div>
+
+              <div class="field" data-actions="grant replace">
+                <label class="check"><input type="checkbox" id="backdate_confirm" name="backdate_confirm"> The start is in the past, and I confirm backdating</label>
+              </div>
+
+              <div class="field" data-actions="extend">
+                <label for="extension_unit">Extend by</label>
+                <select id="extension_unit" name="extension_unit">
+                  <option value="month">One calendar month</option>
+                  <option value="year">One calendar year</option>
+                </select>
+                <p class="error" data-error-for="extension_unit" hidden></p>
+              </div>
+
+              <div class="field">
+                <label for="reason">Reason</label>
+                <textarea id="reason" name="reason" rows="3" maxlength="500" required></textarea>
+                <p class="hint">Recorded in the audit log. Up to 500 characters.</p>
+                <p class="error" data-error-for="reason" hidden></p>
+              </div>
+
+              <div class="field">
+                <label class="check"><input type="checkbox" id="confirm" name="confirm"> I confirm this change to the shop&rsquo;s licence</label>
+                <p class="error" data-error-for="confirm" hidden></p>
+              </div>
+
+              <button type="submit" id="review-submit">Review change</button>
+            </form>
+          </section>
+
+          <section id="review" class="card" aria-labelledby="review-title" hidden>
+            <h2 id="review-title">Check before you send</h2>
+            <dl id="review-list" class="kv"></dl>
+            <div class="row">
+              <button type="button" id="review-confirm">Send this change</button>
+              <button type="button" class="ghost" id="review-back">Back to edit</button>
+            </div>
+          </section>
+
+          <section id="result" class="card" aria-labelledby="result-title" aria-live="polite" hidden>
+            <h2 id="result-title" tabindex="-1">Result</h2>
+            <p id="result-text"></p>
+            <dl id="result-list" class="kv"></dl>
+            <div class="row" id="result-actions" hidden>
+              <button type="button" id="retry">Retry the same request</button>
+            </div>
+          </section>
+
+          <section id="audit-card" class="card" aria-labelledby="audit-title" hidden>
+            <h2 id="audit-title">Audit history</h2>
+            <p class="hint">Newest first. Each committed change to this shop is recorded here. Which admin recorded each entry is not shown (open decision N5).</p>
+            <p id="audit-error" class="error" role="alert" hidden></p>
+            <ul id="audit-list" class="audit"></ul>
+            <p id="audit-empty" class="muted" hidden>No audit entries for this shop yet.</p>
+            <div class="row">
+              <button type="button" class="ghost" id="audit-more" hidden>Load older entries</button>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="blocked-title">
+            <h2 id="blocked-title">Not available yet</h2>
+            <p class="muted">This view needs a path that is not approved yet. It is not built and nothing is shown for it.</p>
+            <ul class="blocked">
+              <li><strong>Payment entry.</strong> Deferred (decision M5).</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

@@ -1,7 +1,18 @@
 // Browser check for the statistics page and the order payment controls.
 // Supabase is replaced by an in-memory mock (page.route). This checks the front end only.
 const fs = require('fs');
-const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+const path = require('path');
+const os = require('os');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+// Output folder for screenshots and PNGs. Set QRQUICK_SMOKE_OUT to choose it.
+const OUT_DIR = process.env.QRQUICK_SMOKE_OUT || path.join(os.tmpdir(), 'qrquick-smoke');
+require('fs').mkdirSync(OUT_DIR, { recursive: true });
+// CHROMIUM_PATH names a Chromium binary. Unset, Playwright uses its own browser.
+const launchOptions = () => {
+  const options = { args: ['--no-sandbox'] };
+  if (process.env.CHROMIUM_PATH) options.executablePath = process.env.CHROMIUM_PATH;
+  return options;
+};
 
 const BASE = 'http://127.0.0.1:5173/';
 const SHOP_ID = 'bbbbbbbb-0000-0000-0000-000000000001';
@@ -112,7 +123,7 @@ function check(label, ok, detail = '') {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  const browser = await chromium.launch(launchOptions());
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
@@ -221,7 +232,12 @@ function check(label, ok, detail = '') {
   check('cancel reason is saved for the rejected order', reason?.body.p_order_id === 'ord-2' && reason.body.p_reason === 'file_problem');
 
   // The status buttons still work alongside the new controls.
-  check('status buttons still show for open orders', (await page.locator('[data-order-id="ord-1"][data-next="printing"]').count()) === 1);
+  // "printing" is not a button (owner.js); the open order still offers its next steps.
+  check(
+    'status buttons still show for open orders',
+    (await page.locator('[data-order-id="ord-1"][data-next]').count()) >= 1 &&
+      (await page.locator('[data-order-id="ord-1"][data-next="printing"]').count()) === 0
+  );
 
   // Phone width: no sideways scrolling on the statistics page.
   await page.evaluate(() => { location.hash = '#/owner/shop/demo-xerox/stats'; });
@@ -233,7 +249,7 @@ function check(label, ok, detail = '') {
   console.log('OFFENDERS:\n  ' + offenders.join('\n  '));
   const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
   check('no sideways scrolling at 390px wide', widths.scroll <= widths.inner, JSON.stringify(widths));
-  await page.screenshot({ path: '/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/stats-phone.png', fullPage: false });
+  await page.screenshot({ path: path.join(OUT_DIR, 'stats-phone.png'), fullPage: false });
 
   check('no page errors or console errors', problems.length === 0, problems.join(' | '));
   await browser.close();

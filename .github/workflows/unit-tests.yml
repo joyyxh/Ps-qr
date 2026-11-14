@@ -1,0 +1,57 @@
+name: Unit tests (agent, web, admin)
+
+# Runs the local unit tests on every push and pull request. These are the same commands
+# that were run locally for the Stage 7 integration:
+#   agent: node --test                 (Node 22)
+#   web:   npm test                    (Node 22)
+#   admin: npm test                    (Node 22)
+# Not run here: the browser smoke scripts (web/tests/browser, which need Playwright and a
+# browser), the PostgreSQL licence suites (supabase/tests/licence_7c, which need a local
+# PostgreSQL 16 cluster), and any staging or hosted check. See docs/STAGE7_HANDOVER.md.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+
+  admin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test

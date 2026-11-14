@@ -1,0 +1,146 @@
+name: Stage 7 database and browser tests
+
+# Adds the checks that could previously run only on a developer machine:
+#   licence-postgres              the licence migration and RPC suites on a clean PostgreSQL 16
+#                                 database (combined chain: migrations 0001-0010, 0015-0017)
+#   browser-smokes                the mocked-backend browser checks that pass on this branch
+#                                 (owner, QR, statistics, licence)
+#   browser-features-open-check   features-smoke.cjs: one owner wording check remains open
+#
+# The unit-test jobs (agent, web, admin) stay in unit-tests.yml, unchanged.
+#
+# Nothing here uses hosted Supabase credentials, staging, production data or a printer. The
+# PostgreSQL service is a throwaway container that exists only for this job. Its password is not a
+# secret: it protects nothing outside this job.
+#
+# Versions are pinned to the ones the suites were run with locally:
+#   Playwright 1.63.0 (npm), opencv-python-headless 5.0.0.93 (PyPI), PostgreSQL 16, Node 22, Python 3.13.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  licence-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-throwaway-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -h 127.0.0.1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGPASSWORD: ci-throwaway-password
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure a psql client is available
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+
+      - name: Licence migration and RPC suites (clean database, combined chain)
+        run: supabase/tests/licence_7c/run_suites.sh 127.0.0.1 5432
+
+  browser-smokes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install OpenCV for the QR check (virtualenv, first on PATH)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install opencv-python-headless==5.0.0.93
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Install Playwright 1.63.0 and Chromium (outside the repository)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Mocked-backend browser checks (owner, QR, statistics, licence)
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
+          QRQUICK_SMOKE_OUT: ${{ runner.temp }}/smoke-out
+        run: web/tests/browser/run_smokes.sh owner-smoke.cjs qr-smoke.cjs stats-smoke.cjs licence-smoke.cjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-smokes-output
+          path: ${{ runner.temp }}/smoke-out
+          if-no-files-found: ignore
+
+  browser-features-open-check:
+    # KNOWN OPEN CHECK, not a regression. features-smoke.cjs has one check that cannot pass until
+    # the owner decides the wording for the greyed-out Colour and Double-sided boxes: "the greyed-out
+    # boxes say why". The check is kept, not weakened, so this job shows as failed.
+    #
+    # The phone-width overflow was fixed in web/styles.css at d3889e5. CI now reports 23 of 24:
+    # the overflow check passes; only the owner wording check remains open. The earlier 22 of 24
+    # result on a94cba2 is historical. See docs/STAGE7_HANDOVER.md, section 5.
+    #
+    # continue-on-error stops these outstanding checks from failing the whole workflow run. The job
+    # itself still shows a red result, so the owner wording check stays visible. Remove this line
+    # only after the owner wording is decided and its check passes.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install OpenCV for the QR check (virtualenv, first on PATH)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install opencv-python-headless==5.0.0.93
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Install Playwright 1.63.0 and Chromium (outside the repository)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: "Features smoke: one owner wording check remains open (23 of 24)"
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
+          QRQUICK_SMOKE_OUT: ${{ runner.temp }}/smoke-out
+        run: web/tests/browser/run_smokes.sh features-smoke.cjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-features-output
+          path: ${{ runner.temp }}/smoke-out
+          if-no-files-found: ignore
