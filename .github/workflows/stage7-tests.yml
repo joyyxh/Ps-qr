@@ -5,7 +5,7 @@ name: Stage 7 database and browser tests
 #                                 database (combined chain: migrations 0001-0010, 0015-0017)
 #   browser-smokes                the mocked-backend browser checks that pass on this branch
 #                                 (owner, QR, statistics, licence)
-#   browser-features-open-check   features-smoke.cjs: two outstanding failures in CI (see below)
+#   browser-features-open-check   features-smoke.cjs: one owner wording check remains open
 #
 # The unit-test jobs (agent, web, admin) stay in unit-tests.yml, unchanged.
 #
@@ -100,14 +100,13 @@ jobs:
     # the owner decides the wording for the greyed-out Colour and Double-sided boxes: "the greyed-out
     # boxes say why". The check is kept, not weakened, so this job shows as failed.
     #
-    # A second check fails in CI only: "customer page has no horizontal scroll at phone width"
-    # (overflow=3px; the diagnostic names input#file-input at 393px on a 390px viewport). It passed on
-    # the developer machine. Not changed and not weakened. Result on a94cba2: 22 of 24.
-    # See docs/STAGE7_HANDOVER.md, section 5.
+    # The phone-width overflow was fixed in web/styles.css at d3889e5. CI now reports 23 of 24:
+    # the overflow check passes; only the owner wording check remains open. The earlier 22 of 24
+    # result on a94cba2 is historical. See docs/STAGE7_HANDOVER.md, section 5.
     #
     # continue-on-error stops these outstanding checks from failing the whole workflow run. The job
-    # itself still shows a red result, so both failures stay visible. Remove this line only after
-    # the owner wording is decided AND the phone-width overflow check passes.
+    # itself still shows a red result, so the owner wording check stays visible. Remove this line
+    # only after the owner wording is decided and its check passes.
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -133,7 +132,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
 
-      - name: "Features smoke: two outstanding CI failures, observed 22 of 24"
+      - name: "Features smoke: one owner wording check remains open (23 of 24)"
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
           QRQUICK_SMOKE_OUT: ${{ runner.temp }}/smoke-out
