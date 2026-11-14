@@ -46,11 +46,12 @@ Not run: staging (EX-02 not granted), hosted database checks, physical printer c
 
 ### 1. Chain A integration is blocked by a missing commit (external)
 
-- Chain A is local `main` commit `37e4623` ("Add owner email-code registration and password setup"). It was never pushed. It is **not** in this repository or on any remote branch.
-- Its migrations survive only as read-only copies in the audit package (`info-files/round3_2026-11-12/dmig_option_b/chain_a_readonly/`), copied with `git show` on 2026-11-12. The four migration files (0011 to 0014) match those copies byte for byte. No hash was recorded for them. They are **not** on this branch.
-- Its application code (including `web/src/owner.js`, `owner-api.js`, `styles.css`, `package.json` and the browser tests, which P4 and U6 also change) cannot be recovered here.
-- Consequences: P4 and U6 conflict with Chain A's versions of those files, so the integration cannot be reconciled. Stage 7F's refusal must sit on Chain A's `approve_order_for_print`, `agent_claim_next_job` and `agent_mark_printing` (Chain A migrations 0011 and 0012), so 7F cannot be built correctly yet.
-- **Owner action:** push local `main` commit `37e4623` to a branch, or provide a git bundle of it. Then integration can proceed.
+- Chain A is local `main` commit `37e4623` ("Add owner email-code registration and password setup"). It was never pushed. The commit object is **not** in any repository, reflog, bundle or audit artifact searched (see `docs/STAGE7_CHAIN_A_RECOVERY.md` for the full list).
+- Partial recovery only. The four migrations `0011` to `0014` are recovered as read-only copies, and `0011` and `0012` match the hashes in the audit manifest. The commit message and one owner file (`web/src/owner.js`, 1826 lines) are also recovered. Their provenance is not verified against the missing object. They are **not** on this branch.
+- Not recovered: `web/src/owner-api.js`, `styles.css`, the Chain A `package.json`, the customer screens, the Chain A browser tests, `logic.js`, `auth.js`, and the rollbacks for `0013` and `0014`. The `mut-claim/` copies of `0011` and `0012` are mutants and must not be used.
+- Integration is not performed. Applying `0013` alone would revoke `update (cash_payment_timing)` on `shops`, while the current owner code still saves that column (`owner-api.js` line 10, `owner.js` line 840).
+- Consequences: P4 and U6 cannot be reconciled with Chain A's versions of those files. 7F's refusal sits on Chain A's functions, so it cannot be built on a correct base yet.
+- **Owner action:** push local `main` commit `37e4623` to a branch, or send a git bundle or a patch of `4d97e40..37e4623`. That is the only source that unblocks integration.
 
 ### 2. Stage 7F: not built
 
