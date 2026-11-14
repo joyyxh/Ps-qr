@@ -15,7 +15,7 @@ Nothing here has been applied to a hosted database, deployed, merged into `main`
 | Browser checks | Five Playwright scripts, with the greyed-out check kept open | `web/tests/browser/` |
 | P5 fail-closed agent | Prints only after an explicit server confirmation. Commit `a1a91f1` is kept unchanged and merged. | `agent/src/worker.mjs`, `agent/test/worker.test.mjs` |
 | Decision records | Replaced with the newer copies from the audit package (2026-11-09 wording and Stage 7F decisions ยง13C). Each has a dated renumbering note. Historical text is unchanged. | `OWNER_DECISION_SHEET.md`, `STAGE7_DECISIONS.md` |
-| CI | Runs the agent, web and admin unit tests, the PostgreSQL licence suites and the mocked browser checks, on push and pull request | `.github/workflows/unit-tests.yml`, `.github/workflows/stage7-tests.yml` |
+| CI | Runs the agent, web and admin unit tests, the PostgreSQL licence suites and the mocked browser checks, on push and pull request. `base-regression-tests.yml` also runs the seven base SQL suites and the two Node suites, which were local-only before. | `.github/workflows/unit-tests.yml`, `.github/workflows/stage7-tests.yml`, `.github/workflows/base-regression-tests.yml` |
 | Cleanup workflow | Schedule removed (reversible Option B). Manual run kept. | `.github/workflows/cleanup-files.yml` |
 
 ## Tests run (local, 2026-11-14, exact results)
@@ -43,6 +43,8 @@ Not run: staging (EX-02 not granted), hosted database checks, physical printer c
 
 - `supabase/tests/licence_7c/combined/`: a platform stand-in file, a combined reset script that loads every migration in `supabase/migrations/`, and a test-only defaults file. The defaults give the licence tests' bare `insert into public.shops (id)` a valid slug and name. They are not product migrations.
 - `reset_local.sh` and `reset_combined_local.sh` now create the test database with `encoding 'UTF8' template template0`. A server default of `SQL_ASCII` makes `normalize()` fail, and Supabase is UTF8.
+- `supabase/tests/base/00_base_platform_shims.sql` (commit `0c5848e`): a test-only stand-in for Supabase's platform surface, used by the base SQL suites in CI. It is reconstructed from assumed Supabase behaviour and has not been checked against a live project. It provides the `auth` and `storage` schemas and columns, `auth.uid()` and `auth.jwt()`, the `anon`, `authenticated` and `service_role` roles, default table and sequence privileges in `public`, client grants on the storage tables, and a guard that refuses direct SQL deletes from `storage.objects` and `storage.buckets` with SQLSTATE 42501. Only stage6 S41 asserts that guard. It does not emulate Supabase's default EXECUTE privileges on functions; the migrations grant those explicitly. Owner review should confirm each item against the hosted project before anyone relies on it.
+- `supabase/tests/base/run_base_suites.sh` and `check_results.py` (commit `0c5848e`): the runner and the checker. The runner refuses non-local hosts and any `001[1-4]_*.sql` migration (Chain A). It builds one template from the shims, migrations 0001 to 0010 and 0015 to 0017, and the dev-only seed `supabase/seed/demo_seed.sql`, then runs each suite on a fresh copy of that template. The checker fails a suite on any row that is not ok, on a short result set, or on a bad header. Any psql error also fails the suite.
 
 ## Not done, and why
 
@@ -96,7 +98,23 @@ Enforcement stays OFF. The C-3 decision (enforcement held back) is recorded in ย
 - `unit-tests.yml` (unchanged): jobs `agent`, `web` and `admin` (`node --test` and `npm test`, Node 22). On commit `a94cba2`, push run [43605116842](https://github.com/joyyxh/Ps-qr/actions/runs/43605116842) and pull_request run [43605120293](https://github.com/joyyxh/Ps-qr/actions/runs/43605120293) both succeeded.
 - `stage7-tests.yml` (added in commit `a94cba2`): three jobs, run on push, pull_request and manual dispatch. It uses no hosted Supabase credentials, staging, production data or printer. The PostgreSQL service is a throwaway container for that job only.
 
-Results on `d3889e5` (current head), from the GitHub API and the job logs, checked 2026-11-14:
+- `base-regression-tests.yml` (added in commit `0c5848e`): two jobs, run on push, pull_request and manual dispatch. Neither uses hosted Supabase credentials, staging, production data or a printer. The PostgreSQL service is a throwaway container for that job only. Neither job uses `continue-on-error`.
+
+Results on `0c5848e`, from the GitHub API and the job logs, checked 2026-11-14:
+
+| Job | What it runs | Versions | Result |
+|---|---|---|---|
+| `base-sql-suites` | `supabase/tests/base/run_base_suites.sh 127.0.0.1 5432`. Seven suites, each on a fresh database built from the shims, migrations 0001 to 0010 and 0015 to 0017, and the dev-only seed. | `postgres:16` service; psql 18.6 client | success. 250 of 250 checks ok: stage1 30, stage3 30, stage4 23, stage5 23, stage6 42, stage7 54, stage8 48. 0 not ok. |
+| `base-node-checks` | `node --test supabase/tests/upload_checks.test.js supabase/tests/print_agent_api_checks.test.js` | Node 22 | success. 22 tests, 22 pass, 0 fail (upload 15, print-agent 7). |
+
+Counts are from the push run's job logs. The pull_request run has the same two jobs, and both succeeded.
+
+Workflow runs for `0c5848e`:
+
+- push: [43632725327](https://github.com/joyyxh/Ps-qr/actions/runs/43632725327). Both base jobs success.
+- pull_request: [43632730564](https://github.com/joyyxh/Ps-qr/actions/runs/43632730564). Both base jobs success.
+
+Results on `d3889e5` (earlier head, Stage 7 workflow), from the GitHub API and the job logs, checked 2026-11-14:
 
 | Job | What it runs | Versions | Result |
 |---|---|---|---|
@@ -125,11 +143,14 @@ Earlier runs on `a94cba2` (push [43605116936](https://github.com/joyyxh/Ps-qr/ac
 - Rejected: removing the `width:auto` rule alone stretches the input across the whole box, which changes the desktop look. `max-width:100%` alone did not work, because the grid column still grew to the input's width.
 - Correction: an earlier version of this section said the input had no CSS rule and blamed the fonts. Both were wrong. The rule existed, and the fix is in the rule.
 
-**Workflow label note.** The step label and comments in `.github/workflows/stage7-tests.yml`, from commit `d811a23`, still say "two outstanding CI failures" and "22 of 24". They predate this fix and are left as committed. Update them to one outstanding check and 23 of 24 in the next workflow edit.
+**Workflow label note (resolved).** The step label and comments in `.github/workflows/stage7-tests.yml` that said "two outstanding CI failures" and "22 of 24" (from `d811a23`) are corrected on this branch. The current file says one outstanding check and 23 of 24.
 
-Local only (no workflow or package script runs these):
+Now in CI (`base-regression-tests.yml`, commit `0c5848e`): the seven base SQL suites `supabase/tests/stage1_isolation_tests.sql`, `stage3_owner_tests.sql`, `stage4_files_tests.sql`, `stage5_orders_tests.sql`, `stage6_features_tests.sql`, `stage7_stats_tests.sql` and `stage8_print_tests.sql`, and the two Node suites `supabase/tests/upload_checks.test.js` and `print_agent_api_checks.test.js`. Nothing from that list remains local-only.
 
-- The seven base suites `supabase/tests/stage1_isolation_tests.sql`, `stage3_owner_tests.sql` to `stage8_print_tests.sql` (there is no stage2 file), and `supabase/tests/upload_checks.test.js` and `print_agent_api_checks.test.js`.
+Filenames: an earlier list of local-only files named `stage4_stats_tests.sql`, `stage5_qr_tests.sql`, `stage6_printer_tests.sql` and `stage7_payment_tests.sql`. None of those files exists. The names above are the real ones. There is no stage2 file.
+
+Still local only (no workflow or package script runs these):
+
 - `hash_vectors.py --update`. It rewrites the pinned oracle and must never run in CI.
 - Staging and hosted Supabase checks (EX-02 not granted).
 - Physical printer checks (S-5).
