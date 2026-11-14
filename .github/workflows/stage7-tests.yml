@@ -5,8 +5,7 @@ name: Stage 7 database and browser tests
 #                                 database (combined chain: migrations 0001-0010, 0015-0017)
 #   browser-smokes                the mocked-backend browser checks that pass on this branch
 #                                 (owner, QR, statistics, licence)
-#   browser-features-open-check   features-smoke.cjs: one KNOWN OPEN CHECK, and one more check that
-#                                 fails in CI only (see below)
+#   browser-features-open-check   features-smoke.cjs: two outstanding failures in CI (see below)
 #
 # The unit-test jobs (agent, web, admin) stay in unit-tests.yml, unchanged.
 #
@@ -106,9 +105,9 @@ jobs:
     # the developer machine. Not changed and not weakened. Result on a94cba2: 22 of 24.
     # See docs/STAGE7_HANDOVER.md, section 5.
     #
-    # continue-on-error stops this one open check from failing the whole workflow run. The job
-    # itself still shows a red result, so the failure stays visible. Remove this line once the owner
-    # decides the wording and the check passes.
+    # continue-on-error stops these outstanding checks from failing the whole workflow run. The job
+    # itself still shows a red result, so both failures stay visible. Remove this line only after
+    # the owner wording is decided AND the phone-width overflow check passes.
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -134,7 +133,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
 
-      - name: "Features smoke: KNOWN OPEN CHECK (greyed-out wording), expected 23 of 24"
+      - name: "Features smoke: two outstanding CI failures, observed 22 of 24"
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
           QRQUICK_SMOKE_OUT: ${{ runner.temp }}/smoke-out
