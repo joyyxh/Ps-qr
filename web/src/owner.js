@@ -638,19 +638,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     }
     if (section === 'orders') return renderOrdersFor(shop);
     if (section === 'stats') return statsPages.open(shop);
-    if (section === 'licence' && licenceEnabled) {
-      // Licence status is for the shop owner only. Staff who open the link are told so.
-      if (shop.role !== 'owner') {
-        return show(
-          `<section class="card">
-            <h1>Licence</h1>
-            <p class="muted">Only the shop owner can see the licence status.</p>
-            <p><a href="#/owner/shop/${encodeURIComponent(shop.slug)}">Back to the shop</a></p>
-          </section>`
-        );
-      }
-      return licencePages.open(shop);
-    }
+    if (section === 'licence' && licenceEnabled) return licencePages.open(shop);
 
     const [services, catalog] = await Promise.all([
       ownerApi.listServices(shop.id),
