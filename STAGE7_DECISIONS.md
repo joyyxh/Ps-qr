@@ -1912,6 +1912,25 @@ Checks for this correction (2026-11-15; local PostgreSQL 16.15 and Node 22 only;
 - Browser smokes were not run locally. No web source changed. They run in `stage7-tests.yml`.
 - Hosted and staging checks: not run, and not claimed.
 
+## 13H. Record of 2026-11-15: Android owner licence-status view reopened
+
+Source: the owner's request on 2026-11-15 to finish Stage 7 and include the new Stage 7 updates and features in the updated Android APK. This specifically reopens the previously deferred Android presentation of the already-approved, read-only Stage 7E owner licence-status view (item 13 / decision 19). It does not approve any licence write action, payment, migration, hosted deployment or enforcement activation.
+
+Approved for the Android owner app:
+- Include the same read-only Stage 7E licence-status screen already implemented for the web owner app.
+- Keep it owner-only; staff continue to receive no licence-status data.
+- Keep the approved labels and display wording recorded in §13B. The screen remains read-only and has no grant, extend, revoke, replace or payment controls.
+- The Android copy step must bundle the screen and CI must assert that the feature is enabled.
+
+Superseded:
+- The Android deferral under item 13 / decision 19 (OD1, 2026-11-09) is superseded only as to inclusion of the read-only status view in the Android owner APK.
+- The Android licence-payment deferral and all other deferred licence features remain unchanged.
+
+No change to:
+- 7F enforcement, held-file release, kill-switch design or activation gates.
+- C-1 lawyer review, C-3 held-file policy, Chain A recovery or the cash_payment_timing decision.
+- Staging/production approvals, migration application, deployment, PR merge or physical printer verification.
+
 ## 14. Consolidated decision register (added 2026-10-30; rebuilt 2026-10-31)
 
 This register gives one status to each numbered item of the 2026-10-30 closure review (items 1 to 35), to each group A to E, and to each open ID in this file: decisions A to L, decisions 1 to 20, C-1 to C-15, S-1 to S-8, M1 to M8 and R1 to R19. The closure review is not reproduced in this file. Its item numbers and group letters are used as recorded there. Nothing in this register approves a gate, setup, migration, test, deployment, live change or production access.
@@ -2166,7 +2185,7 @@ Item 4's owner parts (collection channel, price and minimum) follow the CA's tax
 
 - Stage 8 scope. This document does not define it. The README's Stage 8 wording (lines 23 and 467–470) is not adopted here. Stage 8 is blocked until the criteria in §16.1 are met.
 - Gateway integration, and any Stripe or Razorpay call or key (later stage; §12A.12).
-- Android licence payments and the Android licence view (items 13 and 28).
+- Android licence payments remain deferred (items 13 and 28). The read-only Android owner licence-status view is reopened under §13H.
 - Fixes to the printing defects (items 23 and 24), which have their own gates.
 - Changes to the README, `CLAUDE.md` or any file other than this document.
 - Live settings, production data (including deleting the test rows, item 34), deployments and APK builds.
