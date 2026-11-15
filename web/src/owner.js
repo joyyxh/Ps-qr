@@ -65,9 +65,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   let managed = null; // { shop, services } for the shop page on screen
   let orderView = null; // { shop, orders, showAll, printing, jobsByItem, pairing } for the orders page on screen
   const statsPages = createStatsPages({ app, ownerApi, messageFor });
-  // The licence view is off in the Android owner bundle (config.ownerApp is set by mobile/scripts/copy-web.mjs),
-  // because the Android view is deferred (STAGE7_DECISIONS.md item 13 / decision 19). Off means no button, no route and no request.
-  const licenceEnabled = config.ownerApp !== true;
+  // The read-only Stage 7E licence view is available to shop owners in both web and Android builds.
+  const licenceEnabled = true;
   const licencePages = createLicencePages({ app, ownerApi, enabled: licenceEnabled });
 
   // Automatic refresh of the orders page (order-refresh.js). The page is only redrawn when the data changed.
