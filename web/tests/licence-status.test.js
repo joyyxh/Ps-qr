@@ -537,20 +537,20 @@ test('the shop page links to the licence screen only for owners, and sign-out an
   assert.match(owner, /async function signOut\(\) \{\s*licencePages\.close\(\);/);
 });
 
-test('the licence view is switched off in the Android owner bundle (config.ownerApp), and only there', () => {
+test('the read-only licence view is enabled in the Android owner bundle', () => {
   const owner = src('owner.js');
-  assert.match(owner, /const licenceEnabled = config\.ownerApp !== true;/);
+  assert.match(owner, /const licenceEnabled = true;/);
   assert.match(owner, /createLicencePages\(\{ app, ownerApi, enabled: licenceEnabled \}\)/);
-  // The copy script is what sets ownerApp for the Android bundle; the web default stays false.
+  // The copy script preserves the enabled owner-only view in the Android bundle.
   const copyScript = readFileSync(new URL('../../mobile/scripts/copy-web.mjs', import.meta.url), 'utf8');
-  assert.match(copyScript, /ownerApp:\s*true/);
+  assert.match(copyScript, /ownerApp:\s*false/);
   const config = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
   assert.match(config, /ownerApp: false,/);
 });
 
-// ---------- 6. the Android owner bundle: the licence view is off ----------
+// ---------- 6. the Android owner bundle: the licence view is on ----------
 
-test('with the view switched off, opening it for an owner sends no request and draws nothing', async () => {
+test('when a host explicitly disables the view, opening it sends no request and draws nothing', async () => {
   const calls = [];
   const app = { innerHTML: 'unchanged' };
   const pages = createLicencePages({
