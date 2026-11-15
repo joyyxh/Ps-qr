@@ -16,7 +16,7 @@ on:
         required: false
         type: string
   push:
-    branches: [main]
+    branches: [main, stage7-implementation-2026-11-13]
     paths:
       - 'mobile/**'
       - 'web/**'
