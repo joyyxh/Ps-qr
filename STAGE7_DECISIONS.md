@@ -1802,7 +1802,7 @@ Not changed by this record:
 Actions not taken: no enforcement code; no migration applied or created; no hosted or staging SQL; no edge deployment; no UI change; no commit, push, PR, merge or deployment. The main checkout (`/home/claude/joyyxh/ps-qr`, branch `main`, three uncommitted agent files) and stash entry `b559dce` were not touched.
 
 Open housekeeping:
-- `CLAUDE.md` (untracked draft awaiting owner review) still names 0011 to 0013 in its migration section (lines 51 to 55). It was not edited. An owner decision is needed to update it.
+- `CLAUDE.md` (untracked draft awaiting owner review) still names 0011 to 0013 in its migration section (lines 51 to 55). It was not edited. [SUPERSEDED 2026-11-14, section 13G: the numbering decision is made, so no owner decision is needed for the numbers. Updating CLAUDE.md is still an owner action, and the file is not in this repository.]
 - [SUPERSEDED 2026-11-10, see §13F: the mapping below did not apply while the licence files were at 0011 to 0013. §13F is itself SUPERSEDED by section 13G (2026-11-14), so the mapping below applies again.] Earlier records in this file and in `OWNER_DECISION_SHEET.md` keep the original numbers as history. Read them with this mapping: 0011 becomes 0015, 0012 becomes 0016, 0013 becomes 0017. Chain A's 0011 to 0014 are unchanged.
 
 Checks run for this record (2026-11-10):
