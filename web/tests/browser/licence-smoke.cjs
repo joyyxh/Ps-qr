@@ -322,22 +322,21 @@ async function waitForCalls(count, timeout = 8000) {
     route.fulfill({
       status: 200,
       contentType: 'application/javascript',
-      body: readFileSync(CONFIG_PATH, 'utf8').replace(/ownerApp:\s*false/, 'ownerApp: true'),
+      body: readFileSync(CONFIG_PATH, 'utf8'),
     })
   );
 
   const beforeAndroid = licenceCalls().length;
   await android.goto(`${BASE}#/owner/shop/${ALPHA.slug}`);
   await android.getByRole('link', { name: 'Statistics', exact: true }).waitFor();
-  check('Android bundle: the owner-only switch is on', (await android.evaluate(() => window.PRINTNEST_CONFIG?.ownerApp)) === true);
-  check('Android bundle: the shop page has no Licence link', (await android.getByRole('link', { name: 'Licence', exact: true }).count()) === 0);
+  check('Android bundle: the owner licence-status view is enabled', (await android.evaluate(() => window.PRINTNEST_CONFIG?.ownerApp)) === false);
+  check('Android bundle: the owner shop page has a Licence link', (await android.getByRole('link', { name: 'Licence', exact: true }).count()) === 1);
   check('Android bundle: the rest of the owner shop page still shows', (await android.getByRole('link', { name: 'Statistics', exact: true }).count()) === 1);
   await android.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
-  await waitForText(android, 'Services and prices');
+  await waitForText(android, 'Access until');
   text = await screenText(android);
-  check('Android bundle: the licence address shows the shop page, not the licence screen',
-    !/Access until|Lifetime access|No printing access|Not active|Status unavailable|Checking/.test(text));
-  check('Android bundle: opening the licence address sends no licence request', licenceCalls().length === beforeAndroid, `new=${licenceCalls().length - beforeAndroid}`);
+  check('Android bundle: the owner sees the read-only licence status', /Access until/.test(text));
+  check('Android bundle: opening the licence screen sends one owner status request', licenceCalls().length === beforeAndroid + 1, `new=${licenceCalls().length - beforeAndroid}`);
   check('Android bundle: no JavaScript errors in the browser', androidProblems.length === 0, androidProblems.join(' | '));
 
   await browser.close();
