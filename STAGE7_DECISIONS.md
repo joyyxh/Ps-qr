@@ -1,6 +1,6 @@
 # Stage 7 decisions: draft for owner review
 
-> **Renumbering note (2026-11-14, D-MIG Option B approved by the owner).** The licence migrations are now `0015_licence_foundation.sql`, `0016_licence_admin_rpcs.sql` and `0017_licence_admin_read_rpcs.sql`. Chain A keeps `0011` to `0014`. `0018` is reserved for Stage 7F. Where this record says `0011`, `0012` or `0013` for the licence files, read the new number. The historical text below is unchanged. Full mapping: `docs/STAGE7_MIGRATION_MAP.md`.
+> **Renumbering note (2026-11-14, D-MIG Option B approved by the owner).** The licence migrations are now `0015_licence_foundation.sql`, `0016_licence_admin_rpcs.sql` and `0017_licence_admin_read_rpcs.sql`. Chain A keeps `0011` to `0014`. `0018` is reserved for Stage 7F. Where this record says `0011`, `0012` or `0013` for the licence files, read the new number. The historical text below is unchanged, except where a later record marks a statement SUPERSEDED. The current D-MIG status is section 13G (2026-11-14). Full mapping: `docs/STAGE7_MIGRATION_MAP.md`.
 
 
 **Status:** DRAFT PROPOSAL. This file is not an approval of any business, legal, tax, pricing, or technical decision.
@@ -47,7 +47,7 @@
 - No Stripe or Razorpay code or dependency exists in `web/`, `mobile/`, `agent/`, or `supabase/`. Stripe appears in the worktree only in `README.md`, `CLAUDE.md`, and this draft. Razorpay appears only in this draft (grep, 2026-10-29 and again 2026-10-30).
 - **"Stripe is installed" appears in `README.md`.** Lines 22 and 35 read "Stripe is installed but not connected" and "Stripe (installed, not connected)". This is a README statement, not evidence of an installed package. The bare word "installed" also appears in unrelated code and docs: `agent/src/cli.mjs`, `agent/src/printers/linux.mjs`, `agent/src/printers/windows.mjs`, `agent/test/printers.test.mjs`, and `TODO.md` line 38. The tracked-file search was capped at ten lines, so this list is not exhaustive. The Stripe claim rests on `README.md` lines 22 and 35.
 - **Resend.** No direct Resend or SMTP API call exists in `web/`, `agent/`, or `supabase/` (grep, 2026-10-29). The "Resend code" button is rendered at `web/src/owner.js` line 327 and bound at line 332. Its countdown runs at lines 337–350. The `resendSignupCode` call sites are `web/src/owner.js` lines 259 and 358 (`onResendCode`, which starts at line 353). `resendSignupCode` is defined in `web/src/auth.js` (lines 207–208) and requests Supabase Auth's `/auth/v1/resend` endpoint (test at `web/tests/owner-registration.test.js` line 344). Re-checked 2026-10-30. Sign-up codes are therefore sent through Supabase Auth. QRquick is not integrated with Resend. Whether Supabase Auth uses custom SMTP, and through which provider, is not shown in the repo. The Supabase dashboard was not checked.
-- Next free migration number: `0011`.
+- Next free migration number: `0011`. [As of 2026-10-29. For the licence files this is SUPERSEDED by D-MIG Option B, section 13G (2026-11-14).]
 - Worktree: `stage7-payments` at `717717b`. Untracked: `CLAUDE.md`, and this file.
 - Main checkout: three pre-existing modified files (`agent/README.md`, `agent/src/worker.mjs`, `agent/test/worker.test.mjs`) and stash `b559dce`. Not touched.
 - **Stage 6 branch (checked 2026-10-30).** `stage6-simulated-printer` at `885d28b` ("Stage 6: offline simulated printing for the local print agent") exists locally and as `origin/stage6-simulated-printer`. It is not an ancestor of `origin/main` (717717b). The base print agent is already on `origin/main`: `agent/src/worker.mjs`, `supabase/functions/print-agent/index.ts` and `supabase/migrations/0010_print_agents.sql`.
@@ -734,7 +734,7 @@ A conflict clause without the matching predicate does not infer the partial uniq
 3. Whether to tighten `search_path` on the 0011 functions (L).
 4. Whether to add a UTC-hour alignment check to `licence_denial_windows` (I).
 5. *Global ceiling register.* The global ceiling of 1,000 detail records per UTC hour (E) is recorded as a provisional engineering and staging default, not a production value. The production value is OPEN (Q). Changing the value is an RPC change with its own approval.
-6. *0011 header and comments (documentation only).* Line 31 (the append-only description, O) is incomplete. Line 53 says the global detail ceiling is OPEN, but it is now provisional (E). The lock-order comment at lines 40–41 is superseded by F. Correcting these comments is a future migration-file change and needs its own approval.
+6. *0011 header and comments (documentation only).* [Numbering corrected 2026-11-14 under section 13G; the file is now 0015. The other comments in this item were not changed.] Line 31 (the append-only description, O) is incomplete. Line 53 says the global detail ceiling is OPEN, but it is now provisional (E). The lock-order comment at lines 40–41 is superseded by F. Correcting these comments is a future migration-file change and needs its own approval.
 7. *Overlap and cross-shop constraints.* O4 overlap and cross-shop target validation are enforced by the RPC (§12A.6, K.1). A database constraint or trigger that enforces either one, for example an exclusion constraint over same-kind non-revoked intervals, would be a migration change and needs separate approval. None is approved.
 8. *Hash-version column.* A stored hash-version column on `licence_requests` is not approved. The domain string inside the hash is the only version marker (A.9). Adding a column needs separate approval.
 
@@ -1710,13 +1710,13 @@ The decisions below are APPROVED for local implementation by the owner instructi
 |---|---|---|---|
 | S1 | Backdating fails closed. With no `staging_backdate_window_days` row, every backdate is refused with the existing code `backdate_window_exceeded`. The confirmation check runs first and still returns `backdate_not_confirmed`. | APPROVED (engineering). Production window OPEN (decision 5). | Until a window is set by a separate decision, production refuses every backdate. Change made in 0012, which is unapplied. BW-05 inverted; BW-07 to BW-14 added. |
 | S2 | H4 is preserved. The owner status read `shop_licence_status` writes no denial row and moves no counter on denial. It is an explicit exception to A4. It stays `STABLE`. | APPROVED (engineering). The A4 wording for owner reads needs the owner's signature: OPEN. | 0012 comments and tests H4-01 to H4-04. |
-| S3 | Admin read RPCs `admin_search_shops`, `admin_shop_licence` and `admin_shop_audit` (migration 0013, provisional number). The same AAL2 and platform-admin checks as the write RPCs. Denials are logged under A4. | APPROVED as the proposal presented (engineering). Applying or deploying: OPEN. | Read paths only. No write contract changed. Requires the browser panel to send only these reads. |
+| S3 | Admin read RPCs `admin_search_shops`, `admin_shop_licence` and `admin_shop_audit` (migration 0013, provisional number; now 0017 under D-MIG Option B, section 13G). The same AAL2 and platform-admin checks as the write RPCs. Denials are logged under A4. | APPROVED as the proposal presented (engineering). Applying or deploying: OPEN. | Read paths only. No write contract changed. Requires the browser panel to send only these reads. |
 | S4 | Search: 2 to 80 characters after trimming. Matches an exact shop UUID, or a prefix of the slug or the name. LIKE metacharacters are literal. Limit 1 to 25. No cursor. Returns `shop_id`, `slug` and `name` only. | APPROVED (engineering). Substring search needs `pg_trgm`: OPEN. | Phone and address are not returned to admins by this RPC. |
 | S5 | Coverage view: live and scheduled coverages only, at most 50, with a truncation flag. No actor, request or revocation fields. | APPROVED (engineering). Showing expired or revoked history: OPEN. | Replace and revoke take a coverage ID from this list. |
 | S6 | Audit view: 25 per page, 100 at most. Keyset on `(created_at, id)`. Each entry includes `actor_user_id` and the before and after snapshots. The snapshots hold no reasons. | APPROVED as proposed (engineering). Whether admins may see each other's user IDs: OPEN, to be confirmed before any production use. | Append-only log, so new rows never shift an older page. |
 | S7 | Indexes: `shops_slug_pattern_idx` and `shops_name_pattern_idx` on the Stage 1 `shops` table, and `licence_audit_log_shop_created_id_idx`. | APPROVED in the migration text (engineering). Applying the two `shops` indexes: OPEN, because `shops` is a Stage 1 table. | The 0011 audit index is kept unchanged. |
 | S8 | The read RPCs do not check for READ COMMITTED. The write RPCs still do. Each read is one statement, so its snapshot is consistent. | DECIDED (engineering). Listed for review. | Test SC-01 and SC-02 cover a read during an uncommitted grant. |
-| S9 | Migration number 0013 is provisional on this branch. 0011 and 0012 are not renumbered. | PROVISIONAL. Final numbering: OPEN (E7). | |
+| S9 | Migration number 0013 is provisional on this branch. 0011 and 0012 are not renumbered. | PROVISIONAL. Final numbering: OPEN (E7). **SUPERSEDED 2026-11-14 (section 13G): DECIDED by D-MIG Option B. Licence files 0015 to 0017; 0018 reserved for 7F.** | |
 
 Local evidence only, not staging: `supabase/tests/licence_7c/read_api_tests.py` on the throwaway database `stage7c_local` (see the 2026-11-08 report). Hosted AAL2 (O11), staging concurrency and the owner's signature are still needed.
 
@@ -1743,7 +1743,7 @@ Owner decisions for the Stage 7E owner status screen. They set labels and displa
 
 **Status of Stage 7E.** Implemented in the worktree `stage7e-owner-licence-status` with these labels. Not committed. Remaining gates, each separate: the migration plan (decision 6), a staging integration test, and commit, push, pull request, merge and deployment.
 
-**Not changed by this record.** Items 1, 2, 25, 26, 32, 33 and 35 keep their statuses. C-1 and C-3 stay open. §12A.13 decision 18 (no grace) stays RECOMMENDED. Migration numbers stay 0011 to 0013 (0013 provisional, S9). Entries from 2026-10-31 to 2026-11-04 that say the labels are open are not rewritten. This record supersedes them for labels only.
+**Not changed by this record.** Items 1, 2, 25, 26, 32, 33 and 35 keep their statuses. C-1 and C-3 stay open. §12A.13 decision 18 (no grace) stays RECOMMENDED. Migration numbers stayed 0011 to 0013 (0013 provisional, S9) as of 2026-11-09. SUPERSEDED 2026-11-14 by section 13G. Entries from 2026-10-31 to 2026-11-04 that say the labels are open are not rewritten. This record supersedes them for labels only.
 
 **Not recorded here.** The owner's 2026-11-09 enforcement instructions (lawyer input on C-1, the owner's C-3 policy, and the hold until M1 and an approved held-file release policy exist) are not recorded in this file. They need the owner's confirmation of the C-3 branch first.
 
@@ -1773,10 +1773,10 @@ These questions need an owner decision. They are recorded so they are not lost. 
 | D-Q5b | Customer tracking label for held orders (currently "Printing") | No recommendation yet. Owner decision, with lawyer review through C-1, because it is customer-facing | F7 in `STAGE7F_PREP.md` §7 |
 | D-I32 | Kill-switch design approval: (a) authority is DB owner only, break-glass, lock-first (O7); (b) missing or invalid row is treated as off; (c) two-person activation with `approval_ref`, single operator for off; (d) dry-run function before activation; (e) `enabled_at` column | Approve as drafted. The 7F gate needs this approval | `STAGE7F_ITEM32_KILL_SWITCH.md` §12 |
 | D-HS | Hold start for a shop that was never ACTIVE | Clamp: start = max(derived instant, job `created_at`, enforcement `enabled_at`). Interacts with decision 18 (no grace; recommended, not approved) | `STAGE7F_PREP.md` §6 |
-| D-MIG | Migration numbers (owner decision 2): Chain A 0011 to 0014 and the stage7 licence files 0011 to 0013 collide. 7F gate number | Keep Chain A at 0011 to 0014. Move the stage7 licence files to 0015 to 0017. 7F migration at 0018. No renumbering or application has been performed | `STAGE7F_ITEM33_PLAN.md` §6 |
+| D-MIG [SUPERSEDED 2026-11-14, section 13G: the owner approved Option B] | Migration numbers (owner decision 2): Chain A 0011 to 0014 and the stage7 licence files 0011 to 0013 collide. 7F gate number | Keep Chain A at 0011 to 0014. Move the stage7 licence files to 0015 to 0017. 7F migration at 0018. No renumbering or application has been performed | `STAGE7F_ITEM33_PLAN.md` §6 |
 | D-R18-T2 | R18 two-session test 2: the expectation changes under Q4. The requeue happens at mark refusal and release, not at revoke | Re-approve the changed expectation, matching the D-Q4 option chosen | `STAGE7F_ITEM33_PLAN.md` T33-2 |
 
-Status update 2026-11-10 (§13E): D-MIG, D-Q4 (Option A as drafted), D-Q5 and D-HS now carry owner-authorised working defaults. D-Q5b, D-I32 and D-R18-T2 remain pending. Not affected by this section: retry stays excluded until item 23 (§13C).
+Status update 2026-11-10 (§13E; D-MIG SUPERSEDED 2026-11-14, section 13G): D-MIG, D-Q4 (Option A as drafted), D-Q5 and D-HS now carry owner-authorised working defaults. D-Q5b, D-I32 and D-R18-T2 remain pending. Not affected by this section: retry stays excluded until item 23 (§13C).
 
 ## 13E. Record of 2026-11-10: owner-authorised working defaults (Stage 7F preparation)
 
@@ -1785,7 +1785,7 @@ Source: the owner's instruction of 2026-11-10 that the previously documented rec
 | Item | Working default (owner-authorised, 2026-11-10) | Effect and limits |
 |---|---|---|
 | C-3 | Enforcement remains disabled until M1 and the held-file release policy are approved. | Unchanged from §13C. Enabling is blocked. |
-| D-MIG | [Recorded as a working default. Its application was reverted on 2026-11-10; see §13F.] Chain A migrations 0011 to 0014 are retained on local `main` (unpushed, unchanged). The Stage 7 licence migrations are placed at 0015 to 0017. 0018 is reserved for 7F. | Reverted the same day (§13F): the licence files are at 0011 to 0013 again. Original text, kept for history: Done in the stage7 worktree only. Renamed: `0011_licence_foundation.sql` to `0015_licence_foundation.sql`; `0012_licence_admin_rpcs.sql` to `0016_licence_admin_rpcs.sql`; `0013_licence_admin_read_rpcs.sql` to `0017_licence_admin_read_rpcs.sql`. Only comments and file references changed. The non-comment SQL of each file is identical to its pre-rename copy. The admin tests read the new paths. Nothing committed and nothing applied. Hosted migration history NOT verified (hosted access blocked). No file created for 0018. |
+| D-MIG | [SUPERSEDED 2026-11-14, section 13G: the owner approved Option B.] [Recorded as a working default. Its application was reverted on 2026-11-10; see §13F.] Chain A migrations 0011 to 0014 are retained on local `main` (unpushed, unchanged). The Stage 7 licence migrations are placed at 0015 to 0017. 0018 is reserved for 7F. | Reverted the same day (§13F): the licence files are at 0011 to 0013 again. Original text, kept for history: Done in the stage7 worktree only. Renamed: `0011_licence_foundation.sql` to `0015_licence_foundation.sql`; `0012_licence_admin_rpcs.sql` to `0016_licence_admin_rpcs.sql`; `0013_licence_admin_read_rpcs.sql` to `0017_licence_admin_read_rpcs.sql`. Only comments and file references changed. The non-comment SQL of each file is identical to its pre-rename copy. The admin tests read the new paths. Nothing committed and nothing applied. Hosted migration history NOT verified (hosted access blocked). No file created for 0018. |
 | D-Q4 | Atomic refusal at mark time: a licence refusal writes no printing result. The agent's release reverses the claim increment if it succeeds. If the release fails, the increment stays until lease expiry. Tests for both outcomes are required. | This is Option A of `STAGE7F_Q4_CONTRACT.md` §5: the refusal raises and rolls back, and the release is a separate call. It is not the Option B recommended in §13D, which reverses the increment inside the mark transaction. Residual R-Q4-1 is therefore present, by the owner's choice. Five unresolved refusals on one job still lead to the cap and to the `too_many_claims` text, which is wrong for a licence hold. That text needs its own decision. The default also answers the reading point in the §13C Q4 row: the release reverses the claim increment. |
 | D-Q5 | Owner message: "Printing is paused. This shop has no active QRquick licence, so this file will not print until the licence is active." Staff message: "Printing is paused for this shop." Licence reasons are not shown to staff. | Wording recorded only. No UI code changed. Placement in the owner app and the approve refusal text still need their own UI approval. |
 | D-Q5b | No change to customer-facing tracking wording without an approved decision. | OPEN. The customer label for held orders stays "Printing" (F7 in `STAGE7F_PREP.md` §7). |
@@ -1803,7 +1803,7 @@ Actions not taken: no enforcement code; no migration applied or created; no host
 
 Open housekeeping:
 - `CLAUDE.md` (untracked draft awaiting owner review) still names 0011 to 0013 in its migration section (lines 51 to 55). It was not edited. An owner decision is needed to update it.
-- [SUPERSEDED 2026-11-10, see §13F: the mapping below no longer applies, because the licence files are at 0011 to 0013.] Earlier records in this file and in `OWNER_DECISION_SHEET.md` keep the original numbers as history. Read them with this mapping: 0011 becomes 0015, 0012 becomes 0016, 0013 becomes 0017. Chain A's 0011 to 0014 are unchanged.
+- [SUPERSEDED 2026-11-10, see §13F: the mapping below did not apply while the licence files were at 0011 to 0013. §13F is itself SUPERSEDED by section 13G (2026-11-14), so the mapping below applies again.] Earlier records in this file and in `OWNER_DECISION_SHEET.md` keep the original numbers as history. Read them with this mapping: 0011 becomes 0015, 0012 becomes 0016, 0013 becomes 0017. Chain A's 0011 to 0014 are unchanged.
 
 Checks run for this record (2026-11-10):
 - `admin/` `npm test`: 72 of 72 pass, before and after the renaming.
@@ -1815,10 +1815,10 @@ Checks run for this record (2026-11-10):
 
 Source: the reconciliation brief of 2026-11-10 ("QRquick Stage 7 — Evidence-Based Reconciliation and Repair"). This record approves nothing. Each status below is the evidence level reached, not a claim of completion. Evidence and logs: `scratchpad/reconciliation_2026-11-10/` (reports 01 to 07).
 
-**Migration numbering (D-MIG): reverted the same day; NOT APPROVED.**
+**Migration numbering (D-MIG): reverted the same day; NOT APPROVED on 2026-11-10. [SUPERSEDED 2026-11-14, section 13G: the owner approved Option B.]**
 - The §13E working default was applied in the stage7 worktree and is now reverted. `0011_licence_foundation.sql`, `0012_licence_admin_rpcs.sql` and `0013_licence_admin_read_rpcs.sql` match the pre-rename snapshot by SHA-256. The licence test files, `reset_local.sh`, `docs/STAGE7C_OPERATIONS.md` and the admin files were restored. No 0015–0018 token remains in the stage7 worktree outside this register's history text.
 - Reason: the 2026-11-10 brief says the proposal is NOT approved and that renumbering needs explicit owner approval. The brief governs over the working default. The renamed copies are kept, not deleted, in `scratchpad/renamed_2026-11-10_moved_aside/`.
-- Owner decision needed: approve or reject the proposal (Chain A 0011–0014 stay; licence 0015–0017; 7F 0018). Until then the stage7 licence files (0011–0013) share numbers with Chain A 0011–0013 on unpushed local `main`.
+- Owner decision needed: approve or reject the proposal (Chain A 0011–0014 stay; licence 0015–0017; 7F 0018). [Answered 2026-11-14: approved, section 13G.] Until then the stage7 licence files (0011–0013) share numbers with Chain A 0011–0013 on unpushed local `main`.
 - Dependency found: Chain A redefines `approve_order_for_print`, `agent_claim_next_job` and `agent_mark_printing`, the three functions item 33 places locks in. 7F gates can therefore only sit on top of Chain A, so combining the lines is a precondition (G16). No function or table name clash exists between the licence files and Chain A or 0001–0010.
 
 **Cleanup (R-D): inconsistency recorded; not changed.**
@@ -1868,6 +1868,49 @@ Source: the reconciliation brief of 2026-11-10 ("QRquick Stage 7 — Evidence-Ba
 - CF-4 Item number 19 is used for two different items. §14.2 item 19 is "Advisers (decision 11)". The shop-facing licence view row (labels approved 2026-11-09, §13B) cites "owner decision 1, 2026-11-09" for Android DEFERRED. The numbered "Owner decision 1" record is dated 2026-10-31 and concerns the licence unit. The owner needs to confirm the item number and which decision authorises the Android deferral.
 - CF-5 Commit: none of §13A–§13F is in the committed text (5c82d37). Decision-sheet Parts 1K–1N are not committed. Committing any of them needs separate approval.
 - §13D note (recorded 2026-11-10): the §13D heading was reworded from "NOT APPROVED" to "NOT APPROVED, except the owner-authorised working defaults in §13E" to match §13E. No sentence was removed: "Not affected by this section: retry stays excluded until item 23 (§13C)." now sits in the 2026-11-10 status-update paragraph. The owner should confirm or reject the heading wording.
+
+## 13G. Record of 2026-11-14: D-MIG Option B approved by the owner (supersedes the D-MIG status in §13D, §13E and §13F)
+
+Source: the owner's approval of D-MIG Option B on 2026-11-14, recorded in the renumbering notes at the top of this file and of `OWNER_DECISION_SHEET.md`. This record states what was approved and which earlier statements it supersedes. It approves nothing else.
+
+Approved (owner, 2026-11-14; decision 2 in §13D):
+- Chain A keeps migrations 0011 to 0014. They are not renumbered.
+- The Stage 7 licence migrations are 0015 to 0017: `0015_licence_foundation.sql`, `0016_licence_admin_rpcs.sql` and `0017_licence_admin_read_rpcs.sql`.
+- 0018 is reserved for Stage 7F. No 0018 file exists.
+
+Status of the licence files: committed in `c5e573b` (2026-11-14). Not applied to any database.
+
+Superseded by this record (each is marked in place, and the text is kept):
+- §13D: the D-MIG row and the 2026-11-10 status line. The question is answered.
+- §13E: the D-MIG row and the mapping note. The mapping 0011 becomes 0015, 0012 becomes 0016 and 0013 becomes 0017 applies again from this date.
+- §13F: the heading "reverted the same day; NOT APPROVED" and the open owner decision. The decision is answered.
+- §2: "Next free migration number: 0011" (a repository fact of 2026-10-29), for the licence files.
+- §13A: the S3 and S9 rows, and the 2026-11-09 statement that migration numbers stay 0011 to 0013.
+- `OWNER_DECISION_SHEET.md`: the 2026-11-10 corrections record (D-MIG bullet), rows 1 and 2 of Part 1A, and row N7 of Part 1N.
+
+Not changed by this record:
+- Chain A integration is still OPEN. Its unpushed commit `37e4623` on local `main` has not been pushed, bundled or integrated.
+- 0018 (Stage 7F) is not created. Stage 7F is not built and not approved.
+- No migration has been applied to any hosted or staging database. Nothing has been deployed.
+- Every other decision keeps its status: C-1, C-3, M1, the held-file release policy, D-I32, D-R18-T2, D-Q4 (working default only), D-Q5b, D-HS, and the cleanup workflow.
+- The "future changes, recorded and not made" items for the 0011 header (`OWNER_DECISION_SHEET.md`, Part 1L; §12A.17 item 6) were not made. Only the migration numbers in the header were corrected.
+
+Documentation correction made under this record (2026-11-15):
+- Header and comment lines corrected in `0015_licence_foundation.sql`, `0016_licence_admin_rpcs.sql` and `0017_licence_admin_read_rpcs.sql`: the title lines, the original-number notes, the dependency lines, and four body comments that named an old licence number. Chain A references were kept, for example `0011_service_options.sql` on local `main`, and Chain A's 0011 and 0012 in the 2026-11-07 note.
+- SQL bodies checked: with full-line comments removed, each file is identical to its `HEAD` version before the correction. SHA-256 of the non-comment text, before and after: 0015 `155e77bf212878ce`, 0016 `0468b8cd7c798a22`, 0017 `13da9a3546d7fb50`. Every changed line is a full-line comment.
+- Test identifiers renamed, with no assertion changed: `MIGRATION_0011` to `MIGRATION_0015` in `admin/tests/read-model.test.js`, and `sql13` to `sql0017` in `admin/tests/guards.test.js`.
+- Documents corrected: `docs/STAGE7_MIGRATION_MAP.md`, `docs/STAGE7C_OPERATIONS.md` (the 0017 status line), `docs/STAGE7E_LICENCE_STATUS.md` (remaining gate 1), and `docs/STAGE7_HANDOVER.md` (the register note).
+
+Outside this repository (owner action):
+- `GATE_REGISTER.md` row 20 says "NOT APPROVED". The file is not in this repository, so the owner must update it there.
+- `CLAUDE.md`, named in §13E as an untracked draft, is not in this repository. Its migration section names 0011 to 0013 (lines 51 to 55). The owner must update it.
+
+Checks for this correction (2026-11-15; local PostgreSQL 16.15 and Node 22 only; no hosted or staging access):
+- `supabase/tests/licence_7c/run_suites.sh 127.0.0.1 5432` on the corrected files: `rpc_tests.py` 282 passed, 0 failed; `read_api_tests.py` 125 passed, 0 failed; `hash_vectors.py` 0 failures.
+- `supabase/tests/base/run_base_suites.sh 127.0.0.1 5432`: 250 of 250 checks ok across the seven base suites.
+- `admin` `npm test`: 72 of 72 pass (17 of them in the two renamed-identifier files). `web` `npm test`: 212 of 212. `agent` `npm test`: 62 of 62.
+- Browser smokes were not run locally. No web source changed. They run in `stage7-tests.yml`.
+- Hosted and staging checks: not run, and not claimed.
 
 ## 14. Consolidated decision register (added 2026-10-30; rebuilt 2026-10-31)
 

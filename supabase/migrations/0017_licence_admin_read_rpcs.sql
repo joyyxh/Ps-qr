@@ -1,8 +1,9 @@
--- 0013: admin read RPCs (Stage 7D backend). FILE ONLY. NOT APPLIED. NOT RUN ON ANY SUPABASE PROJECT.
+-- 0017: admin read RPCs (Stage 7D backend). FILE ONLY. NOT APPLIED. NOT RUN ON ANY SUPABASE PROJECT.
 --
--- Provisional number on the Stage 7 branch (2026-11-08). Renumber only with owner approval.
--- Depends on: 0001 (shops, is_shop_owner), 0011 (platform_admins, is_platform_admin, shop_licence_meta,
--- shop_licence_state, licence_coverages, licence_audit_log) and 0012 (licence_admin_deny,
+-- Number: 0017 under D-MIG Option B (owner approval 2026-11-14; STAGE7_DECISIONS.md section 13G).
+-- It was provisional as 0013 from 2026-11-08 until that approval.
+-- Depends on: 0001 (shops, is_shop_owner), 0015 (platform_admins, is_platform_admin, shop_licence_meta,
+-- shop_licence_state, licence_coverages, licence_audit_log) and 0016 (licence_admin_deny,
 -- licence_admin_reject). It changes no existing function and no existing table.
 --
 -- Adds (all SECURITY DEFINER, fixed search_path, schema-qualified, VOLATILE so that a denial can write
@@ -27,7 +28,7 @@
 -- ---------- gate ----------
 
 -- Returns null when the caller passes. Otherwise it writes the denial records and returns the committed
--- forbidden result. A caller with no readable UID is counted in the global counter only (as in 0012).
+-- forbidden result. A caller with no readable UID is counted in the global counter only (as in 0016).
 create or replace function public.licence_admin_read_gate(p_function_name text)
 returns jsonb
 language plpgsql
@@ -283,7 +284,7 @@ $$;
 create index shops_slug_pattern_idx on public.shops (slug text_pattern_ops);
 create index shops_name_pattern_idx on public.shops (lower(name) text_pattern_ops);
 
--- Keyset order for admin_shop_audit. The 0011 index (shop_id, created_at) is kept unchanged.
+-- Keyset order for admin_shop_audit. The 0015 index licence_audit_log_shop_created_idx (shop_id, created_at) is kept unchanged.
 create index licence_audit_log_shop_created_id_idx
   on public.licence_audit_log (shop_id, created_at desc, id desc);
 
@@ -304,4 +305,4 @@ grant execute on function
   public.admin_shop_audit(uuid, timestamptz, uuid, integer)
   to authenticated;
 
--- End of 0013 (Stage 7D admin read RPCs). Not applied. Not run on any Supabase project.
+-- End of 0017 (Stage 7D admin read RPCs). Not applied. Not run on any Supabase project.

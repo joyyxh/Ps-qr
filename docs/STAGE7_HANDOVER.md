@@ -161,7 +161,7 @@ Still local only (no workflow or package script runs these):
 
 These were taken from the decision records as they were read during this work. Only the item marked as checked was re-verified in the final pass.
 
-- D-MIG: `GATE_REGISTER.md` row 20 and STAGE7_DECISIONS §13F say "NOT APPROVED", from before 2026-11-14. The owner's 2026-11-14 approval is recorded only in the new renumbering notes. The owner should update the register.
+- D-MIG: resolved in the records. `STAGE7_DECISIONS.md` section 13G and `OWNER_DECISION_SHEET.md` record the owner's 2026-11-14 approval, and the earlier "NOT APPROVED" statements are marked SUPERSEDED. `GATE_REGISTER.md` row 20 is not in this repository, so the owner must update it there.
 - P5: the 2026-11-12 README says "no commit". Commit `a1a91f1` and merge `86b4b99` are now on this branch.
 - C-3: §13C and §14.3 say decided (hold back). §13F CF-1 says written confirmation is needed. OWNER_DECISION_SHEET Part 8 says "both OPEN".
 - F17: PREP §6 and §7 say `v_last_end` can include future periods. The 2026-11-13 README says it cannot on the path that computes it. Not re-checked in the final pass; the `0015` coverage query (around lines 466 to 512) should be read against it.

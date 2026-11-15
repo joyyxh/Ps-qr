@@ -1,8 +1,11 @@
--- 0011: licence foundation (Stage 7, steps 7B-1 and 7B-2, plus the 7C replay ledger and denial tables). FILE ONLY.
+-- 0015: licence foundation (Stage 7, steps 7B-1 and 7B-2, plus the 7C replay ledger and denial tables). FILE ONLY.
+--
+-- Number: 0015 under D-MIG Option B (owner approval 2026-11-14; STAGE7_DECISIONS.md section 13G).
+-- Chain A keeps 0011 to 0014. This file was first numbered 0011 and was renumbered on 2026-11-14.
 --
 -- Status: NOT APPLIED. NOT EXECUTED. NOT TESTED.
 -- Edited 2026-11-05 under the owner-approved Stage 7C bundles 1 to 3. Pre-staging review (O2) is still required.
--- Written on the origin/main line (migrations 0001-0010). Number 0011 confirmed free on
+-- Written on the origin/main line (migrations 0001-0010). Its number, then 0011, was confirmed free on
 -- origin/main on 2026-11-01 (owner decision 1). Local main has a different, unmerged
 -- 0011_service_options.sql. It is not part of this file (owner decision 2).
 --
@@ -622,4 +625,4 @@ revoke execute on function public.licence_requests_guard(),
   public.licence_denials_guard(), public.licence_denial_windows_guard()
   from public, anon, authenticated, service_role;
 
--- End of 0011 (7B-1, 7B-2 and the 7C ledger and denial tables). Not applied.
+-- End of 0015 (7B-1, 7B-2 and the 7C ledger and denial tables). Not applied.

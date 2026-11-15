@@ -11,11 +11,11 @@ import {
   licenceFacts,
 } from '../src/read-model.js';
 
-const MIGRATION_0011 = readFileSync(new URL('../../supabase/migrations/0015_licence_foundation.sql', import.meta.url), 'utf8');
+const MIGRATION_0015 = readFileSync(new URL('../../supabase/migrations/0015_licence_foundation.sql', import.meta.url), 'utf8');
 const SHOP = { shop_id: '8f14e45f-ceea-4b7a-9c1d-2a3b4c5d6e7f', slug: 'sunrise-print', name: 'Sunrise Print' };
 
 function listFromCheck(pattern) {
-  const match = MIGRATION_0011.match(pattern);
+  const match = MIGRATION_0015.match(pattern);
   assert.ok(match, `pattern not found in 0015: ${pattern}`);
   return match[1].split(',').map((item) => item.trim().replace(/'/g, '')).sort();
 }

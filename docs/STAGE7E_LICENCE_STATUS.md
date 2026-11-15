@@ -134,9 +134,7 @@ against a real Postgres, and it uses a stubbed state function. The coverage rule
 
 ## Remaining gates
 
-1. **Migration plan (decision 6).** No renumbering and no application until the owner approves the
-   integration plan. The RPC's file name and number are set by that plan. This doc calls it `0016`
-   until then.
+1. **Migration plan (decision 6).** Numbering is approved: D-MIG Option B (owner approval 2026-11-14) sets this RPC's file as `0016`. No application until the owner approves the integration plan with Chain A, which is still OPEN.
 2. **Real Supabase integration test,** after decision 6 and a separate staging approval: an owner
    sees their shop's status; staff and another owner are refused; a call with an expired session
    is refused. The owner-membership check is exercised by a real signed-in owner.

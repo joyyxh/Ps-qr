@@ -1,6 +1,6 @@
 # Stage 7 owner decision sheet
 
-> **Renumbering note (2026-11-14, D-MIG Option B approved by the owner).** The licence migrations are now `0015_licence_foundation.sql`, `0016_licence_admin_rpcs.sql` and `0017_licence_admin_read_rpcs.sql`. Chain A keeps `0011` to `0014`. `0018` is reserved for Stage 7F. Where this record says `0011`, `0012` or `0013` for the licence files, read the new number. The historical text below is unchanged. Full mapping: `docs/STAGE7_MIGRATION_MAP.md`.
+> **Renumbering note (2026-11-14, D-MIG Option B approved by the owner).** The licence migrations are now `0015_licence_foundation.sql`, `0016_licence_admin_rpcs.sql` and `0017_licence_admin_read_rpcs.sql`. Chain A keeps `0011` to `0014`. `0018` is reserved for Stage 7F. Where this record says `0011`, `0012` or `0013` for the licence files, read the new number. The historical text below is unchanged, except where a later record marks a statement SUPERSEDED. The current D-MIG status is section 13G (2026-11-14). Full mapping: `docs/STAGE7_MIGRATION_MAP.md`.
 
 
 **Status: documentation only.** Prepared 2026-10-31 from `STAGE7_DECISIONS.md`, corrected after the review of the same date, and updated 2026-11-02 for the O1–O13 record and the consistency pass, and updated 2026-11-04 for the ten decisions in Part 1H and the six Stage 7C decisions in Part 1I, and the AAL2 failure decision in Part 1J, and updated 2026-11-06 for the specification correction pass (Part 1L) and the consolidated pass (Part 1M). This sheet approves no gate, setup, migration, test, price, publication, production change or external action. Owner decisions appear only in the Parts that record them. It proposes no price. A "Claude suggests" entry is a suggestion, not a default. Nothing here has been checked against production.
@@ -30,8 +30,8 @@ These seven owner decisions, dated 2026-11-01, are recorded in `STAGE7_DECISIONS
 
 | No. | Owner decision (2026-11-01) | Effect |
 |---|---|---|
-| 1 | Stage 7 uses the origin/main baseline (717717b lineage). Migration numbering starts at 0011 | 7B-1 is built on migrations 0001–0010. The next number is 0011, confirmed free on the Stage 7 branch. |
-| 2 | Local-main migrations 0011–0014 stay separate and unmerged. Integration is reviewed later | Local main's `0011_service_options` is a different file from the Stage 7 0011. The two must not be combined without renumbering under approval. |
+| 1 | Stage 7 uses the origin/main baseline (717717b lineage). Migration numbering starts at 0011 [Licence numbers SUPERSEDED 2026-11-14: D-MIG Option B, licence files 0015 to 0017, section 13G] | 7B-1 is built on migrations 0001–0010. The next number is 0011, confirmed free on the Stage 7 branch. |
+| 2 | Local-main migrations 0011–0014 stay separate and unmerged. Integration is reviewed later | Local main's `0011_service_options` is a different file from the Stage 7 0011. The two must not be combined without renumbering under approval. [Answered 2026-11-14: Chain A keeps 0011 to 0014 and the licence files are 0015 to 0017, so they no longer share numbers. Chain A integration is still OPEN.] |
 | 3 | C-5: paid verification, payment records and trial coverage are excluded from the 7B foundation | C-5 DECIDED. 0011 has no paid tables, no `payment_id` and no trial kind. |
 | 4 | Item 8: revocation preserves future coverage. REVOKED wins same-instant ties. Coverage end is exclusive | Item 8 DECIDED (C-8, fixes 5 and 9). Standalone paid revocation stays DEFERRED (decision 17). |
 | 5 | Item 7: a lifetime grant takes precedence over an admin grant | Basis ranking DECIDED. It sets the basis order in `shop_licence_state`. |
@@ -250,7 +250,7 @@ Source: `STAGE7_DECISIONS.md` §12A.17 and §13 ("Owner decision record (2026-11
 
 **Corrections recorded.** Custom-grant status made consistent (C2). D2 removed. D3 and D5 replaced with the B-labels they correspond to. Stale line references corrected. AAL references now cite decision 14, not licence-unit decision 1. `payment_id` removed from the `licence_coverages` column list. The `licence_lock_shop` signature includes `p_mode`. The omitted-count reference is B3-2. Superseded permission-count wording removed from operative text. The 90-day denial retention is a proposal subject to legal review. The replay conflict contract is stated. The lock order is complete. The append-only description is documented in §12A.17 O.
 
-**Future changes, recorded and not made.** Each needs separate review and approval: the 0011 header (the line 31 append-only description, the D-labels in its comments, and the lock-order comment at lines 40–41); revoking sequence privileges on the `licence_denial_windows` identity sequence after staging review; whether to tighten `search_path`; and whether to add a UTC-hour alignment check; and whether to add a database constraint for O4 overlap or cross-shop target validation (STAGE7 §12A.17 N.7). The 0011 line 53 comment, which says the global ceiling is OPEN, is now provisional (§12A.17 N.6). No change to 0011 was made in this pass.
+**Future changes, recorded and not made.** [Update 2026-11-14: only the migration numbers in the 0011 header were corrected, under D-MIG Option B (STAGE7_DECISIONS.md section 13G). The other changes below were not made.] Each needs separate review and approval: the 0011 header (the line 31 append-only description, the D-labels in its comments, and the lock-order comment at lines 40–41); revoking sequence privileges on the `licence_denial_windows` identity sequence after staging review; whether to tighten `search_path`; and whether to add a UTC-hour alignment check; and whether to add a database constraint for O4 overlap or cross-shop target validation (STAGE7 §12A.17 N.7). The 0011 line 53 comment, which says the global ceiling is OPEN, is now provisional (§12A.17 N.6). No change to 0011 was made in this pass.
 
 **Still OPEN** (not decided, not approved here): legal retention periods, including the 90-day denial proposal; the production denial-detail ceiling; the production backdating window; production admin identity and MFA policy beyond the approved requirements; legal review of identity-derived payload hashes; production alert thresholds and the alerting mechanism; actual hosted and local `aal` verification evidence; and completion of the emergency-disable, break-glass and recovery procedure (A3, O6, O7); and database constraints that would need a migration change, including for O4 overlap and cross-shop target validation.
 
@@ -421,7 +421,7 @@ Recorded in `STAGE7_DECISIONS.md` §13A (S1 to S9). The engineering items below 
 | N4 | Search and coverage limits as proposed (2 to 80 characters, prefix match, limit 25, coverage cap 50). | APPROVED (engineering) | Substring search: OPEN. Showing expired or revoked history: OPEN. |
 | N5 | Audit page sizes as proposed (25 default, 100 maximum). Visibility of admin user IDs to other admins: **UNRESOLVED**. | Page sizes: APPROVED (engineering). User IDs: UNRESOLVED (owner decision). | Interim: the 7D audit view hides `actor_user_id` (not shown on screen). The database field and the API response keep it. Owner decision needed before any production use. |
 | N6 | Indexes on the Stage 1 `shops` table (two) and the audit log (one). | APPROVED in migration text | Applying the `shops` indexes: OPEN. |
-| N7 | Migration number 0013, provisional. | PROVISIONAL | Final numbering: OPEN (E7). |
+| N7 | Migration number 0013, provisional. | PROVISIONAL. [SUPERSEDED 2026-11-14: DECIDED by D-MIG Option B (section 13G). Licence files are 0015 to 0017.] | Final numbering: OPEN (E7). [SUPERSEDED 2026-11-14.] |
 
 Still OPEN and unchanged: production backdate window (decision 5), production denial cap and alerting (C-12, O9), hosted AAL2 (O11), staging project (O12), staging concurrency (item 33), legal retention and DPDP (decision 20, M8), the admin UI hosting decision (§14.2 item 6), and the 7D gate.
 
@@ -449,6 +449,15 @@ Not listed here, and still open: §12B.2 B (conditional on C-1 and C-3; EXTERNAL
 
 No approval is given or changed by this note.
 
-- D-MIG: the 0015–0017 renaming was reverted the same day. The licence files are back at 0011–0013. The numbering proposal is NOT approved. Owner approval is required before any renumbering.
+- D-MIG: the 0015–0017 renaming was reverted the same day. The licence files are back at 0011–0013. The numbering proposal is NOT approved. Owner approval is required before any renumbering. [SUPERSEDED 2026-11-14: the owner approved D-MIG Option B. See the corrections record of 2026-11-14 below.]
 - Cleanup (decision row 4, and the production-owner row): "cleanup stays disabled" describes the intent of R-D. The repository's `cleanup-files.yml` on `origin/main` is still scheduled. Whether it runs depends on secrets and deployment (UNVERIFIED, item 27). An owner decision is needed on how R-D is implemented.
 - "item 32 kill-switch design approved" (7F build row) is a gate condition, not a status. D-I32 is PENDING.
+
+## Corrections record 2026-11-14 (see STAGE7_DECISIONS.md section 13G)
+
+No approval beyond D-MIG Option B is given or changed by this note.
+
+- D-MIG: APPROVED as Option B by the owner on 2026-11-14. Chain A keeps 0011 to 0014. The licence files are 0015 to 0017. 0018 is reserved for Stage 7F.
+- The 2026-11-10 D-MIG bullet above, rows 1 and 2 of Part 1A, and row N7 of Part 1N are superseded by that approval. Each is marked in place.
+- Chain A integration: still OPEN. The owner's action is to push or bundle commit `37e4623`.
+- Cleanup, Stage 7F and all other decisions in this sheet: unchanged by this note.

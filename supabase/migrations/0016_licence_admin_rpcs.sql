@@ -1,4 +1,7 @@
--- 0012: licence admin RPCs (Stage 7C). FILE ONLY. NOT APPLIED. NOT RUN ON ANY SUPABASE PROJECT.
+-- 0016: licence admin RPCs (Stage 7C). FILE ONLY. NOT APPLIED. NOT RUN ON ANY SUPABASE PROJECT.
+--
+-- Number: 0016 under D-MIG Option B (owner approval 2026-11-14; STAGE7_DECISIONS.md section 13G).
+-- This file was first numbered 0012 and was renumbered on 2026-11-14.
 --
 -- Status: implementation written 2026-11-07 under the Stage 7C implementation task. Tested only on a
 -- throwaway local PostgreSQL 16 cluster (supabase/tests/licence_7c). Hosted AAL2 verification and
@@ -7,8 +10,8 @@
 -- Correction pass, 2026-11-07 (STAGE7_DECISIONS.md, dated 2026-11-07 notes): the P-07 overlap rule is
 -- removed; enumerated tokens match exactly after NFC; one_month and one_year reject future starts;
 -- the staging backdating window reads licence_config (server-side, no client access); shop_licence_status
--- is added (decision D, owner only). Migration numbering is reported separately (0011 and 0012 also
--- exist on local main, unmerged). Nothing is renamed.
+-- is added (decision D, owner only). Chain A's 0011 and 0012 also exist on local main, unmerged. On
+-- 2026-11-07 nothing had been renamed (the 2026-11-14 renumbering is in the header above).
 --
 -- Depends on 0015_licence_foundation.sql, which is unchanged by this file.
 --
@@ -763,7 +766,7 @@ begin
        null, public.licence_admin_snapshot(v_new_cov), p_request_id);
   end if;
 
-  -- Step 12: one update of shop_licence_meta to V + 1 per committed operation (B2-2). The 0011 guard
+  -- Step 12: one update of shop_licence_meta to V + 1 per committed operation (B2-2). The 0015 guard
   -- requires exactly +1. The state version is not changed on any other path.
   update public.shop_licence_meta
      set state_version = v_next_ver
@@ -1081,4 +1084,4 @@ revoke all on public.licence_config from public, anon, authenticated, service_ro
 revoke execute on function public.shop_licence_status(uuid) from public, anon, service_role;
 grant execute on function public.shop_licence_status(uuid) to authenticated;
 
--- End of 0012 (Stage 7C admin RPCs). Not applied. Not run on any Supabase project.
+-- End of 0016 (Stage 7C admin RPCs). Not applied. Not run on any Supabase project.
