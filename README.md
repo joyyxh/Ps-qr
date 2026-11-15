@@ -60,7 +60,7 @@ printnest/
 │   │   └── checks.js                           pure checks, also tested in Node
 │   ├── functions/owner-file-link/index.ts      signed link for an owner's order file (verify_jwt on)
 │   ├── seed/demo_seed.sql                      dev-only test owners and shops
-│   ├── tests/stage1_isolation_tests.sql        29 database checks, rolled back
+│   ├── tests/stage1_isolation_tests.sql        30 database checks, rolled back
 │   ├── tests/stage3_owner_tests.sql            30 owner permission checks, rolled back
 │   ├── tests/stage4_files_tests.sql            23 file checks, rolled back
 │   ├── tests/stage5_orders_tests.sql           23 order checks, rolled back
@@ -179,7 +179,7 @@ requirement for this flow.
 ## What is verified
 
 - **Database checks, live project:**
-  - Stage 1: 29 checks in `supabase/tests/stage1_isolation_tests.sql`, all pass after
+  - Stage 1: 30 checks in `supabase/tests/stage1_isolation_tests.sql`, all pass after
     migration 0003. The fixtures now create uploaded-file rows, and the whole run is in
     one transaction that rolls back. The earlier run had found a tracking-code bug, which
     is fixed.
