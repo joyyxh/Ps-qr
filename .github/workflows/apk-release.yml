@@ -2,15 +2,13 @@ name: Publish APK release
 
 # Copies the qrquick-debug-apk artifact of one Android APK run into a GitHub prerelease, so
 # the APK has a direct download link. Artifact links need a GitHub sign-in; release assets do not.
-# Runs only when started by hand, with the run id of the Android APK run to publish.
+# Runs when .github/apk-release-request.txt changes. Its first line is the Android APK run id.
 
 on:
-  workflow_dispatch:
-    inputs:
-      run_id:
-        description: 'Android APK run id whose qrquick-debug-apk artifact is published'
-        required: true
-        type: string
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - '.github/apk-release-request.txt'
 
 permissions:
   contents: write
@@ -22,8 +20,16 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      RUN_ID: ${{ inputs.run_id }}
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the run id
+        run: |
+          set -euo pipefail
+          RUN_ID="$(head -n 1 .github/apk-release-request.txt | tr -d '[:space:]')"
+          case "$RUN_ID" in ''|*[!0-9]*) echo "The first line must be a run id." >&2; exit 1 ;; esac
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+
       - name: Download the APK artifact
         run: |
           set -euo pipefail
