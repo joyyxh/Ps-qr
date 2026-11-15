@@ -56,6 +56,10 @@ jobs:
             exit 1
           }
           npm run copy-web
+          grep -q 'ownerApp: false' www/config.js || {
+            echo 'The Android bundle must include the read-only owner licence status screen.' >&2
+            exit 1
+          }
 
       - name: Create the Android project (first build only)
         run: test -d android || npx cap add android
