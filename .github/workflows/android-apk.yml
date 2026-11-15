@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   build-apk:
@@ -46,6 +47,21 @@ jobs:
 
       - name: Install Capacitor
         run: npm ci
+
+      - name: Use the stored debug signing key (when the owner has set one)
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          # Gradle signs debug builds with ~/.android/debug.keystore (alias androiddebugkey,
+          # password android). Each runner otherwise creates a new key, so an APK from one
+          # build cannot update an installed copy from another build.
+          if [ -n "$ANDROID_DEBUG_KEYSTORE_BASE64" ]; then
+            mkdir -p "$HOME/.android"
+            echo "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 -d > "$HOME/.android/debug.keystore"
+            echo 'Signing with the stored debug key, so builds can update each other.'
+          else
+            echo '::warning::ANDROID_DEBUG_KEYSTORE_BASE64 is not set. Each build uses a new signing key, so an installed copy must be uninstalled before a newer build can be installed.'
+          fi
 
       - name: Copy the web app into the Android project source
         env:
@@ -107,12 +123,20 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: |
-            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk | tee "$RUNNER_TEMP/install.txt"
-            grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success:'; cat "$RUNNER_TEMP/install.txt"; exit 1; }
-            adb shell monkey -p com.printnest.app -c android.intent.category.LAUNCHER 1
-            sleep 15
-            adb shell pidof com.printnest.app || { echo 'The app process is not running after launch.'; exit 1; }
-            adb shell dumpsys package com.printnest.app | grep -E 'versionName|versionCode|primaryCpuAbi'
+            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/install.txt" 2>&1
+            cat "$RUNNER_TEMP/install.txt"
+            adb shell monkey -p com.printnest.app -c android.intent.category.LAUNCHER 1 > "$RUNNER_TEMP/monkey.txt" 2>&1
+            cat "$RUNNER_TEMP/monkey.txt"
+            sleep 20
+            adb shell pidof com.printnest.app > "$RUNNER_TEMP/pid.txt" 2>&1 || true
+            adb logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+            adb shell dumpsys package com.printnest.app | grep -E 'versionName|versionCode|primaryCpuAbi' || true
+            grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success.'; exit 1; }
+            test -s "$RUNNER_TEMP/pid.txt" || { echo 'The app process is not running after launch.'; exit 1; }
+
+      - name: Post the emulator install and launch results
+        if: always()
+        run: bash .github/scripts/apk-emulator-report.sh
 
       - name: Upload the APK
         uses: actions/upload-artifact@v4
