@@ -3,10 +3,9 @@
 This file says what is built, what was tested, and what was not. Read it before you tell a
 shop that printing works.
 
-**Short answer:** the database rules, the print-agent API, the desktop agent and the owner
-screens are written and pass their local tests. **Automatic printing has not been tested on a
-real printer, with the live Supabase project, or in the Android app.** Those steps are yours
-(see "Before going live").
+**Short answer:** the database rules, print-agent API, desktop agent and owner screens exist in source and have automated local/CI coverage. The agent tests use fake printers. **Automatic printing has not been verified on a real printer, on a live Supabase project, or from an installed Android app.**
+
+> **Current release-gate correction (2026-11-15):** The setup instructions below are historical, not deployment approval. The cleanup cron schedule has been removed from `.github/workflows/cleanup-files.yml`; only manual dispatch remains. Do not manually run cleanup: when both GitHub secrets are configured it deletes expired customer files, and legal C-1 plus an owner-approved retention policy are still required. Stage 7F enforcement is not built and remains OFF. No hosted Stage 7 migration or deployment is authorized by this document. See `docs/STAGE7_HANDOVER.md` and `STAGE7_DECISIONS.md` for current gates.
 
 ## Requirements, one by one
 
@@ -21,7 +20,7 @@ real printer, with the live Supabase project, or in the Android app.** Those ste
 | Failure handling | Built, tested locally | Offline printer, unsupported option, spooler error, lost connection, revoked computer, repeated claims. |
 | Owner retry | Built, tested locally | Failed jobs can be printed again. Jobs that may have printed need confirmation. |
 | Print options | Partial | Copies, colour, double-sided and A4 are applied and refused when the printer cannot do them. Orientation, page range, fit-to-page, cropping and the customer's paper choice are **not** built. |
-| Retention cleanup | Built, not deployed | Files of finished orders are removed after 30 days; files used by open jobs are never removed. Runs from GitHub Actions at 02:00 IST. |
+| Retention cleanup | Function exists; scheduled workflow disabled in the repository | The cron schedule was removed on 2026-11-14. Manual dispatch remains and can delete expired files if both secrets are set; do not run until legal C-1 and owner retention approval are complete. |
 | Rate limits | Built, tested locally in SQL | Anonymous uploads, order tracking, pairing, and per-address and per-token agent limits. Depends on the real client address reaching the functions (see below). |
 | RLS and server authorisation review | Done by reading, partial | Print tables have RLS enabled and no browser policies; owner RPCs check membership; agent RPCs check the token. Not a formal audit. |
 | Statistics and pricing controls | Reviewed by reading only | Not changed in this round. |
@@ -48,28 +47,13 @@ Not run in this round: the Deno edge functions (no Deno runtime here), the live 
 any real printer, the Windows and CUPS adapters against real software, the owner screens in a
 browser, and the Android APK build (the build runs only in GitHub Actions).
 
-## Before going live (in this order)
+## Release gates (current, 2026-11-15)
 
-1. **Confirm with the team that migration 0010 may be applied to the live database.** Then apply it
-   after 0009. It is not applied anywhere yet.
-2. Deploy the functions:
-   - `supabase functions deploy print-agent --no-verify-jwt`
-   - `supabase functions deploy cleanup-files --no-verify-jwt`
-   - `supabase functions deploy upload-file` and `owner-file-link` (both changed in this round).
-3. Set the cleanup secret on Supabase: `supabase secrets set CLEANUP_SECRET=<long random value>`.
-4. In the GitHub repository, add two secrets:
-   - `QRQUICK_CLEANUP_URL` = `https://<project-ref>.supabase.co/functions/v1/cleanup-files`
-   - `CLEANUP_SECRET` = the same value as step 3.
-   Then run the **cleanup-files** workflow once by hand and check its output.
-5. **Check that the client address reaches the functions.** The rate limits key on `x-forwarded-for`
-   (or `cf-connecting-ip`). If the gateway does not pass a client address, every visitor shares
-   one limit, and a busy shop can block everyone else. Look at a function log line or a test
-   response after deploying.
-6. Run `supabase/tests/stage8_print_tests.sql` on a **staging** copy of the database, not the live one.
-7. Rebuild the Android APK with the **android-apk** workflow. The owner screens changed, and the
-   app loads them from the web build.
-8. Run the desktop agent on one real shop computer and tick every item in `agent/README.md`'s
-   hardware checklist. Only then describe automatic printing as working.
+1. Do not apply hosted migrations or deploy functions without the separate owner approval recorded in `STAGE7_DECISIONS.md`.
+2. Do not run the cleanup workflow until legal C-1 and an owner-approved retention policy are complete. Manual dispatch is destructive when its two secrets are configured.
+3. The current Stage 7 branch keeps PR #3 open and draft. Chain A, staging approval, hosted verification and the 7F owner/legal decisions remain blockers; enforcement is OFF.
+4. The Android APK workflow now includes package/signature/alignment checks and an Android emulator install/launch attempt. Treat the result as unverified until that workflow completes successfully; emulator success is not a substitute for the owner's device check.
+5. The final real-world printer test remains an owner task. Until a real Windows/CUPS environment and physical printer are verified, do not claim automatic printing is production-ready.
 
 ## Things still to do (not part of this round)
 
