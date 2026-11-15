@@ -56,8 +56,8 @@ jobs:
             exit 1
           }
           npm run copy-web
-          grep -q 'ownerApp: false' www/config.js || {
-            echo 'The Android bundle must include the read-only owner licence status screen.' >&2
+          grep -q 'ownerApp: true' www/config.js || {
+            echo 'The Android bundle must be the owner-only app (ownerApp: true).' >&2
             exit 1
           }
 
@@ -107,8 +107,11 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: |
-            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell monkey -p com.printnest.app 1
+            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk | tee "$RUNNER_TEMP/install.txt"
+            grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success:'; cat "$RUNNER_TEMP/install.txt"; exit 1; }
+            adb shell monkey -p com.printnest.app -c android.intent.category.LAUNCHER 1
+            sleep 15
+            adb shell pidof com.printnest.app || { echo 'The app process is not running after launch.'; exit 1; }
             adb shell dumpsys package com.printnest.app | grep -E 'versionName|versionCode|primaryCpuAbi'
 
       - name: Upload the APK

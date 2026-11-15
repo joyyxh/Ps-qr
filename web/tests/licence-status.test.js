@@ -532,7 +532,8 @@ test('the licence screen has one action, Refresh, and no grant, extend, revoke o
 test('the shop page links to the licence screen only for owners, and sign-out and navigation clear it', () => {
   const owner = src('owner.js');
   assert.match(owner, /shop\.role === 'owner' && licenceEnabled \? `<a class="button" href="#\/owner\/shop\/\$\{encodeURIComponent\(shop\.slug\)\}\/licence">Licence<\/a>` : ''/);
-  assert.match(owner, /if \(section === 'licence' && licenceEnabled\) return licencePages\.open\(shop\);/);
+  assert.match(owner, /if \(section === 'licence' && licenceEnabled\) \{/);
+  assert.match(owner, /return licencePages\.open\(shop\);/);
   assert.match(owner, /licencePages\.close\(\); \/\/ leaving the licence page/);
   assert.match(owner, /async function signOut\(\) \{\s*licencePages\.close\(\);/);
 });
@@ -541,11 +542,18 @@ test('the read-only licence view is enabled in the Android owner bundle', () => 
   const owner = src('owner.js');
   assert.match(owner, /const licenceEnabled = true;/);
   assert.match(owner, /createLicencePages\(\{ app, ownerApi, enabled: licenceEnabled \}\)/);
-  // The copy script preserves the enabled owner-only view in the Android bundle.
+  // The Android bundle is the owner-only shell; copy-web switches the source flag on.
   const copyScript = readFileSync(new URL('../../mobile/scripts/copy-web.mjs', import.meta.url), 'utf8');
-  assert.match(copyScript, /ownerApp:\s*false/);
+  assert.match(copyScript, /ownerApp:\s*true/);
   const config = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
   assert.match(config, /ownerApp: false,/);
+});
+
+test('staff cannot open the licence screen by URL; only the shop owner sees it', () => {
+  const owner = src('owner.js');
+  assert.match(owner, /if \(section === 'licence' && licenceEnabled\) \{\s*\/\/ Licence status is for the shop owner only/);
+  assert.match(owner, /if \(shop\.role !== 'owner'\) \{\s*return show\(/);
+  assert.match(owner, /Only the shop owner can see the licence status\./);
 });
 
 // ---------- 6. the Android owner bundle: the licence view is on ----------
