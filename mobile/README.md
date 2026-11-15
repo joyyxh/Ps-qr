@@ -3,7 +3,7 @@
 The shop-owner app for Android. It is the QRquick web app in an Android
 wrapper (Capacitor), so the same screens, database and rules are used. A
 shopkeeper signs in, sees their shop, shows the shop's QR code, uploads the
-payment QR, sets the yes/no features and manages orders.
+payment QR, sets the yes/no features, manages orders and views the read-only licence status.
 
 ## Get the APK (no Android tools needed)
 
@@ -44,17 +44,14 @@ npx cap open android     # build from Android Studio, or run ./gradlew assembleD
 
 ## Known limits (read before handing this to shops)
 
-- **Downloads inside the app.** The "Download QR as PNG" button and the CSV
-  exports use a browser download link. The Android WebView does not save
-  those files by itself, so these buttons may do nothing in the APK. Use the
-  installable web app (below) for downloads, or ask for a native save plugin.
+- **Downloads inside the app.** The "Download QR as PNG" button and CSV
+  exports still use browser download links. Verify these on the target phone;
+  if Android WebView does not save them, use the installable web app (below)
+  until native file-save support is added.
 - **Not tested on a phone yet.** The build runs in GitHub's cloud. The
   screens were checked in a desktop browser at phone width, not on a device.
-- **Versions are not pinned to a lock file yet.** `package.json` uses the
-  Capacitor 8 line. Commit the generated `package-lock.json` once a build
-  works, so later builds use the same versions.
-- **App icon.** The APK uses the default Capacitor icon until the icons are
-  copied into the Android resources.
+- Capacitor dependencies are pinned by `package-lock.json` and installed with `npm ci` in CI.
+- **App icon.** The generated Android project still uses the default Capacitor icon.
 - **Sign-in e-mails.** Confirmation links open in the browser, not in the app.
 
 ## Alternative: install the web app (no APK)
