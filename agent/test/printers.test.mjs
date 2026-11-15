@@ -71,10 +71,11 @@ test('colour and double-sided come only from the printer\'s own options', () => 
 test('an IPP "one-sided" value is NOT read as double-sided', () => {
   assert.equal(capabilitiesFromOptions({ sides: ['one-sided'] }).duplex, false);
   assert.equal(capabilitiesFromOptions({ sides: ['one-sided', 'two-sided-long-edge'] }).duplex, true);
+  assert.equal(capabilitiesFromOptions({ Duplex: ['None', 'DuplexTumble'] }).duplex, false);
 });
 
 test('lp arguments: printer, copies, colour, duplex, media, then "--" before the file', () => {
-  const capabilities = { papers: ['A4', 'Letter'], colourModes: ['Gray', 'RGB'] };
+  const capabilities = { papers: ['A4', 'Letter'], colourModes: ['Gray', 'RGB'], duplexModes: ['two-sided-long-edge'] };
   const args = buildLpArgs({
     printer: 'Office', file: '/tmp/x.pdf', copies: 3, colour: true, duplex: true,
     paper: 'A4', title: 'QRquick job', capabilities,
@@ -86,6 +87,24 @@ test('lp arguments: printer, copies, colour, duplex, media, then "--" before the
     '-o', 'sides=two-sided-long-edge',
     '--', '/tmp/x.pdf',
   ]);
+});
+
+test('lp arguments use the legacy PPD long-edge duplex option when that is what the printer reports', () => {
+  const args = buildLpArgs({
+    printer: 'Office', file: '/tmp/x.pdf', copies: 1, colour: false, duplex: true,
+    paper: 'A4', title: 'QRquick job',
+    capabilities: { papers: ['A4'], colourModes: ['Gray'], duplexModes: ['DuplexNoTumble'] },
+  });
+  assert.ok(args.includes('Duplex=DuplexNoTumble'));
+  assert.ok(!args.includes('sides=two-sided-long-edge'));
+});
+
+test('lp arguments refuse duplex when the printer does not report a supported long-edge mode', () => {
+  assert.throws(() => buildLpArgs({
+    printer: 'Office', file: '/tmp/x.pdf', copies: 1, colour: false, duplex: true,
+    paper: 'A4', title: 'QRquick job',
+    capabilities: { papers: ['A4'], colourModes: ['Gray'], duplexModes: ['DuplexTumble'] },
+  }), (err) => err.code === 'unsupported_setting');
 });
 
 test('lp arguments leave out media the printer does not list, and pick a grey mode for black-and-white', () => {
