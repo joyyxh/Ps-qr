@@ -3,6 +3,7 @@
 // Only the files the app needs are copied (no tests, no service worker, no build
 // tools). The customer page address for QR codes is written into www/config.js from
 // PRINTNEST_PUBLIC_URL, so the repository's config.js does not have to change.
+// The Android owner app includes the read-only Stage 7E licence status screen.
 //
 //   PRINTNEST_PUBLIC_URL=https://your-printnest-site.example  node scripts/copy-web.mjs
 
@@ -37,9 +38,9 @@ if (publicUrl) {
       'and the app shows a warning until the address is set.'
   );
 }
-config = config.replace(/ownerApp:\s*(true|false)/, 'ownerApp: true');
-if (!/ownerApp:\s*true/.test(config)) {
-  console.error('config.js has no ownerApp flag to configure the Android owner-only bundle.');
+config = config.replace(/ownerApp:\s*(true|false)/, 'ownerApp: false');
+if (!/ownerApp:\s*false/.test(config)) {
+  console.error('config.js has no ownerApp flag to enable the Android owner licence status screen.');
   process.exit(1);
 }
 
