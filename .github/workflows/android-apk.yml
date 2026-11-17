@@ -111,7 +111,8 @@ jobs:
           grep -q "package: name='com.printnest.app'" "$RUNNER_TEMP/apk-badging.txt"
           grep -q "application: label='QRquick'" "$RUNNER_TEMP/apk-badging.txt"
           unzip -l "$APK" | grep -q 'res/mipmap-anydpi-v26/ic_launcher.xml'
-          unzip -l "$APK" | grep -q 'res/mipmap-xxxhdpi/ic_launcher_foreground.png'
+          # The APK stores density folders with a -v4 suffix (mipmap-xxxhdpi-v4).
+          unzip -l "$APK" | grep -Eq 'res/mipmap-xxxhdpi(-v4)?/ic_launcher_foreground\.png'
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'assets/public/index.html'
           unzip -l "$APK" | grep -q 'assets/public/src/licence-status.js'
