@@ -53,6 +53,30 @@ into chat.
    confirm the code arrives, enter it, set a password, sign in. Also try an unverified account
    to see the resend path. Record the time, the sender, and whether the email landed in spam.
 
+## Read-only check on 2026-11-18
+
+Checked with the Supabase and Resend connectors. Counts only: no addresses were read or copied.
+
+- Supabase project `printnest` has 9 accounts: 3 confirmed and 6 not confirmed.
+- Supabase recorded a confirmation send for 7 of the 9 accounts. The latest was on 2026-11-17 at
+  20:13 UTC. Supabase records that it tried to send. It does not record that the email arrived, or
+  which sender it used.
+- The Resend connector lists no sending domains and no sent emails. So the verification email does
+  not go through that Resend account. Check the sender Supabase uses: the built-in sender, or the
+  SMTP settings in the dashboard.
+- The Supabase connector could not read the Auth logs (its query returned "table does not exist").
+  Read them in the dashboard instead: Logs, then Auth. Look for email or SMTP errors around the
+  times above.
+
+Status: Supabase tries to send the code, but delivery to a real inbox is still unconfirmed. The
+owner steps below are the next checks.
+
+1. Logs, then Auth: note any email or SMTP error.
+2. Authentication, then Emails, then SMTP settings: note whether the built-in sender or custom SMTP
+   is used. The built-in sender is rate-limited and meant for testing.
+3. Confirm the "Confirm signup" template contains `{{ .Token }}`.
+4. Register with an owner-controlled mailbox and record whether the code arrives, and how long it takes.
+
 ## Not verified here
 
 - Whether the hosted project has "Confirm email" on, what the redirect allow-list contains,

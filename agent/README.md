@@ -60,15 +60,29 @@ node bin/qrquick-print-agent.mjs run
 The agent works on A4 paper only, because the order does not yet record a paper size.
 A printer with no A4 option will refuse every order, and the owner sees why.
 
-### Keep it running
+### Start automatically and keep it running
 
-- **Windows:** Task Scheduler → Create Task → trigger "At log on" → action
-  `node C:\QRquick\agent\bin\qrquick-print-agent.mjs run`, with "Start in" set to `C:\QRquick\agent`.
-- **Linux:** a systemd user service that runs `node bin/qrquick-print-agent.mjs run` in the agent folder with
-  `Restart=always`.
+After `pair` and `set-printer`, run this once on the shop computer:
+
+```
+node bin/qrquick-print-agent.mjs autostart
+```
+
+It writes a file into the `autostart` folder next to the agent and prints the install commands:
+
+- **Windows:** a Task Scheduler task (`QRquick-print-agent.xml`) that starts `run` when you sign in,
+  and restarts it one minute after it stops. Install it with the `schtasks` command the tool prints.
+- **Linux:** a systemd user service (`qrquick-print-agent.service`) that starts `run` and restarts it
+  after 10 seconds if it stops. Install it with the `systemctl --user` commands the tool prints.
+
+`autostart` only starts the agent. It does not change what gets printed: the agent still prints only
+orders the owner has approved and marked paid, and each one still needs **Send to printer** unless the
+owner turns automatic sending on (not yet built; see "Known limits").
 
 The computer must stay on, online and logged in for printing to happen. Orders wait in the
 queue while it is off, and print when it comes back.
+
+> Not yet checked on a real shop computer. Run the hardware checklist below before relying on it.
 
 ## What the owner sees
 
@@ -122,6 +136,9 @@ Until items 3 to 5 pass, do not describe automatic printing as working.
 
 ## Known limits
 
+- **Automatic sending.** Today the owner presses **Send to printer** for each approved, paid order.
+  A setting that sends paid orders without that press is not built. It would change the rule that
+  nothing prints without the owner's action, so it needs the owner's decision first.
 - Windows: SumatraPDF settings (`-print-settings` with copies, `color`/`monochrome`, `duplexlong`)
   follow SumatraPDF's documented words but are not yet checked on a real installation.
 - Windows: PowerShell `Get-PrintConfiguration` may need the printer driver to report colour and
@@ -129,6 +146,6 @@ Until items 3 to 5 pass, do not describe automatic printing as working.
 - Linux: colour and duplex use the printer's own CUPS options (`ColorModel`, `Duplex` or
   `sides`). A colour printer with no black-and-white option may print in colour for
   black-and-white orders; the agent cannot force a mode the printer does not offer.
-- Paper size is A4 only. Orientation, page ranges, fit-to-page and cropping are not implemented.
+- Paper size is A4 only. Orientation, page ranges, fit-to-page and passport sheet layout are not implemented. Cropping and brightness/contrast happen on the customer's page before upload, so the agent receives the edited picture.
 - No printing confirmation: the agent knows the job was accepted by the printing system, not
   that paper came out.

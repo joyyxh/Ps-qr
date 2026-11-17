@@ -1,10 +1,12 @@
 // Command-line front end for the agent. Each command returns an exit code and never
 // prints the agent's token.
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createAgentApi } from './api.mjs';
+import { autostartFiles } from './autostart.mjs';
 import { configPaths, defaultConfigDir, loadConfig, normaliseServerUrl, saveConfig } from './config.mjs';
 import { createJournal } from './journal.mjs';
 import { createPrinterAdapter } from './printers/index.mjs';
@@ -24,9 +26,12 @@ Commands:
   doctor                                 Check the setup and the connection to QRquick
   test-print                             Print one test page on the chosen printer (uses paper)
   run                                    Start printing approved orders (keep this running)
+  autostart                              Write the file that starts "run" at sign-in, with the commands to install it
 
-Setup order: pair, printers, set-printer, doctor, test-print, run.
+Setup order: pair, printers, set-printer, doctor, test-print, run, autostart.
 `;
+
+const AGENT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function platformName(platform) {
   if (platform === 'win32') return 'windows';
@@ -209,7 +214,38 @@ async function run(_args, deps, { dir, out, platform }) {
   return 0;
 }
 
-const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run };
+// Writes the start-at-sign-in file for this platform, next to the agent, and prints how to install it.
+// It only starts the agent; the agent still prints only the orders the owner has approved and marked paid.
+async function autostart(_args, deps, { dir, out, platform }) {
+  if (!platformName(platform)) throw new Error('Start-at-sign-in is set up for Windows and Linux only.');
+  const config = await requireConfig(dir);
+  const agentDir = deps.agentDir ?? AGENT_DIR;
+  const fileDir = path.join(agentDir, 'autostart');
+  const user = deps.userId ?? (process.env.USERDOMAIN && process.env.USERNAME
+    ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+    : '');
+  const file = autostartFiles(platform, {
+    nodePath: deps.nodePath ?? process.execPath,
+    scriptPath: path.join(agentDir, 'bin', 'qrquick-print-agent.mjs'),
+    workingDir: agentDir,
+    userId: user,
+    fileDir,
+  });
+  await mkdir(fileDir, { recursive: true });
+  await writeFile(file.path, file.content, { encoding: file.encoding });
+  out(`Wrote ${file.path} for ${config.shopName ?? 'this shop'}.`);
+  out('');
+  out('To start the agent at sign-in, run these once:');
+  for (const line of file.install) out(`  ${line}`);
+  out('');
+  out('To stop starting it at sign-in, run:');
+  for (const line of file.remove) out(`  ${line}`);
+  out('');
+  out('The computer must stay on and signed in for orders to print. Orders wait in the queue while it is off.');
+  return 0;
+}
+
+const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run, autostart };
 
 // Entry point. deps are for tests: dir, platform, out, fail, fetchImpl, run, adapter, download, computerName.
 export async function main(argv, deps = {}) {

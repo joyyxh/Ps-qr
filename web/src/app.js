@@ -2,6 +2,8 @@ import { createApi } from './api.js';
 import { createAuth } from './auth.js';
 import { createOwnerApi } from './owner-api.js';
 import { createOwnerPages } from './owner.js';
+import { isPhotoFile } from './photo-edit.js';
+import { openPhotoEditor } from './photo-editor.js';
 import { browserSessionStorage, createSessionStore } from './session.js';
 import {
   buildItem,
@@ -281,7 +283,7 @@ function shopTemplate() {
         <label class="field-label">Copies
           <input name="copies" type="number" min="1" max="100" value="1" inputmode="numeric" required />
         </label>
-        <div class="choice-grid"><label class="choice-card"><input name="colour" id="colour" type="checkbox" ${shopOffersColour(shop) ? '' : 'disabled'} /><span><strong>Colour</strong><small>Vibrant colour printing</small></span></label><label class="choice-card"><input name="duplex" id="duplex" type="checkbox" ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /><span><strong>Double-sided</strong><small>Save paper on every sheet</small></span></label></div>
+        <div class="choice-grid"><label class="choice-card"><input name="colour" id="colour" type="checkbox" ${shopOffersColour(shop) ? '' : 'disabled'} /><span><strong>Colour${shopOffersColour(shop) ? '' : ' (not offered at this shop)'}</strong><small>Vibrant colour printing</small></span></label><label class="choice-card"><input name="duplex" id="duplex" type="checkbox" ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /><span><strong>Double-sided${shopOffersDoubleSided(shop) ? '' : ' (not offered at this shop)'}</strong><small>Save paper on every sheet</small></span></label></div>
         <button type="submit" id="add-item" disabled>Add file to order <span aria-hidden="true">→</span></button>
       </form>
       <p class="muted small">Your file is stored privately and only this shop can open it. Automatic deletion is not switched on yet.</p>
@@ -325,9 +327,10 @@ function shopTemplate() {
 }
 
 // The features this shop has switched on, for example "Colour printing, Stapling".
+// Passport photos are ordered from the services list, so they are not repeated here.
 function offeredFeaturesHtml() {
   const labels = catalog
-    .filter((feature) => shop.features?.[feature.key] === true)
+    .filter((feature) => feature.key !== 'passport_photos' && shop.features?.[feature.key] === true)
     .map((feature) => escapeHtml(feature.label));
   return labels.length ? `<p class="small"><strong>Also offered here:</strong> ${labels.join(', ')}</p>` : '';
 }
@@ -414,9 +417,27 @@ async function onFileChosen(event) {
     return;
   }
 
+  // A JPEG or PNG can be cropped and adjusted first. The customer may also keep it as it is.
+  let toUpload = file;
+  if (isPhotoFile(file)) {
+    const edited = await openPhotoEditor(file);
+    if (seq !== uploadSeq) return; // the customer picked another file meanwhile
+    if (!edited) {
+      input.value = '';
+      return;
+    }
+    const editProblem = checkUploadFile(edited);
+    if (editProblem) {
+      input.value = '';
+      setText('item-error', editProblem);
+      return;
+    }
+    toUpload = edited;
+  }
+
   setText('upload-status', 'Uploading and checking the file…');
   try {
-    const upload = await api.uploadFile(shop.slug, file);
+    const upload = await api.uploadFile(shop.slug, toUpload);
     if (seq !== uploadSeq) return; // the customer picked another file meanwhile
     pendingUpload = upload;
     setText('upload-status', `${upload.original_name} · ${plural(upload.page_count, 'page')} · ready to add`);

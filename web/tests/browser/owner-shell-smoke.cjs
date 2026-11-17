@@ -206,6 +206,18 @@ async function main() {
     check('Prices tab shows the open state read-only', (await page.getByText('Open for orders').count()) === 1);
     await page.screenshot({ path: shot('prices-390.png'), fullPage: true });
 
+    // Passport photos switched on with no passport service: the Prices tab says so, and the quick start fills the form.
+    state.shops[0].features.passport_photos = true;
+    await page.reload();
+    await page.getByRole('heading', { name: 'Services and prices' }).waitFor();
+    const banner = await page.locator('p.banner', { hasText: 'Passport photos is switched on' }).count();
+    check('Prices tab warns when passport photos is on but has no service', banner === 1);
+    await page.click('[data-preset="passport"]');
+    const presetName = await page.locator('#service-form input[name="name"]').inputValue();
+    const presetUnit = await page.locator('#service-form select[name="pricingUnit"]').inputValue();
+    check('the passport quick start fills the name and unit (price left for the owner)', presetName === 'Passport photo sheet' && presetUnit === 'per_copy', `${presetName} / ${presetUnit}`);
+    state.shops[0].features.passport_photos = false;
+
     await tab('stats').click();
     await page.waitForURL(new RegExp(`#/owner/shop/${SLUG}/stats$`));
     await page.locator('#owner-tabbar a[data-tab="stats"][aria-current="page"]').waitFor();
@@ -255,8 +267,9 @@ async function main() {
       body: getComputedStyle(document.body).backgroundColor,
       bar: getComputedStyle(document.querySelector('#owner-tabbar')).backgroundColor,
     }));
-    check('dark system theme: page background is dark', dark.body === 'rgb(15, 22, 38)', JSON.stringify(dark));
-    check('dark system theme: tab bar uses the card colour', dark.bar === 'rgb(23, 32, 51)', JSON.stringify(dark));
+    // Dark theme is black surfaces (not blue-navy): page #000, cards and tab bar #0b0b0b.
+    check('dark system theme: page background is black', dark.body === 'rgb(0, 0, 0)', JSON.stringify(dark));
+    check('dark system theme: tab bar uses the card colour', dark.bar === 'rgb(11, 11, 11)', JSON.stringify(dark));
     await page.screenshot({ path: shot('more-dark-390.png'), fullPage: true });
     await page.emulateMedia({ colorScheme: 'light' });
 

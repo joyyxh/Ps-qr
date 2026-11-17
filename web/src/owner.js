@@ -43,6 +43,7 @@ import {
   printAgentFunctionUrl,
   printerOptionLabel,
   printFailureText,
+  passportNeedsService,
   printingNotice,
   printJobLabel,
   retryOptions,
@@ -57,6 +58,13 @@ const UNIT_OPTIONS = [
   { value: 'per_sheet', label: 'Per sheet (double-sided halves the sheets)' },
   { value: 'per_copy', label: 'Per copy (one flat charge)' },
 ];
+
+// Quick-start names for photo services. The owner still types the price; nothing is priced for them.
+const PHOTO_PRESETS = {
+  passport: { name: 'Passport photo sheet', pricingUnit: 'per_copy' },
+  'photo-4x6': { name: 'Photo print 4 × 6 in', pricingUnit: 'per_copy' },
+};
+
 
 const CONNECTION_MESSAGE = 'Could not reach the server. Check your internet connection and try again.';
 
@@ -185,8 +193,10 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
       <section class="card">
         <h2>Services and prices</h2>
+        ${passportNeedsService(shop, services) ? '<p class="banner" role="status">Passport photos is switched on, but customers cannot order it yet. Add a Passport photo sheet below with its price.</p>' : ''}
         ${serviceTable}
         <h3>${editing ? 'Edit service' : 'Add a service'}</h3>
+        ${editing ? '' : '<p class="muted small">Quick start: <button type="button" class="link" data-preset="passport">Passport photo sheet</button> · <button type="button" class="link" data-preset="photo-4x6">Photo print 4 × 6 in</button>. Fill in the price yourself.</p>'}
         <form id="service-form" class="grid">
           <input type="hidden" name="serviceId" value="${escapeHtml(editing?.id ?? '')}" />
           <label>Service name
@@ -1025,6 +1035,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('#cash-policy-form', 'submit', onSaveCashPolicy);
     on('[data-action="remove-payment-qr"]', 'click', onRemovePaymentQr);
     on('#service-form', 'submit', onSaveService);
+    onAll('[data-preset]', 'click', applyPhotoPreset);
     on('[data-action="toggle-open"]', 'click', onToggleOpen);
     on('[data-action="cancel-edit"]', 'click', () => renderManager());
     onAll('[data-edit]', 'click', (event) => renderManager({ editingId: event.currentTarget.dataset.edit }));
@@ -1096,6 +1107,16 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     }
   }
 
+  // Fills the add-service form from a quick-start preset. The owner still sets the price and saves.
+  function applyPhotoPreset(event) {
+    const preset = PHOTO_PRESETS[event.currentTarget.dataset.preset];
+    const form = document.getElementById('service-form');
+    if (!preset || !form) return;
+    form.elements.name.value = preset.name;
+    form.elements.pricingUnit.value = preset.pricingUnit;
+    form.elements.bwPrice?.focus();
+  }
+
   async function onSaveService(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -1134,7 +1155,10 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     try {
       const saved = await ownerApi.saveFeatures(managed.shop.id, features);
       managed.shop = { ...managed.shop, features: saved };
-      renderManager({ notice: 'Features saved. Customers now see the updated list.' });
+      const notice = passportNeedsService(managed.shop, managed.services)
+        ? 'Features saved. Passport photos needs a priced service on the Prices tab before customers can order it.'
+        : 'Features saved. Customers now see the updated list.';
+      renderManager({ notice });
     } catch (err) {
       setError(form, messageFor(err));
       setBusy(form, false);

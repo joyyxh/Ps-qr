@@ -47,6 +47,13 @@ export function escapeHtml(value) {
 }
 
 // Upload limits. These mirror the upload-file function, which checks again from the bytes.
+// True when "Passport photos" is switched on but no active service with a passport name exists,
+// so customers have nothing to order.
+export function passportNeedsService(shop, services = []) {
+  return shop?.features?.passport_photos === true
+    && !services.some((service) => service.is_active !== false && /passport/i.test(service.name ?? ''));
+}
+
 export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 export const UPLOAD_ACCEPT = 'application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png';
 const UPLOAD_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];

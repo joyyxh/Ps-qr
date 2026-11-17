@@ -19,7 +19,7 @@ shop that printing works.
 | Sending jobs without duplicates | Built, tested locally | Claim lease, "printing" recorded before the printer gets the file, `needs_check` for uncertain jobs, no automatic reprint. |
 | Failure handling | Built, tested locally | Offline printer, unsupported option, spooler error, lost connection, revoked computer, repeated claims. |
 | Owner retry | Built, tested locally | Failed jobs can be printed again. Jobs that may have printed need confirmation. |
-| Print options | Partial | Copies, colour, double-sided and A4 are applied and refused when the printer cannot do them. Orientation, page range, fit-to-page, cropping and the customer's paper choice are **not** built. |
+| Print options | Partial | Copies, colour, double-sided and A4 are applied and refused when the printer cannot do them. Customers can crop and adjust JPEG and PNG pictures before upload (passport, square, 4 × 6 shapes; turn; brightness and contrast). Orientation, page range, fit-to-page, the passport sheet layout and the customer's paper choice are **not** built. |
 | Retention cleanup | Function exists; scheduled workflow disabled in the repository | The cron schedule was removed on 2026-11-14. Manual dispatch remains and can delete expired files if both secrets are set; do not run until legal C-1 and owner retention approval are complete. |
 | Rate limits | Built, tested locally in SQL | Anonymous uploads, order tracking, pairing, and per-address and per-token agent limits. Depends on the real client address reaching the functions (see below). |
 | RLS and server authorisation review | Done by reading, partial | Print tables have RLS enabled and no browser policies; owner RPCs check membership; agent RPCs check the token. Not a formal audit. |
@@ -57,7 +57,7 @@ browser, and the Android APK build (the build runs only in GitHub Actions).
 
 ## Things still to do (not part of this round)
 
-- Customer-side print options: orientation, page range, fit-to-page, cropping, paper size.
+- Customer-side print options: orientation, page range, fit-to-page, passport sheet layout, paper size.
   The order does not yet record them.
 - A real paper-size check on Windows.
 - Repeat the review of the file-link and retention code with a timestamp simulation.

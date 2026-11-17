@@ -298,8 +298,11 @@ requirement for this flow.
   in, up to 10 MB each. Unclaimed files expire from use after one day, but nothing
   deletes them from storage yet. Stage 8 adds the cleanup and limits. Claimed files are
   kept until then too. Watch the free plan's storage quota until Stage 8.
-- **No passport photo layout or image crop** yet. A passport photo is uploaded as an
-  image and priced as one page. The layout and crop are not built.
+- **No passport photo layout yet.** A customer can crop a JPEG or PNG to a passport, square or
+  4 × 6 shape and adjust brightness and contrast before upload (in the browser, not on the server).
+  The page is still priced as one page: there is no sheet layout that fits several passport photos
+  on one A4 page. The owner must add a priced "Passport photo sheet" service before customers can
+  order one (Prices tab).
 - **Tracking codes can be guessed.** There are 32^8 combinations, but nothing yet
   rate-limits `track_order`, `place_order` or the upload. Rate limiting is needed before
   launch.
@@ -455,7 +458,7 @@ so regenerate and reprint.
 3. **Database:** re-run `stage3_owner_tests.sql` after migration 0003, and confirm
    migrations 0004 and 0005 on the live project (bucket settings and storage policies).
 4. **Stage 4, still open:** deploy-test the two edge functions on the live project with a
-   real PDF and a real owner account. Passport photo layout and image crop. Confirm the
+   real PDF and a real owner account. Passport photo sheet layout. Confirm the
    page count with the print agent once Stage 6 exists.
 5. **Stage 3, still open:** staff invitations (for now an owner can add a member only by
    user ID, with no invite flow).
