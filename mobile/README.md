@@ -108,6 +108,12 @@ It does not sign in, because CI has no owner account. Screenshots are in the
 `qrquick-ui-check` artifact of the run. The APK badging check also confirms the
 `QRquick` application label and the adaptive launcher icon in the APK.
 
+**Status: the screen checks are not passing yet.** On the GitHub-hosted x86_64 emulator the
+app's WebView crashed natively, about two minutes after launch, with the default, ANGLE and
+software-compositing settings. Build, signature, label and icon checks, installation and launch
+do pass. The screen checks need a working emulator or a physical phone before they count as a
+test result.
+
 ## Alternative: install the web app (no APK)
 
 Android Chrome can install the web app from the published https address:
