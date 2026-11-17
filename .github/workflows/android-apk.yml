@@ -109,7 +109,7 @@ jobs:
           "$BUILD_TOOLS/zipalign" -c -v 4 "$APK"
           "$BUILD_TOOLS/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
           grep -q "package: name='com.printnest.app'" "$RUNNER_TEMP/apk-badging.txt"
-          grep -q "application-label:'QRquick'" "$RUNNER_TEMP/apk-badging.txt"
+          grep -q "application: label='QRquick'" "$RUNNER_TEMP/apk-badging.txt"
           unzip -l "$APK" | grep -q 'res/mipmap-anydpi-v26/ic_launcher.xml'
           unzip -l "$APK" | grep -q 'res/mipmap-xxxhdpi/ic_launcher_foreground.png'
           unzip -t "$APK" >/dev/null
