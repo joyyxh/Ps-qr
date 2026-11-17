@@ -139,6 +139,9 @@ jobs:
           # The checks wait for the page rather than timing animations. Disabling animations
           # runs extra settings calls, which failed on this runner with a broken pipe.
           disable-animations: false
+          # Default swiftshader_indirect GPU mode: the WebView renderer crashed natively
+          # (libwebviewchromium) with "invalid color buffer" messages. Try ANGLE instead.
+          emulator-options: -no-window -gpu angle_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/install.txt" 2>&1
             cat "$RUNNER_TEMP/install.txt"
@@ -171,6 +174,9 @@ jobs:
           retention-days: 30
 
       - name: Upload the APK
+        # Runs even when the emulator screen checks fail, so the built APK is kept. The run
+        # still shows the failed check, so the APK is never reported as fully verified.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qrquick-debug-apk
