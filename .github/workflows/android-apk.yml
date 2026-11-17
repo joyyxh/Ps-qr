@@ -139,10 +139,11 @@ jobs:
           # The checks wait for the page rather than timing animations. Disabling animations
           # runs extra settings calls, which failed on this runner with a broken pipe.
           disable-animations: false
-          # Default swiftshader_indirect GPU mode: the WebView renderer crashed natively
-          # (libwebviewchromium) with "invalid color buffer" messages. Try ANGLE instead.
-          emulator-options: -no-window -gpu angle_indirect -noaudio -no-boot-anim -camera-back none
           script: |
+            # Test harness only: software compositing for the WebView in this emulator. The
+            # emulator's GPU path crashed the WebView renderer natively on this runner, with
+            # both swiftshader and ANGLE. The app is not changed. Debuggable builds read this file.
+            adb shell "echo '_ --disable-gpu --disable-gpu-compositing' > /data/local/tmp/webview-command-line"
             adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/install.txt" 2>&1
             cat "$RUNNER_TEMP/install.txt"
             adb shell monkey -p com.printnest.app -c android.intent.category.LAUNCHER 1 > "$RUNNER_TEMP/monkey.txt" 2>&1
