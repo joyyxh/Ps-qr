@@ -136,6 +136,9 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_6
+          # The checks wait for the page rather than timing animations. Disabling animations
+          # runs extra settings calls, which failed on this runner with a broken pipe.
+          disable-animations: false
           script: |
             adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/install.txt" 2>&1
             cat "$RUNNER_TEMP/install.txt"
