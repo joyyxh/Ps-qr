@@ -85,8 +85,28 @@ npx cap open android     # build from Android Studio, or run ./gradlew assembleD
   Android emulator (API 35) in GitHub's cloud. The screens were checked in a
   desktop browser at phone width. Neither check replaces a test on a real phone.
 - Capacitor dependencies are pinned by `package-lock.json` and installed with `npm ci` in CI.
-- **App icon.** The generated Android project still uses the default Capacitor icon.
-- **Sign-in e-mails.** Confirmation links open in the browser, not in the app.
+- **App icon.** The QRquick launcher icon (square, round and adaptive) is generated from
+  `web/icons/qrquick-mark.png` by `mobile/scripts/make-launcher-icons.sh` and copied into the
+  Android project by the APK workflow. Recent apps use the same icon. Not yet checked on a
+  real phone's launcher.
+- **Sign-in e-mails.** Verification codes come from Supabase Auth. Delivery to a real inbox has
+  not been tested, and the hosted Supabase settings need an owner check. See
+  `docs/OWNER_EMAIL_VERIFICATION.md`.
+
+## What the emulator check covers
+
+Each APK build is installed on an API 35 emulator and the screens are read with
+`uiautomator` (`.github/scripts/apk-ui-check.sh`). The check verifies that:
+
+- the app opens on the protected sign-in screen, with no owner tabs before sign-in;
+- the QRquick name is on that screen;
+- the "Create an account" link opens the registration screen, and Back returns to sign-in;
+- the app is labelled QRquick on the launcher (best effort; a warning if the icon is not on the home screen);
+- reopening the app lands on the sign-in screen, and the process is still running.
+
+It does not sign in, because CI has no owner account. Screenshots are in the
+`qrquick-ui-check` artifact of the run. The APK badging check also confirms the
+`QRquick` application label and the adaptive launcher icon in the APK.
 
 ## Alternative: install the web app (no APK)
 

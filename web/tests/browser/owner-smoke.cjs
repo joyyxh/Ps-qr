@@ -338,17 +338,24 @@ async function waitText(page, text, timeout = 8000) {
   );
 
   // 4. Open the shop: details, services, hidden service shown to owner.
-  await page.click('text=Demo Xerox Centre');
+  await page.click('a[href="#/owner/shop/demo-xerox"]:has-text("Demo Xerox Centre")');
   await waitText(page, 'Open for orders');
   const rows = await page.locator('table.breakdown tbody tr').count();
   check('owner sees all services, including hidden ones', rows === 2, `rows=${rows}`);
   check('hidden service is labelled', (await page.getByText('hidden from customers').count()) === 1);
+  // The customer page address and the QR code are on the More tab.
+  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+  await page.locator('input[readonly]').waitFor();
   const pageAddress = await page.locator('input[readonly]').inputValue();
   check('customer page address is shown', pageAddress.endsWith('#/s/demo-xerox'), pageAddress);
+  await page.goto(`${BASE}#/owner/shop/demo-xerox`);
+  await waitText(page, 'Open for orders');
 
   await page.screenshot({ path: path.join(OUT_DIR, 'owner-shop-phone.png'), fullPage: true });
 
-  // 5. Close the shop: PATCH with only is_open, with the owner token.
+  // 5. Close the shop: PATCH with only is_open, with the owner token. The switch is on the More tab.
+  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+  await waitText(page, 'Open for orders');
   const beforePatch = state.requests.length;
   await page.click('[data-action="toggle-open"]');
   await waitText(page, 'Closed. Customers can see prices');
@@ -356,6 +363,8 @@ async function waitText(page, text, timeout = 8000) {
   check('toggle sends only is_open', toggle && JSON.stringify(toggle.body) === '{"is_open":false}', JSON.stringify(toggle?.body));
   check('toggle carries the owner token', toggle && toggle.auth.startsWith('Bearer owner-token-'));
   check('shop state changed in the database mock', state.shops[0].is_open === false);
+  await page.goto(`${BASE}#/owner/shop/demo-xerox`);
+  await waitText(page, 'Closed for orders');
 
   // 6. Edit a service price: typed rupees become paise.
   await page.click(`button[data-edit="${SVC_DOC}"]`);
@@ -389,7 +398,9 @@ async function waitText(page, text, timeout = 8000) {
   check('new colour-only service saved with paise', added && added.colour_price_paise === 4000 && added.bw_price_paise === null);
   check('new service is tied to this shop', added && added.shop_id === SHOP_ID);
 
-  // 9. Shop name with HTML is shown as text, not markup.
+  // 9. Shop name with HTML is shown as text, not markup. Shop details are on the More tab.
+  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+  await page.locator('#details-form').waitFor();
   await page.fill('input[name=name]', 'Tom & <b>Jerry</b> <img src=x onerror="window.__xss=1">');
   await page.click('#details-form button[type=submit]');
   await waitText(page, 'Shop details saved.');
@@ -464,7 +475,10 @@ async function waitText(page, text, timeout = 8000) {
   await page.locator('#service-form').waitFor();
   const created = state.requests.find((r) => r.path === '/rest/v1/rpc/create_shop');
   check('create shop sends slug and details to create_shop', created && created.body.p_slug === 'second-copy' && created.body.p_name === 'Second Copy Shop');
-  check('new shop opens on its manager page', (await page.locator('input[readonly]').inputValue()).endsWith('#/s/second-copy'));
+  check('new shop opens on its prices page', (await page.getByRole('heading', { name: 'Services and prices' }).count()) === 1);
+  await page.goto(`${BASE}#/owner/shop/second-copy/more`);
+  await page.locator('input[readonly]').waitFor();
+  check('new shop shows its customer page address on More', (await page.locator('input[readonly]').inputValue()).endsWith('#/s/second-copy'));
 
   // 11. Taken web address gives a clear message.
   await page.evaluate(() => {
@@ -493,9 +507,9 @@ async function waitText(page, text, timeout = 8000) {
 
   // 13. Sign out clears the session.
   await page.evaluate(() => {
-    location.hash = '#/owner';
+    location.hash = '#/owner/shop/demo-xerox/more';
   });
-  await page.getByText('Your shops').first().waitFor();
+  await page.getByRole('heading', { name: 'Account' }).waitFor();
   await page.click('[data-action="signout"]');
   await page.locator('#auth-form').waitFor();
   const afterSignOut = await page.evaluate(() => sessionStorage.getItem('qrquick.owner.session'));

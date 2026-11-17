@@ -83,6 +83,14 @@ jobs:
       - name: Sync web files into the Android project
         run: npx cap sync android
 
+      - name: Apply the QRquick launcher icons (replaces the default Capacitor icons)
+        run: |
+          set -euo pipefail
+          test -f branding/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+          cp -R branding/res/. android/app/src/main/res/
+          test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -f android/app/src/main/res/values/ic_launcher_background.xml
+
       - name: Build the debug APK
         working-directory: mobile/android
         run: |
@@ -101,6 +109,9 @@ jobs:
           "$BUILD_TOOLS/zipalign" -c -v 4 "$APK"
           "$BUILD_TOOLS/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
           grep -q "package: name='com.printnest.app'" "$RUNNER_TEMP/apk-badging.txt"
+          grep -q "application-label:'QRquick'" "$RUNNER_TEMP/apk-badging.txt"
+          unzip -l "$APK" | grep -q 'res/mipmap-anydpi-v26/ic_launcher.xml'
+          unzip -l "$APK" | grep -q 'res/mipmap-xxxhdpi/ic_launcher_foreground.png'
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'assets/public/index.html'
           unzip -l "$APK" | grep -q 'assets/public/src/licence-status.js'
@@ -110,6 +121,8 @@ jobs:
             echo "- APK bytes: $(stat -c '%s' "$APK")"
             echo "- SHA-256: `$(sha256sum "$APK" | cut -d ' ' -f 1)`"
             echo "- Package: `com.printnest.app`"
+            echo "- App label: QRquick (checked in the badging)"
+            echo "- Launcher icons: adaptive QRquick icon present"
             echo "- Signature verification: passed"
             echo "- Zip alignment: passed"
             echo "- Bundled web entry point and owner licence-status module: present"
@@ -135,6 +148,7 @@ jobs:
             python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED); z.write(sys.argv[1], "app-debug.apk"); z.close()' mobile/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/artifact-wrapped.zip"
             adb install "$RUNNER_TEMP/artifact-wrapped.zip" > "$RUNNER_TEMP/zip-install.txt" 2>&1 || true
             test -s "$RUNNER_TEMP/pid.txt" || { echo 'The app process is not running after launch.'; exit 1; }
+            bash .github/scripts/apk-ui-check.sh "$RUNNER_TEMP/apk-ui"
 
       - name: Post the emulator install and launch results
         if: always()
@@ -142,6 +156,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/apk-emulator-report.sh
+
+      - name: Upload the emulator screen checks and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qrquick-ui-check
+          path: ${{ runner.temp }}/apk-ui
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload the APK
         uses: actions/upload-artifact@v4

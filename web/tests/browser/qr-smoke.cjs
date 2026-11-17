@@ -220,6 +220,7 @@ async function handleSupabase(route) {
   }
 
   // ----- RPCs -----
+  if (url.pathname === '/rest/v1/rpc/owner_print_status') return json(200, { is_owner: true, agents: [], jobs: [] });
   if (url.pathname === '/rest/v1/rpc/create_shop') {
     if (state.shops.some((s) => s.slug === body.p_slug)) {
       return json(409, {
@@ -335,7 +336,7 @@ async function scenario(label, { publicBase = null, expectUrl, expectBanner, exp
   }
 
   await signIn(page);
-  await page.goto(`${BASE}#/owner/shop/demo-xerox`);
+  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
   // Wait for the address field: a local address shows a banner instead of the QR code.
   await page.locator('input[readonly]').waitFor();
 
