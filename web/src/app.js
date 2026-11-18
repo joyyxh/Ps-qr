@@ -124,6 +124,12 @@ function renderHome() {
           <a class="button button-large" href="#/scan">Scan shop QR <span aria-hidden="true">↗</span></a>
           <a class="button secondary button-large" href="#/owner">Add your shop</a>
         </div>
+        <ol class="step-strip" aria-label="How QRquick works, in four steps">
+          <li><span>1</span><div><b>Scan</b><small>the shop QR</small></div></li>
+          <li><span>2</span><div><b>Upload</b><small>your file</small></div></li>
+          <li><span>3</span><div><b>Pay</b><small>cash or UPI</small></div></li>
+          <li><span>4</span><div><b>Pick up</b><small>when ready</small></div></li>
+        </ol>
       </div>
       <div class="qr-home-art" aria-hidden="true"><span class="qr-art-square">▦</span><span class="qr-art-paper">▤</span></div>
     </section>
@@ -649,9 +655,13 @@ async function lookupOrder(code) {
       out.innerHTML = '<p class="error">No order found with that code.</p>';
       return;
     }
+    const shopAndDate = [order.shop_name, new Date(order.created_at).toLocaleString('en-IN')]
+      .filter(Boolean)
+      .map(escapeHtml)
+      .join(' · ');
     out.innerHTML = `
       <div class="status">
-        <p class="muted">${escapeHtml(order.shop_name)} · ${escapeHtml(new Date(order.created_at).toLocaleString('en-IN'))}</p>
+        <p class="muted">${shopAndDate}</p>
         <p class="code">${escapeHtml(order.tracking_code)}</p>
         <p><strong>${escapeHtml(statusLabel(order.status))}</strong></p>
         <p>Total ${formatPaise(order.total_paise)}</p>

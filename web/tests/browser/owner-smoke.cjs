@@ -315,6 +315,10 @@ async function waitText(page, text, timeout = 8000) {
   });
 
   await page.route(/supabase\.co/, handleSupabase);
+  // Google Fonts is stubbed too: the page links it, and the test must not depend on
+  // outside network access (the CI sandbox cannot reach it).
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+    route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 
   // 1. Signed out: sign-in form.
   await page.goto(`${BASE}#/owner`);
