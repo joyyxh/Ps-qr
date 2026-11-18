@@ -147,10 +147,10 @@ function check(label, ok, detail = '') {
   await page.click('#auth-form button[type=submit]');
   await text('Demo Xerox Centre').waitFor();
 
-  // The shop has Orders and Stats tabs in the owner tab bar.
+  // Shop page keeps Orders and gains Statistics.
   await page.click('a[href="#/owner/shop/demo-xerox"]');
-  await page.locator('#owner-tabbar a[data-tab="stats"]').waitFor();
-  check('shop page has Orders and Stats tabs', (await page.locator('#owner-tabbar a[href="#/owner/shop/demo-xerox/orders"][data-tab="orders"]').count()) === 1 && (await page.locator('#owner-tabbar a[href="#/owner/shop/demo-xerox/stats"][data-tab="stats"]').count()) === 1);
+  await page.locator('a[href="#/owner/shop/demo-xerox/stats"]').waitFor();
+  check('shop page links to Statistics next to Orders', (await page.locator('a[href="#/owner/shop/demo-xerox/orders"]').count()) === 1);
 
   // Statistics page.
   await page.locator('a[href="#/owner/shop/demo-xerox/stats"]').click();

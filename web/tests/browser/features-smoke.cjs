@@ -253,8 +253,6 @@ async function handleSupabase(route) {
     shop.features = { ...shop.features, ...body.p_features };
     return json(200, shop.features);
   }
-  // The Home summary asks for the printing computers; this shop has none.
-  if (url.pathname === '/rest/v1/rpc/owner_print_status') return json(200, { is_owner: true, agents: [], jobs: [] });
   if (url.pathname === '/rest/v1/rpc/set_payment_qr') {
     const shop = state.shops.find((s) => s.id === body.p_shop_id);
     if (!shop) return json(403, { code: '42501', message: 'you do not have permission to change this shop' });
@@ -312,9 +310,6 @@ async function until(test, ms = 8000) {
     if (msg.type() === 'error' && !/favicon/i.test(msg.text())) problems.push(`console: ${msg.text()}`);
   });
   await page.route(/supabase\.co/, handleSupabase);
-  // Google Fonts is stubbed: the page links it, and this check must not depend on outside network access.
-  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
-    route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   // Later routes win: serve the stored picture from the mock, not a 404.
   await page.route(/supabase\.co\/storage\/v1\/object\/public\//, (route) =>
     route.fulfill({ status: 200, contentType: 'image/png', body: PICTURE })
@@ -357,9 +352,7 @@ async function until(test, ms = 8000) {
       Boolean(save) && save.body.p_features.colour_printing === false && save.body.p_features.double_sided === false && save.body.p_features.stapling === true
     );
 
-    // 3. Payment QR: none yet. The UPI QR now lives on the More tab.
-    await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
-    await waitText(page, 'Shop QR code');
+    // 3. Payment QR: none yet.
     check('no payment QR yet', (await page.getByText('No payment QR yet').count()) === 1);
 
     // 4. A text file is refused before any request is sent.
@@ -458,8 +451,8 @@ async function until(test, ms = 8000) {
     await page.screenshot({ path: `${DIR}/customer-features-phone.png`, fullPage: true });
 
     // 8. Owner removes the payment QR; the customer page stops showing it.
-    await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
-    await waitText(page, 'Shop QR code');
+    await page.goto(`${BASE}#/owner/shop/demo-xerox`);
+    await waitText(page, 'Printing features');
     await page.click('[data-action="remove-payment-qr"]');
     const removed = await until(() => state.requests.some((r) => r.path === '/rest/v1/rpc/set_payment_qr' && r.body.p_path === null));
     check('remove sends a null payment QR path', removed);

@@ -154,12 +154,12 @@ async function waitForCalls(count, timeout = 8000) {
   await page.route(/supabase\.co/, handleSupabase);
 
   // ----- owner opens a shop -----
-  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/more`);
-  await page.getByRole('link', { name: 'Licence status', exact: true }).waitFor();
+  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}`);
+  await page.getByRole('link', { name: 'Licence', exact: true }).waitFor();
   check('web build: the owner-only Android switch is off', (await page.evaluate(() => window.PRINTNEST_CONFIG?.ownerApp)) === false);
-  check('owner sees a Licence link on the shop page', (await page.getByRole('link', { name: 'Licence status', exact: true }).count()) === 1);
+  check('owner sees a Licence link on the shop page', (await page.getByRole('link', { name: 'Licence', exact: true }).count()) === 1);
 
-  await page.getByRole('link', { name: 'Licence status', exact: true }).click();
+  await page.getByRole('link', { name: 'Licence', exact: true }).click();
   await waitForText(page, 'Access until');
   let text = await screenText(page);
   check('active dated licence says it is active until a time', /Active/.test(text) && /Access until \d{1,2} \w{3} \d{4}, \d{2}:\d{2} IST/.test(text), text.split('\n').slice(0, 6).join(' | '));
@@ -246,7 +246,7 @@ async function waitForCalls(count, timeout = 8000) {
   state.licence[ALPHA.id] = { body: ACTIVE_DATED, delayMs: 900 };
   state.licence[BETA.id] = { body: SCHEDULED };
   // Start from the shop list, so each licence visit is a real navigation (same-hash goto does nothing).
-  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/more`);
+  await page.goto(`${BASE}#/owner`);
   await page.getByRole('button', { name: 'Sign out' }).waitFor();
   const beforeSwitch = licenceCalls().length;
   await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
@@ -259,12 +259,12 @@ async function waitForCalls(count, timeout = 8000) {
 
   // ----- sign-out during a check: nothing from the licence stays on screen -----
   state.licence[BETA.id] = { body: ACTIVE_LIFETIME, delayMs: 900 };
-  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/more`);
+  await page.goto(`${BASE}#/owner`);
   await page.getByRole('button', { name: 'Sign out' }).waitFor();
   const beforeSignOutCheck = licenceCalls().length;
   await page.goto(`${BASE}#/owner/shop/${BETA.slug}/licence`);
   await waitForCalls(beforeSignOutCheck + 1);
-  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/more`);
+  await page.goto(`${BASE}#/owner`);
   await page.getByRole('button', { name: 'Sign out' }).click();
   await page.locator('#auth-form').waitFor();
   await sleep(1300);
@@ -280,9 +280,9 @@ async function waitForCalls(count, timeout = 8000) {
   await page.reload();
   state.role = 'staff';
   const beforeStaff = licenceCalls().length;
-  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/more`);
-  await page.getByRole('heading', { name: 'Account' }).waitFor();
-  check('staff see no Licence link on the More page', (await page.getByRole('link', { name: 'Licence status', exact: true }).count()) === 0);
+  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}`);
+  await page.getByRole('link', { name: 'Statistics', exact: true }).waitFor();
+  check('staff see no Licence link on the shop page', (await page.getByRole('link', { name: 'Licence', exact: true }).count()) === 0);
   await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
   await waitForText(page, 'shown to the shop owner only');
   check('staff who open the licence page directly are told it is for owners', /shown to the shop owner only/.test(await screenText(page)) && !/Access until|Lifetime access|Not active/.test(await screenText(page)));
@@ -290,7 +290,7 @@ async function waitForCalls(count, timeout = 8000) {
   state.role = 'owner';
 
   // ----- layout and errors -----
-  await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/more`);
+  await page.goto(`${BASE}#/owner`);
   await page.getByRole('button', { name: 'Sign out' }).waitFor();
   await page.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
   await waitForText(page, 'Access until');
@@ -327,11 +327,11 @@ async function waitForCalls(count, timeout = 8000) {
   );
 
   const beforeAndroid = licenceCalls().length;
-  await android.goto(`${BASE}#/owner/shop/${ALPHA.slug}/more`);
-  await android.getByRole('link', { name: 'Licence status', exact: true }).waitFor();
+  await android.goto(`${BASE}#/owner/shop/${ALPHA.slug}`);
+  await android.getByRole('link', { name: 'Statistics', exact: true }).waitFor();
   check('Android bundle: the owner licence-status view is enabled', (await android.evaluate(() => window.PRINTNEST_CONFIG?.ownerApp)) === false);
-  check('Android bundle: the owner shop page has a Licence link', (await android.getByRole('link', { name: 'Licence status', exact: true }).count()) === 1);
-  check('Android bundle: the rest of the owner shop page still shows', (await android.getByRole('link', { name: 'Stats', exact: true }).count()) === 1);
+  check('Android bundle: the owner shop page has a Licence link', (await android.getByRole('link', { name: 'Licence', exact: true }).count()) === 1);
+  check('Android bundle: the rest of the owner shop page still shows', (await android.getByRole('link', { name: 'Statistics', exact: true }).count()) === 1);
   await android.goto(`${BASE}#/owner/shop/${ALPHA.slug}/licence`);
   await waitForText(android, 'Access until');
   text = await screenText(android);
