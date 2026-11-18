@@ -419,3 +419,12 @@ input[type='file']::file-selector-button { font: inherit; font-weight: 700; colo
   body.has-tabbar main#app { padding-bottom: 70px; }
 }
 @media (min-width: 901px) { .tabbar > a:first-child { margin-left: -14px; } }
+
+/* ---- Desktop statistics: the cards sit in two columns; the period header and the wide tables span both. ---- */
+@media (min-width: 1000px) {
+  main#app:has(.stats-periods) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  main#app:has(.stats-periods) > section.card { min-width: 0; }
+  main#app:has(.stats-periods) > section.card:first-child,
+  main#app:has(.stats-periods) > section.card:has(.table-wrap),
+  main#app:has(.stats-periods) > section.card:has(.week-nav) { grid-column: 1 / -1; }
+}
