@@ -395,3 +395,27 @@ input[type='file']::file-selector-button { font: inherit; font-weight: 700; colo
   .qr-art-square { width: 150px; height: 150px; top: 0; right: 6%; font-size: 5rem; }
   .qr-art-paper { width: 120px; height: 160px; font-size: 4.5rem; right: 2%; bottom: 0; }
 }
+
+/* An empty message line takes no room. The text is added by the page when there is something to say. */
+.notice:empty, .error:empty { display: none; }
+
+/* ---- Desktop owner app: the tabs sit in a sticky row under the header, aligned with the
+   page column, instead of a bar pinned over the bottom of the window. Phones keep the bottom bar. ---- */
+@media (min-width: 901px) {
+  .tabbar {
+    position: sticky; top: 0; bottom: auto; left: auto; right: auto;
+    max-width: none; margin: 0; padding: 8px max(20px, calc((100% - 1140px) / 2));
+    display: flex; gap: 4px; align-items: center;
+    border-top: 0; border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--card) 94%, transparent);
+    box-shadow: none;
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .tabbar a {
+    grid-auto-flow: column; justify-items: start; justify-content: start; align-items: center;
+    min-height: 40px; padding: 8px 14px; gap: 8px; font-size: .92rem; border-radius: 999px;
+  }
+  .tabbar svg { width: 20px; height: 20px; }
+  body.has-tabbar main#app { padding-bottom: 70px; }
+}
+@media (min-width: 901px) { .tabbar > a:first-child { margin-left: -14px; } }
