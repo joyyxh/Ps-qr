@@ -44,6 +44,7 @@ import {
   printerOptionLabel,
   printFailureText,
   passportNeedsService,
+  autoPrintSummary,
   printingNotice,
   printJobLabel,
   retryOptions,
@@ -322,6 +323,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('[data-print-action="pair"]', 'click', onPairPrinter);
     onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
     onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
+    onAll('[data-auto-print]', 'change', onAutoPrintChange);
     on('[data-action="refresh-printer"]', 'click', refreshPrinter);
   }
 
@@ -1407,6 +1409,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('[data-print-action="pair"]', 'click', onPairPrinter);
     onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
     onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
+    onAll('[data-auto-print]', 'change', onAutoPrintChange);
     onAll('[data-send-order]', 'click', onSendToPrint);
     onAll('[data-retry-job]', 'click', onRetryJob);
   }
@@ -1557,6 +1560,29 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     );
   }
 
+  // The switch that sends approved, paid orders to the printer without a press of Send to printer.
+  // Off unless the owner turns it on. Turning it off does not cancel jobs already queued.
+  function autoPrintHtml() {
+    const enabled = orderView.shop?.auto_print_enabled === true;
+    return `<label class="auto-print-switch">
+        <input type="checkbox" data-auto-print${enabled ? ' checked' : ''} />
+        <span>Send paid orders to the printer automatically</span>
+      </label>
+      <p class="muted small">${escapeHtml(autoPrintSummary(enabled))}</p>`;
+  }
+
+  async function onAutoPrintChange(event) {
+    const input = event.currentTarget;
+    const enabled = input.checked;
+    input.disabled = true;
+    await runOrderChange(async () => {
+      const saved = await ownerApi.setAutoPrint(orderView.shop.id, enabled);
+      orderView.shop.auto_print_enabled = saved?.auto_print_enabled === true;
+    }, enabled
+      ? 'Automatic sending is on for this shop.'
+      : 'Automatic sending is off. Press Send to printer for each order.');
+  }
+
   // The printing computers and the pairing box. Only the shop owner can pair, rename or remove them.
   function printPanelHtml() {
     const printing = orderView.printing;
@@ -1580,6 +1606,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         <strong>Printing computers</strong>
         ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
         ${rows || '<p class="muted small">No computer is connected for printing yet.</p>'}
+        ${printing.is_owner ? autoPrintHtml() : ''}
         ${printing.is_owner
           ? '<div class="actions"><button type="button" data-print-action="pair">Connect a printing computer</button></div>'
           : ''}

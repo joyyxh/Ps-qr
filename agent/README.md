@@ -77,7 +77,7 @@ It writes a file into the `autostart` folder next to the agent and prints the in
 
 `autostart` only starts the agent. It does not change what gets printed: the agent still prints only
 orders the owner has approved and marked paid, and each one still needs **Send to printer** unless the
-owner turns automatic sending on (not yet built; see "Known limits").
+owner switches on automatic sending for the shop (off by default; see "Known limits").
 
 The computer must stay on, online and logged in for printing to happen. Orders wait in the
 queue while it is off, and print when it comes back.
@@ -136,9 +136,11 @@ Until items 3 to 5 pass, do not describe automatic printing as working.
 
 ## Known limits
 
-- **Automatic sending.** Today the owner presses **Send to printer** for each approved, paid order.
-  A setting that sends paid orders without that press is not built. It would change the rule that
-  nothing prints without the owner's action, so it needs the owner's decision first.
+- **Automatic sending.** Each shop has a switch in Orders > Printing computers, off by default. When
+  it is on, an approved and paid order is queued as soon as the second of the two happens, with no press
+  of **Send to printer**. Orders approved before the switch was turned on still need **Send to printer**.
+  Status: the database change is written (migration 0018) but has not been run against a database or
+  applied to the live project. Until it is applied, the switch cannot be saved.
 - Windows: SumatraPDF settings (`-print-settings` with copies, `color`/`monochrome`, `duplexlong`)
   follow SumatraPDF's documented words but are not yet checked on a real installation.
 - Windows: PowerShell `Get-PrintConfiguration` may need the printer driver to report colour and

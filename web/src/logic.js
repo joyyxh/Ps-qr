@@ -391,6 +391,16 @@ export function printingNotice({ agents = [], jobs = [] }) {
   return `No printing computer is connected. ${waiting} job${waiting === 1 ? ' is' : 's are'} waiting.`;
 }
 
+// The text under the automatic-sending switch on the printing page. Nothing prints unless the
+// order is approved AND paid; the switch only saves the press of Send to printer.
+export function autoPrintSummary(enabled) {
+  if (enabled === true) {
+    return 'On. An approved, paid order sends its files to the printing computer straight away. ' +
+      'Orders approved before you switched this on still need Send to printer.';
+  }
+  return 'Off. Press Send to printer for each approved, paid order.';
+}
+
 // ---------- owner: statistics, payments and CSV ----------
 // Calendar days are "YYYY-MM-DD" strings in India time (IST). The arithmetic
 // below runs on those strings in UTC, so the result does not depend on the

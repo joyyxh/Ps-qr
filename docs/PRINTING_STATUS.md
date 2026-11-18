@@ -17,6 +17,7 @@ shop that printing works.
 | Windows agent | Written, **not run on Windows** | SumatraPDF plus PowerShell. Setting names are unverified on a real install. |
 | Linux agent (CUPS) | Written, **not run on CUPS** | Uses `lpstat`, `lpoptions`, `lp`. |
 | Sending jobs without duplicates | Built, tested locally | Claim lease, "printing" recorded before the printer gets the file, `needs_check` for uncertain jobs, no automatic reprint. |
+| Automatic sending of paid orders (opt-in switch, off by default) | Written, not run | Migration 0018 and the switch in Orders > Printing computers. Not yet run against a database or applied to the live project. Send to printer still works without it. |
 | Failure handling | Built, tested locally | Offline printer, unsupported option, spooler error, lost connection, revoked computer, repeated claims. |
 | Owner retry | Built, tested locally | Failed jobs can be printed again. Jobs that may have printed need confirmation. |
 | Print options | Partial | Copies, colour, double-sided and A4 are applied and refused when the printer cannot do them. Customers can crop and adjust JPEG and PNG pictures before upload (passport, square, 4 × 6 shapes; turn; brightness and contrast). Orientation, page range, fit-to-page, the passport sheet layout and the customer's paper choice are **not** built. |

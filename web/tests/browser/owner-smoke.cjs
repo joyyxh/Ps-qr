@@ -248,6 +248,13 @@ async function handleSupabase(route) {
     shop.features = { ...shop.features, ...body.p_features };
     return json(200, shop.features);
   }
+  // Automatic sending of paid orders (migration 0018): the owner switch, off by default.
+  if (url.pathname === '/rest/v1/rpc/set_auto_print') {
+    const shop = state.shops.find((s) => s.id === body.p_shop_id);
+    if (!shop) return json(403, { code: '42501', message: 'you do not have permission to change this shop' });
+    shop.auto_print_enabled = body.p_enabled === true;
+    return json(200, { auto_print_enabled: shop.auto_print_enabled });
+  }
   // Printing computers and recent print jobs (migration 0010). This mock has no paired computer.
   if (url.pathname === '/rest/v1/rpc/owner_print_status') return json(200, { is_owner: true, agents: [], jobs: [] });
   if (url.pathname === '/rest/v1/rpc/set_payment_qr') {
@@ -461,6 +468,22 @@ async function waitText(page, text, timeout = 8000) {
   check('all orders shows both orders', (await page.locator('.order-list > li.order').count()) === 2);
   check('a rejected order offers no buttons', (await page.locator('button[data-order-id="ord-2"]').count()) === 0);
   check('the rejected order shows its status', (await page.getByText('Rejected', { exact: true }).count()) === 1);
+
+  // 9b. Automatic sending: off by default, and turning it on saves through the owner's RPC.
+  const autoSwitch = page.locator('[data-auto-print]');
+  check('automatic sending is off by default', (await autoSwitch.count()) === 1 && !(await autoSwitch.isChecked()));
+  const requestsBeforeSwitch = state.requests.length;
+  await autoSwitch.check();
+  await waitText(page, 'Automatic sending is on for this shop.');
+  const switchSaved = state.requests
+    .slice(requestsBeforeSwitch)
+    .find((r) => r.path === '/rest/v1/rpc/set_auto_print');
+  check(
+    'turning it on saves through set_auto_print for this shop',
+    switchSaved && switchSaved.body.p_shop_id === SHOP_ID && switchSaved.body.p_enabled === true,
+    JSON.stringify(switchSaved?.body)
+  );
+  check('the switch stays on after the list reloads', await page.locator('[data-auto-print]').isChecked());
 
   // 10. Create a second shop.
   await page.evaluate(() => {
