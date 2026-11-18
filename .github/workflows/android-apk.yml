@@ -163,7 +163,7 @@ jobs:
             adb shell dumpsys package com.printnest.app | grep -E 'versionName|versionCode|primaryCpuAbi' || true
             grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success.'; exit 1; }
             test -s "$RUNNER_TEMP/pid.txt" || { echo 'The app process is not running after launch.'; exit 1; }
-            bash .github/scripts/apk-ui-check.sh "$RUNNER_TEMP/apk-ui"
+            bash .github/scripts/apk-back-probe.sh "$RUNNER_TEMP/apk-ui"
 
       - name: Post the emulator install and launch results
         if: always()
