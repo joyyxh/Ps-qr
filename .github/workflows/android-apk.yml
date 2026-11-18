@@ -143,22 +143,7 @@ jobs:
             adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/install.txt" 2>&1 || true
             cat "$RUNNER_TEMP/install.txt"
             grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success.'; exit 1; }
-            adb logcat -c || true
-            adb shell monkey -p com.printnest.app -c android.intent.category.LAUNCHER 1 > "$RUNNER_TEMP/monkey.txt" 2>&1 || true
-            cat "$RUNNER_TEMP/monkey.txt"
-            start=$(date +%s)
-            crashed=no
-            while [ $(( $(date +%s) - start )) -lt 300 ]; do
-              sleep 15
-              pid="$(adb shell pidof com.printnest.app 2>/dev/null | tr -d '\r' || true)"
-              echo "t=$(( $(date +%s) - start ))s pid=${pid:-none}"
-              if adb logcat -d 2>/dev/null | grep -q 'crash detected'; then crashed=yes; echo 'RENDERER CRASH SEEN'; break; fi
-              if [ -z "$pid" ]; then echo 'app process gone'; break; fi
-            done
-            adb logcat -d > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
-            echo "crashed=$crashed"
-            grep -E 'crash detected|wasn.t handled|Force finishing|has died|ANR in|PackageUpdatedTask' "$RUNNER_TEMP/logcat.txt" | head -60 || true
-            mkdir -p "$RUNNER_TEMP/apk-ui"; cp "$RUNNER_TEMP/logcat.txt" "$RUNNER_TEMP/apk-ui/" || true
+            bash .github/scripts/apk-launch-watch.sh "$RUNNER_TEMP/apk-ui"
 
       - name: Post the emulator install and launch results
         if: always()
