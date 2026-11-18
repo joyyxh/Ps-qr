@@ -434,7 +434,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       }
       const session = await auth.getSession();
       // Protected: every owner page needs a session. Signed-out screens show no tabs.
-      if (!session) return renderSignIn('signin');
+      if (!session) return renderSignIn(signInScreen(page));
       if (page === 'reset') {
         setTabs(null);
         return renderResetPassword();
@@ -481,6 +481,20 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     resendTimer = null;
   }
 
+  // The side screens of sign in have their own addresses, so Back (on Android and in the browser)
+  // returns to the screen before them instead of leaving the app.
+  const SIGN_IN_SCREENS = ['register', 'forgot', 'verify'];
+
+  function signInScreen(page) {
+    return SIGN_IN_SCREENS.includes(page) ? page : 'signin';
+  }
+
+  function goAuth(mode) {
+    const hash = mode === 'signin' ? '#/owner' : `#/owner/${mode}`;
+    if (window.location.hash === hash) renderSignIn(mode);
+    else window.location.hash = hash;
+  }
+
   function renderSignIn(mode = 'signin', notice = '') {
     setTabs(null);
     clearResendTimer();
@@ -511,7 +525,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       </section>`
     );
     on('#auth-form', 'submit', onSignInSubmit);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
   }
 
   async function onSignInSubmit(event) {
@@ -568,7 +582,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       </section>`
     );
     on('#auth-form', 'submit', onRegisterSubmit);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
   }
 
   async function onRegisterSubmit(event) {
@@ -594,6 +608,9 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   }
 
   function renderVerify(notice = '') {
+    // The code screen follows on from registration or sign in without a new history entry,
+    // so its address is set to match what is shown: a reload then opens sign in, as before.
+    if (window.location.hash !== '#/owner/verify') window.history.replaceState(null, '', '#/owner/verify');
     show(
       `<section class="card">
         <h1>Check your email</h1>
@@ -613,7 +630,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     );
     on('#auth-form', 'submit', onVerifySubmit);
     on('[data-action="resend"]', 'click', onResendCode);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
     startResendCountdown();
   }
 
@@ -707,7 +724,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('#set-password-form', 'submit', onSetPasswordSubmit);
     onAll('[data-switch]', 'click', (event) => {
       auth.abandonSignup();
-      renderSignIn(event.currentTarget.dataset.switch);
+      goAuth(event.currentTarget.dataset.switch);
     });
   }
 
@@ -741,7 +758,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       </section>`
     );
     on('#auth-form', 'submit', onForgotSubmit);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
   }
 
   async function onForgotSubmit(event) {
@@ -769,7 +786,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         <p><button type="button" class="link" data-switch="signin">Go to sign in</button></p>
       </section>`
     );
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
   }
 
   function renderResetPassword(notice = '') {

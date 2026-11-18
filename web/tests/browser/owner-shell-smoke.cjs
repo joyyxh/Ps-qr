@@ -171,6 +171,12 @@ async function main() {
     await page.locator('h1', { hasText: 'Create an owner account' }).waitFor();
     check('registration screen opens', (await page.locator('#auth-form input[name=email]').count()) === 1);
     check('registration asks for a password of at least 8 characters', (await page.locator('#auth-form input[name=password][minlength="8"]').count()) === 1);
+    // Back (the browser Back button, which Android Back also uses) returns to sign in, not out of the app.
+    await page.goBack();
+    await page.locator('h1', { hasText: 'Shop owner sign in' }).waitFor();
+    check('Back from registration returns to sign in', (await page.locator('#auth-form input[name=email]').count()) === 1);
+    await page.click('[data-switch="register"]');
+    await page.locator('h1', { hasText: 'Create an owner account' }).waitFor();
     await page.screenshot({ path: shot('register-390.png'), fullPage: true });
     await page.fill('#auth-form input[name=email]', EMAIL);
     await page.fill('#auth-form input[name=password]', PASSWORD);
