@@ -130,6 +130,16 @@ jobs:
             echo "- Native .so files: reported by APK contents only; absence is not treated as a failure for this Capacitor app"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Give the emulator hardware acceleration (KVM)
+        # Without KVM the emulator runs x86 in software. The first boot took about seven minutes,
+        # system services stopped responding, and the WebView renderer crashed during the screen
+        # checks. The runner user needs access to /dev/kvm; this makes the emulator use it.
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-filter=kvm
+          test -r /dev/kvm && test -w /dev/kvm || { echo '/dev/kvm is not usable; the emulator would run in software.' >&2; exit 1; }
+
       - name: Install and launch APK on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -149,8 +159,6 @@ jobs:
             adb logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
             adb shell dumpsys package com.printnest.app | grep -E 'versionName|versionCode|primaryCpuAbi' || true
             grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success.'; exit 1; }
-            python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED); z.write(sys.argv[1], "app-debug.apk"); z.close()' mobile/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/artifact-wrapped.zip"
-            adb install "$RUNNER_TEMP/artifact-wrapped.zip" > "$RUNNER_TEMP/zip-install.txt" 2>&1 || true
             test -s "$RUNNER_TEMP/pid.txt" || { echo 'The app process is not running after launch.'; exit 1; }
             bash .github/scripts/apk-ui-check.sh "$RUNNER_TEMP/apk-ui"
 

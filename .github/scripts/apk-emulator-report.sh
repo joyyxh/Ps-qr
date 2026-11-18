@@ -15,9 +15,6 @@ OUT="$RUNNER_TEMP"
   echo "## Process id after launch"
   cat "$OUT/pid.txt" 2>/dev/null || echo "(none)"
   echo
-  echo "## Install of the same APK wrapped in a zip (what a GitHub artifact download is)"
-  cat "$OUT/zip-install.txt" 2>/dev/null || echo "(not run)"
-  echo
   APK="$GITHUB_WORKSPACE/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
   echo "## Built APK"
   echo "- File: app-debug.apk"
