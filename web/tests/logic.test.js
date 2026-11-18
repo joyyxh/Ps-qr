@@ -9,7 +9,6 @@ import {
   escapeHtml,
   fileAlreadyInOrder,
   formatPaise,
-  passportNeedsService,
   statusLabel,
   unitLabel,
 } from '../src/logic.js';
@@ -104,16 +103,4 @@ test('fileAlreadyInOrder spots a file that is already a cart line', () => {
 test('colourAvailable reads the nullable colour price', () => {
   assert.equal(colourAvailable({ colour_price_paise: 1000 }), true);
   assert.equal(colourAvailable({ colour_price_paise: null }), false);
-});
-
-test('passport photos needs a priced passport service before customers can order it', () => {
-  const on = { features: { passport_photos: true } };
-  const off = { features: { passport_photos: false } };
-  assert.equal(passportNeedsService(on, []), true);
-  assert.equal(passportNeedsService(on, [{ name: 'Printing', is_active: true }]), true);
-  assert.equal(passportNeedsService(on, [{ name: 'Passport photo sheet', is_active: false }]), true);
-  assert.equal(passportNeedsService(on, [{ name: 'Passport photo sheet', is_active: true }]), false);
-  assert.equal(passportNeedsService(on, [{ name: 'Passport photo sheet' }]), false);
-  assert.equal(passportNeedsService(off, []), false);
-  assert.equal(passportNeedsService(null, []), false);
 });

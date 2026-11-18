@@ -43,8 +43,6 @@ import {
   printAgentFunctionUrl,
   printerOptionLabel,
   printFailureText,
-  passportNeedsService,
-  autoPrintSummary,
   printingNotice,
   printJobLabel,
   retryOptions,
@@ -59,13 +57,6 @@ const UNIT_OPTIONS = [
   { value: 'per_sheet', label: 'Per sheet (double-sided halves the sheets)' },
   { value: 'per_copy', label: 'Per copy (one flat charge)' },
 ];
-
-// Quick-start names for photo services. The owner still types the price; nothing is priced for them.
-const PHOTO_PRESETS = {
-  passport: { name: 'Passport photo sheet', pricingUnit: 'per_copy' },
-  'photo-4x6': { name: 'Photo print 4 × 6 in', pricingUnit: 'per_copy' },
-};
-
 
 const CONNECTION_MESSAGE = 'Could not reach the server. Check your internet connection and try again.';
 
@@ -97,263 +88,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     onStatus: onLiveStatus,
     visibility: browserVisibility(),
   });
-
-  // ---------- owner tabs: Home, Orders, Prices, Stats, More ----------
-  // The tab bar is outside the page (index.html), so it stays on screen while a tab's page is redrawn.
-  // activeSlug is the shop the tabs open. Home keeps it, and each shop page sets it.
-  const tabbar = document.getElementById('owner-tabbar');
-  let activeSlug = null;
-  const TAB_ICONS = {
-    home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
-    orders: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
-    prices: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><path d="M7.5 8h.01"/></svg>',
-    stats: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-8M12 20V5M19 20v-11"/></svg>',
-    more: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg>',
-  };
-
-  // active: the tab to mark as current, or null to hide the bar (signed-out screens).
-  // slug: the shop the tabs open. Leave it out to keep the current shop.
-  function setTabs(active, slug) {
-    if (slug !== undefined) activeSlug = slug;
-    if (!tabbar) return;
-    if (!active) {
-      tabbar.hidden = true;
-      tabbar.innerHTML = '';
-      document.body.classList.remove('has-tabbar');
-      return;
-    }
-    const shopBase = activeSlug ? `#/owner/shop/${encodeURIComponent(activeSlug)}` : '#/owner/new';
-    const tabs = [
-      ['home', 'Home', '#/owner'],
-      ['orders', 'Orders', activeSlug ? `${shopBase}/orders` : shopBase],
-      ['prices', 'Prices', shopBase],
-      ['stats', 'Stats', activeSlug ? `${shopBase}/stats` : shopBase],
-      ['more', 'More', activeSlug ? `${shopBase}/more` : shopBase],
-    ];
-    tabbar.innerHTML = tabs
-      .map(
-        ([key, label, href]) =>
-          `<a href="${href}" data-tab="${key}"${key === active ? ' aria-current="page"' : ''}>${TAB_ICONS[key]}<span>${label}</span></a>`
-      )
-      .join('');
-    tabbar.hidden = false;
-    document.body.classList.add('has-tabbar');
-  }
-
-  // Counts for the Home summary. A failed read shows a dash instead of a wrong number.
-  async function homeStats(shop) {
-    const [orders, printing] = await Promise.allSettled([ownerApi.listOrders(shop.id), ownerApi.printStatus(shop.id)]);
-    return {
-      open: orders.status === 'fulfilled' ? orders.value.filter((order) => isOpenOrder(order.status)).length : null,
-      agents: printing.status === 'fulfilled' && printing.value ? (printing.value.agents ?? []).length : null,
-    };
-  }
-
-  // The Prices tab: the services editor, the features the shop offers and the cash rule.
-  function pricesHtml(shop, services, editing, notice, error, catalog) {
-    const rows = services
-      .map((service) => {
-        const bw = service.bw_price_paise === null ? '–' : formatPaise(service.bw_price_paise);
-        const colour = service.colour_price_paise === null ? '–' : formatPaise(service.colour_price_paise);
-        const hidden = service.is_active ? '' : ' <span class="muted small">(hidden from customers)</span>';
-        return `
-          <tr>
-            <td>${escapeHtml(service.name)}${hidden}</td>
-            <td>${escapeHtml(unitLabel(service.pricing_unit))}</td>
-            <td class="num">${bw}</td>
-            <td class="num">${colour}</td>
-            <td><button type="button" class="link" data-edit="${escapeHtml(service.id)}">Edit</button></td>
-          </tr>`;
-      })
-      .join('');
-
-    const serviceTable = services.length
-      ? `<div class="table-wrap">
-           <table class="breakdown">
-             <thead><tr><th>Service</th><th>Charged</th><th class="num">B&amp;W</th><th class="num">Colour</th><th></th></tr></thead>
-             <tbody>${rows}</tbody>
-           </table>
-         </div>`
-      : '<p class="muted">No services yet. Add one below.</p>';
-
-    const selectedUnit = editing?.pricing_unit ?? 'per_side';
-    const unitOptions = UNIT_OPTIONS.map(
-      (option) =>
-        `<option value="${option.value}"${option.value === selectedUnit ? ' selected' : ''}>${escapeHtml(option.label)}</option>`
-    ).join('');
-
-    return `
-      <section class="card page-head">
-        <p class="eyebrow">PRICES</p>
-        <h1>${escapeHtml(shop.name)}</h1>
-        <p class="${shop.is_open ? 'badge ok' : 'badge closed'}">${shop.is_open ? 'Open for orders' : 'Closed for orders'}. Open or close it on the More tab.</p>
-        <p class="muted small">Changes apply to new orders. Existing orders keep their prices.</p>
-        <p class="notice" data-notice>${escapeHtml(notice)}</p>
-        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
-      </section>
-
-      <section class="card">
-        <h2>Services and prices</h2>
-        ${passportNeedsService(shop, services) ? '<p class="banner" role="status">Passport photos is switched on, but customers cannot order it yet. Add a Passport photo sheet below with its price.</p>' : ''}
-        ${serviceTable}
-        <h3>${editing ? 'Edit service' : 'Add a service'}</h3>
-        ${editing ? '' : '<p class="muted small">Quick start: <button type="button" class="link" data-preset="passport">Passport photo sheet</button> · <button type="button" class="link" data-preset="photo-4x6">Photo print 4 × 6 in</button>. Fill in the price yourself.</p>'}
-        <form id="service-form" class="grid">
-          <input type="hidden" name="serviceId" value="${escapeHtml(editing?.id ?? '')}" />
-          <label>Service name
-            <input name="name" maxlength="80" required value="${escapeHtml(editing?.name ?? '')}" />
-          </label>
-          <label>Charged
-            <select name="pricingUnit">${unitOptions}</select>
-          </label>
-          <label>Black and white price in rupees (leave empty if not offered)
-            <input name="bwPrice" inputmode="decimal" placeholder="for example 2 or 2.50"
-                   value="${escapeHtml(paiseToRupeesInput(editing?.bw_price_paise))}" />
-          </label>
-          <label>Colour price in rupees (leave empty if not offered)
-            <input name="colourPrice" inputmode="decimal" placeholder="for example 10"
-                   value="${escapeHtml(paiseToRupeesInput(editing?.colour_price_paise))}" />
-          </label>
-          <label class="check">
-            <input name="isActive" type="checkbox" ${editing?.is_active === false ? '' : 'checked'} />
-            Show this service to customers
-          </label>
-          <button type="submit" data-label="${editing ? 'Save service' : 'Add service'}">
-            ${editing ? 'Save service' : 'Add service'}
-          </button>
-          ${editing ? '<button type="button" class="link" data-action="cancel-edit">Cancel editing</button>' : ''}
-          <p class="error" data-error role="alert"></p>
-        </form>
-      </section>
-
-      ${featuresCard(shop, catalog)}
-
-      ${cashPolicyCard(shop)}`;
-  }
-
-  // The More tab: shop status, the shop QR code, shop details, the UPI QR code, printing,
-  // the account and sign out. Every control here uses the same handlers as before (bindManager).
-  function moreHtml(user, shop, printing, notice, error) {
-    const address = customerAddress(shop.slug);
-    const slugPath = encodeURIComponent(shop.slug);
-    const qrContent = address.problem
-      ? `<p class="banner" role="alert">${escapeHtml(address.problem)} QR generation is disabled until a verified HTTPS customer URL is configured.</p>`
-      : `<div class="qr-box">${qrSvg(address.url)}</div>
-         <div class="qr-text">
-           <p class="muted small">Print this code and place it at your counter. Customers scan it to open their page, upload files and place an order.</p>
-           <button type="button" data-action="download-qr">Download QR as PNG</button>
-         </div>`;
-    const agents = printing?.agents ?? [];
-    const printerLine = !printing
-      ? 'Printing status is not available right now.'
-      : agents.length
-        ? `${agents.length} printing ${agents.length === 1 ? 'computer is' : 'computers are'} connected.`
-        : 'No computer is connected for printing yet.';
-    return `
-      <section class="card page-head">
-        <p class="eyebrow">MORE</p>
-        <h1>${escapeHtml(shop.name)}</h1>
-        <p class="${shop.is_open ? 'badge ok' : 'badge closed'}">
-          ${shop.is_open ? 'Open for orders' : 'Closed. Customers can see prices but cannot order.'}
-        </p>
-        <p><button type="button" data-action="toggle-open" data-label="${shop.is_open ? 'Close shop' : 'Open shop'}">
-          ${shop.is_open ? 'Close shop' : 'Open shop'}
-        </button></p>
-        <p class="notice" data-notice>${escapeHtml(notice)}</p>
-        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
-      </section>
-
-      <section class="card">
-        <h2>Shop QR code</h2>
-        <label>Customer page address
-          <input readonly value="${escapeHtml(address.url)}" />
-        </label>
-        <div class="qr-row">${qrContent}</div>
-      </section>
-
-      <section class="card">
-        <h2>Shop details</h2>
-        <form id="details-form" class="grid">
-          <label>Shop name
-            <input name="name" maxlength="120" required value="${escapeHtml(shop.name)}" />
-          </label>
-          <label>Phone
-            <input name="phone" type="tel" maxlength="20" value="${escapeHtml(shop.phone ?? '')}" />
-          </label>
-          <label>Address
-            <input name="address" maxlength="200" value="${escapeHtml(shop.address ?? '')}" />
-          </label>
-          <button type="submit" data-label="Save details">Save details</button>
-          <p class="error" data-error role="alert"></p>
-        </form>
-      </section>
-
-      ${paymentQrCard(shop)}
-
-      <section class="card">
-        <h2>Printing computer</h2>
-        <p class="muted small">${escapeHtml(printerLine)}</p>
-        <p><a class="button secondary" href="#/owner/shop/${slugPath}/printer">Connect or check printing</a></p>
-      </section>
-
-      <section class="card">
-        <h2>Account</h2>
-        <p class="small"><span class="muted">Signed in as</span> <strong class="summary-email">${escapeHtml(user?.email ?? '')}</strong></p>
-        ${shop.role === 'owner' && licenceEnabled ? `<p><a class="button secondary" href="#/owner/shop/${slugPath}/licence">Licence status</a></p>` : ''}
-        <p><button type="button" class="danger" data-action="signout">Sign out</button></p>
-      </section>`;
-  }
-
-  // The printing computer page, reached from More. It uses the same pairing and revoke handlers as Orders.
-  function printerPageHtml(shop, notice, error) {
-    return `
-      <section class="card page-head">
-        <p class="small"><a href="#/owner/shop/${encodeURIComponent(shop.slug)}/more">← More</a></p>
-        <p class="eyebrow">PRINTING</p>
-        <h1>Printing computer</h1>
-        <p class="muted small">Connect the computer attached to your printer. After you approve an order, its files print there automatically. An order counts as sent when the computer picks it up.</p>
-        <p class="notice" data-notice>${escapeHtml(notice)}</p>
-        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
-      </section>
-      <section class="card">${printPanelHtml()}</section>
-      <p><button type="button" class="secondary" data-action="refresh-printer">Refresh status</button></p>`;
-  }
-
-  function bindPrinterPage() {
-    on('[data-print-action="pair"]', 'click', onPairPrinter);
-    onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
-    onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
-    onAll('[data-auto-print]', 'change', onAutoPrintChange);
-    on('[data-action="refresh-printer"]', 'click', refreshPrinter);
-  }
-
-  async function refreshPrinter() {
-    const printing = await readPrinterStatus(orderView.shop.id);
-    orderView.printing = printing;
-    renderOrders(printing ? {} : { error: 'Printing status is not available right now. Try again.' });
-  }
-
-  async function openPrinter(shop) {
-    const nav = navigation;
-    const printing = await readPrinterStatus(shop.id);
-    if (nav !== navigation) return;
-    orderView = { mode: 'printer', shop, orders: [], printing, showAll: false, jobsByItem: new Map(), pairing: null };
-    renderOrders();
-  }
-
-  async function openMore(user, shop) {
-    const nav = navigation;
-    const printing = await readPrinterStatus(shop.id);
-    if (nav !== navigation) return;
-    managed = { view: 'more', user, shop, services: [], catalog: [], printing };
-    renderMore();
-  }
-
-  function renderMore({ notice = '', error = '' } = {}) {
-    const { user, shop, printing } = managed;
-    show(moreHtml(user, shop, printing, notice, error));
-    bindManager();
-  }
 
   // ---------- navigation and shared helpers ----------
 
@@ -428,21 +162,11 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     const [page = '', value = '', section = ''] = parts;
     try {
       // A verified owner who has not chosen a password yet goes no further (see completeSignup).
-      if (auth.hasPendingSignup()) {
-        setTabs(null);
-        return renderSetPassword();
-      }
+      if (auth.hasPendingSignup()) return renderSetPassword();
       const session = await auth.getSession();
-      // Protected: every owner page needs a session. Signed-out screens show no tabs.
       if (!session) return renderSignIn('signin');
-      if (page === 'reset') {
-        setTabs(null);
-        return renderResetPassword();
-      }
-      if (page === 'new') {
-        setTabs('home');
-        return renderNewShop();
-      }
+      if (page === 'reset') return renderResetPassword();
+      if (page === 'new') return renderNewShop();
       if (page === 'shop' && value) return await renderShopManager(session.user, value, section);
       return await renderShopList(session.user);
     } catch (err) {
@@ -482,7 +206,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   }
 
   function renderSignIn(mode = 'signin', notice = '') {
-    setTabs(null);
     clearResendTimer();
     pendingPassword = '';
     if (mode === 'register') return renderRegister(notice);
@@ -814,35 +537,29 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   async function renderShopList(user) {
     const shops = await ownerApi.listMyShops(user.id);
-    const shop = shops.find((item) => item.slug === activeSlug) ?? shops[0] ?? null;
-    setTabs('home', shop ? shop.slug : null);
-    const stats = shop ? await homeStats(shop) : null;
+    const openCount = shops.filter((shop) => shop.is_open).length;
     const items = shops
       .map(
-        (item) => `
+        (shop) => `
         <li class="owner-shop-card">
-          <div class="between"><a href="#/owner/shop/${encodeURIComponent(item.slug)}"><strong>${escapeHtml(item.name)}</strong></a><span class="shop-status ${item.is_open ? 'is-open' : ''}">${item.is_open ? 'Open' : 'Closed'}</span></div>
-          <span class="muted small">/${escapeHtml(item.slug)}</span>
-          <div class="owner-shop-actions"><a class="button secondary" href="#/owner/shop/${encodeURIComponent(item.slug)}">Prices and shop</a><a href="#/owner/shop/${encodeURIComponent(item.slug)}/orders">View orders →</a></div>
+          <div class="between"><a href="#/owner/shop/${encodeURIComponent(shop.slug)}"><strong>${escapeHtml(shop.name)}</strong></a><span class="shop-status ${shop.is_open ? 'is-open' : ''}">${shop.is_open ? 'Open' : 'Closed'}</span></div>
+          <span class="muted small">/${escapeHtml(shop.slug)}</span>
+          <div class="owner-shop-actions"><a class="button secondary" href="#/owner/shop/${encodeURIComponent(shop.slug)}">Manage shop</a><a href="#/owner/shop/${encodeURIComponent(shop.slug)}/orders">View orders →</a></div>
         </li>`
       )
       .join('');
 
     show(
-      `<section class="page-head">
-        <p class="eyebrow">QRQUICK OWNER</p>
-        <h1>Home</h1>
-        <p class="muted">${shop ? `Today at ${escapeHtml(shop.name)}.` : 'Create your shop to start taking orders.'}</p>
+      `<section class="owner-dashboard-head">
+        <div><p class="eyebrow">OWNER DASHBOARD</p><h1>Good to see you.</h1><p class="muted">Here’s what’s happening with your print shops today.</p></div>
+        <button type="button" class="button secondary" data-action="signout">Sign out</button>
       </section>
-      <section class="stat-row" aria-label="Today at a glance">
-        <article class="card stat"><span class="muted small">Needs you now</span><strong>${stats?.open ?? '—'}</strong><span class="muted small">open orders</span></article>
-        <article class="card stat"><span class="muted small">Shop</span><strong>${shop ? (shop.is_open ? 'Open' : 'Closed') : '—'}</strong><span class="muted small">${shop ? escapeHtml(shop.name) : 'No shop yet'}</span></article>
-        <article class="card stat"><span class="muted small">Printing computers</span><strong>${stats?.agents ?? '—'}</strong><span class="muted small">connected</span></article>
-      </section>
-      <section class="card owner-shops-section"><div class="between"><div><p class="eyebrow">YOUR SHOPS</p><h2>${shops.length > 1 ? 'Your shops' : 'Your shop'}</h2></div><a class="button" href="#/owner/new">+ Create a shop</a></div>
+      <section class="owner-summary-grid"><article class="card"><span class="muted small">Your shops</span><strong>${shops.length}</strong><span class="muted small">${openCount} currently open</span></article><article class="card"><span class="muted small">Needs you now</span><strong>—</strong><span class="muted small">Orders appear here</span></article><article class="card"><span class="muted small">Account</span><strong class="summary-email">${escapeHtml(user.email)}</strong><span class="muted small">Owner access</span></article></section>
+      <section class="card owner-shops-section"><div class="between"><div><p class="eyebrow">YOUR SHOPS</p><h2>Manage your print counters</h2></div><a class="button" href="#/owner/new">+ Create a shop</a></div>
         ${shops.length ? `<ul class="list owner-shop-list">${items}</ul>` : '<div class="empty-state"><p class="muted">You do not have a shop yet.</p><a class="button" href="#/owner/new">Create your first shop</a></div>'}
       </section>`
     );
+    on('[data-action="signout"]', 'click', signOut);
   }
 
   // ---------- create a shop ----------
@@ -910,7 +627,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     const shops = await ownerApi.listMyShops(user.id);
     const shop = shops.find((item) => item.slug === slug);
     if (!shop) {
-      setTabs('home', null);
       show(
         `<section class="card">
           <h1>Shop not found</h1>
@@ -920,45 +636,150 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       );
       return;
     }
-    if (section === 'orders') {
-      setTabs('orders', shop.slug);
-      return renderOrdersFor(shop);
-    }
-    if (section === 'stats') {
-      setTabs('stats', shop.slug);
-      return statsPages.open(shop);
-    }
-    if (section === 'licence' && licenceEnabled) {
-      setTabs('more', shop.slug);
-      return licencePages.open(shop);
-    }
-    if (section === 'more') {
-      setTabs('more', shop.slug);
-      return openMore(user, shop);
-    }
-    if (section === 'printer') {
-      setTabs('more', shop.slug);
-      return openPrinter(shop);
-    }
+    if (section === 'orders') return renderOrdersFor(shop);
+    if (section === 'stats') return statsPages.open(shop);
+    if (section === 'licence' && licenceEnabled) return licencePages.open(shop);
 
-    setTabs('prices', shop.slug);
     const [services, catalog] = await Promise.all([
       ownerApi.listServices(shop.id),
       ownerApi.listFeatureCatalog(),
     ]);
-    managed = { view: 'prices', user, shop, services, catalog };
+    managed = { shop, services, catalog };
     renderManager();
   }
 
   function renderManager({ editingId = null, notice = '', error = '' } = {}) {
-    if (managed.view === 'more') return renderMore({ notice, error });
     const { shop, services, catalog } = managed;
     const editing = services.find((service) => service.id === editingId) ?? null;
-    show(pricesHtml(shop, services, editing, notice, error, catalog));
+    show(managerHtml(shop, services, editing, notice, error, catalog));
     bindManager();
   }
 
+  function managerHtml(shop, services, editing, notice, error, catalog) {
+    const address = customerAddress(shop.slug);
+    const qrContent = address.problem
+      ? `<p class="banner" role="alert">${escapeHtml(address.problem)} QR generation is disabled until a verified HTTPS customer URL is configured.</p>`
+      : `<div class="qr-box">${qrSvg(address.url)}</div>
+         <div class="qr-text">
+           <p class="muted small">Print this code and place it at your counter. Customers scan it to open their page, upload files and place an order.</p>
+           <button type="button" data-action="download-qr">Download QR as PNG</button>
+         </div>`;
+    const featuresBlock = featuresCard(shop, catalog);
+    const paymentBlock = paymentQrCard(shop);
+    const cashBlock = cashPolicyCard(shop);
+    const rows = services
+      .map((service) => {
+        const bw = service.bw_price_paise === null ? '–' : formatPaise(service.bw_price_paise);
+        const colour = service.colour_price_paise === null ? '–' : formatPaise(service.colour_price_paise);
+        const hidden = service.is_active ? '' : ' <span class="muted small">(hidden from customers)</span>';
+        return `
+          <tr>
+            <td>${escapeHtml(service.name)}${hidden}</td>
+            <td>${escapeHtml(unitLabel(service.pricing_unit))}</td>
+            <td class="num">${bw}</td>
+            <td class="num">${colour}</td>
+            <td><button type="button" class="link" data-edit="${escapeHtml(service.id)}">Edit</button></td>
+          </tr>`;
+      })
+      .join('');
 
+    const serviceTable = services.length
+      ? `<div class="table-wrap">
+           <table class="breakdown">
+             <thead><tr><th>Service</th><th>Charged</th><th class="num">B&amp;W</th><th class="num">Colour</th><th></th></tr></thead>
+             <tbody>${rows}</tbody>
+           </table>
+         </div>`
+      : '<p class="muted">No services yet. Add one below.</p>';
+
+    const selectedUnit = editing?.pricing_unit ?? 'per_side';
+    const unitOptions = UNIT_OPTIONS.map(
+      (option) =>
+        `<option value="${option.value}"${option.value === selectedUnit ? ' selected' : ''}>${escapeHtml(option.label)}</option>`
+    ).join('');
+
+    return `
+      <section class="card">
+        <p class="small"><a href="#/owner">← Your shops</a></p>
+        <h1>${escapeHtml(shop.name)}</h1>
+        <p class="muted small">Web address: /s/${escapeHtml(shop.slug)}</p>
+        <p class="${shop.is_open ? 'badge ok' : 'badge closed'}">
+          ${shop.is_open ? 'Open for orders' : 'Closed. Customers can see prices but cannot order.'}
+        </p>
+        <p><a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/orders">Orders</a>
+           <a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/stats">Statistics</a>
+           ${shop.role === 'owner' && licenceEnabled ? `<a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/licence">Licence</a>` : ''}</p>
+        <p><button type="button" data-action="toggle-open" data-label="${shop.is_open ? 'Close shop' : 'Open shop'}">
+          ${shop.is_open ? 'Close shop' : 'Open shop'}
+        </button></p>
+        <p class="notice" data-notice>${escapeHtml(notice)}</p>
+        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
+      </section>
+
+      <section class="card">
+        <h2>Customer page and QR code</h2>
+        <label>Customer page address
+          <input readonly value="${escapeHtml(address.url)}" />
+        </label>
+        ${address.problem ? `<p class="banner" role="alert">${escapeHtml(address.problem)}</p>` : ''}
+        <div class="qr-row">${qrContent}</div>
+      </section>
+
+      <section class="card">
+        <h2>Shop details</h2>
+        <form id="details-form" class="grid">
+          <label>Shop name
+            <input name="name" maxlength="120" required value="${escapeHtml(shop.name)}" />
+          </label>
+          <label>Phone
+            <input name="phone" type="tel" maxlength="20" value="${escapeHtml(shop.phone ?? '')}" />
+          </label>
+          <label>Address
+            <input name="address" maxlength="200" value="${escapeHtml(shop.address ?? '')}" />
+          </label>
+          <button type="submit" data-label="Save details">Save details</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>
+
+      ${featuresBlock}
+
+      ${paymentBlock}
+
+      ${cashBlock}
+
+      <section class="card">
+        <h2>Services and prices</h2>
+        ${serviceTable}
+        <h3>${editing ? 'Edit service' : 'Add a service'}</h3>
+        <form id="service-form" class="grid">
+          <input type="hidden" name="serviceId" value="${escapeHtml(editing?.id ?? '')}" />
+          <label>Service name
+            <input name="name" maxlength="80" required value="${escapeHtml(editing?.name ?? '')}" />
+          </label>
+          <label>Charged
+            <select name="pricingUnit">${unitOptions}</select>
+          </label>
+          <label>Black and white price in rupees (leave empty if not offered)
+            <input name="bwPrice" inputmode="decimal" placeholder="for example 2 or 2.50"
+                   value="${escapeHtml(paiseToRupeesInput(editing?.bw_price_paise))}" />
+          </label>
+          <label>Colour price in rupees (leave empty if not offered)
+            <input name="colourPrice" inputmode="decimal" placeholder="for example 10"
+                   value="${escapeHtml(paiseToRupeesInput(editing?.colour_price_paise))}" />
+          </label>
+          <label class="check">
+            <input name="isActive" type="checkbox" ${editing?.is_active === false ? '' : 'checked'} />
+            Show this service to customers
+          </label>
+          <button type="submit" data-label="${editing ? 'Save service' : 'Add service'}">
+            ${editing ? 'Save service' : 'Add service'}
+          </button>
+          ${editing ? '<button type="button" class="link" data-action="cancel-edit">Cancel editing</button>' : ''}
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>`;
+  }
 
   // Yes/no switches for each feature. Customers only see the features that are on.
   function featuresCard(shop, catalog) {
@@ -1037,14 +858,12 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('#cash-policy-form', 'submit', onSaveCashPolicy);
     on('[data-action="remove-payment-qr"]', 'click', onRemovePaymentQr);
     on('#service-form', 'submit', onSaveService);
-    onAll('[data-preset]', 'click', applyPhotoPreset);
     on('[data-action="toggle-open"]', 'click', onToggleOpen);
     on('[data-action="cancel-edit"]', 'click', () => renderManager());
     onAll('[data-edit]', 'click', (event) => renderManager({ editingId: event.currentTarget.dataset.edit }));
     const pageAddress = app.querySelector('input[readonly]');
     pageAddress?.addEventListener('focus', () => pageAddress.select());
     on('[data-action="download-qr"]', 'click', () => downloadQr(managed.shop.slug));
-    on('[data-action="signout"]', 'click', signOut);
   }
 
   // Saves the shop's QR code as a PNG for printing. It is drawn in the browser
@@ -1109,16 +928,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     }
   }
 
-  // Fills the add-service form from a quick-start preset. The owner still sets the price and saves.
-  function applyPhotoPreset(event) {
-    const preset = PHOTO_PRESETS[event.currentTarget.dataset.preset];
-    const form = document.getElementById('service-form');
-    if (!preset || !form) return;
-    form.elements.name.value = preset.name;
-    form.elements.pricingUnit.value = preset.pricingUnit;
-    form.elements.bwPrice?.focus();
-  }
-
   async function onSaveService(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -1157,10 +966,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     try {
       const saved = await ownerApi.saveFeatures(managed.shop.id, features);
       managed.shop = { ...managed.shop, features: saved };
-      const notice = passportNeedsService(managed.shop, managed.services)
-        ? 'Features saved. Passport photos needs a priced service on the Prices tab before customers can order it.'
-        : 'Features saved. Customers now see the updated list.';
-      renderManager({ notice });
+      renderManager({ notice: 'Features saved. Customers now see the updated list.' });
     } catch (err) {
       setError(form, messageFor(err));
       setBusy(form, false);
@@ -1247,7 +1053,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     const nav = navigation;
     const { orders, printing } = await loadOrderView(shop.id);
     if (nav !== navigation) return; // the owner has left this page while it loaded
-    orderView = { mode: 'orders', shop, orders, printing, showAll: false, jobsByItem: new Map(), pairing: null };
+    orderView = { shop, orders, printing, showAll: false, jobsByItem: new Map(), pairing: null };
     liveState = 'live'; // a message from an earlier visit must not show on a fresh page
     renderOrders();
     liveOrders.start();
@@ -1281,11 +1087,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       error = kept?.error ?? '';
     } else {
       feedback = notice || error ? { notice, error, at: Date.now() } : null;
-    }
-    if (orderView.mode === 'printer') {
-      show(printerPageHtml(orderView.shop, notice, error));
-      bindPrinterPage();
-      return;
     }
     const { shop, orders, showAll } = orderView;
     orderView.jobsByItem = latestJobsByItem(orderView.printing?.jobs ?? []);
@@ -1409,7 +1210,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('[data-print-action="pair"]', 'click', onPairPrinter);
     onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
     onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
-    onAll('[data-auto-print]', 'change', onAutoPrintChange);
     onAll('[data-send-order]', 'click', onSendToPrint);
     onAll('[data-retry-job]', 'click', onRetryJob);
   }
@@ -1560,29 +1360,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     );
   }
 
-  // The switch that sends approved, paid orders to the printer without a press of Send to printer.
-  // Off unless the owner turns it on. Turning it off does not cancel jobs already queued.
-  function autoPrintHtml() {
-    const enabled = orderView.shop?.auto_print_enabled === true;
-    return `<label class="auto-print-switch">
-        <input type="checkbox" data-auto-print${enabled ? ' checked' : ''} />
-        <span>Send paid orders to the printer automatically</span>
-      </label>
-      <p class="muted small">${escapeHtml(autoPrintSummary(enabled))}</p>`;
-  }
-
-  async function onAutoPrintChange(event) {
-    const input = event.currentTarget;
-    const enabled = input.checked;
-    input.disabled = true;
-    await runOrderChange(async () => {
-      const saved = await ownerApi.setAutoPrint(orderView.shop.id, enabled);
-      orderView.shop.auto_print_enabled = saved?.auto_print_enabled === true;
-    }, enabled
-      ? 'Automatic sending is on for this shop.'
-      : 'Automatic sending is off. Press Send to printer for each order.');
-  }
-
   // The printing computers and the pairing box. Only the shop owner can pair, rename or remove them.
   function printPanelHtml() {
     const printing = orderView.printing;
@@ -1606,7 +1383,6 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         <strong>Printing computers</strong>
         ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
         ${rows || '<p class="muted small">No computer is connected for printing yet.</p>'}
-        ${printing.is_owner ? autoPrintHtml() : ''}
         ${printing.is_owner
           ? '<div class="actions"><button type="button" data-print-action="pair">Connect a printing computer</button></div>'
           : ''}

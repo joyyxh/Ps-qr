@@ -220,7 +220,6 @@ async function handleSupabase(route) {
   }
 
   // ----- RPCs -----
-  if (url.pathname === '/rest/v1/rpc/owner_print_status') return json(200, { is_owner: true, agents: [], jobs: [] });
   if (url.pathname === '/rest/v1/rpc/create_shop') {
     if (state.shops.some((s) => s.slug === body.p_slug)) {
       return json(409, {
@@ -325,9 +324,6 @@ async function scenario(label, { publicBase = null, expectUrl, expectBanner, exp
   const problems = [];
   wire(page, problems);
   await page.route(/supabase\.co/, handleSupabase);
-  // Google Fonts is stubbed: the page links it, and this check must not depend on outside network access.
-  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
-    route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   if (publicBase !== null) {
     // config.js ships with a published publicBaseUrl; replace whatever value it has.
     await page.route(/\/config\.js(\?.*)?$/, (route) =>
@@ -339,7 +335,7 @@ async function scenario(label, { publicBase = null, expectUrl, expectBanner, exp
   }
 
   await signIn(page);
-  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+  await page.goto(`${BASE}#/owner/shop/demo-xerox`);
   // Wait for the address field: a local address shows a banner instead of the QR code.
   await page.locator('input[readonly]').waitFor();
 

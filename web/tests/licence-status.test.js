@@ -531,9 +531,8 @@ test('the licence screen has one action, Refresh, and no grant, extend, revoke o
 
 test('the shop page links to the licence screen only for owners, and sign-out and navigation clear it', () => {
   const owner = src('owner.js');
-  // The licence link now sits on the More tab (moreHtml). It still shows only for owners and only when enabled.
-  assert.match(owner, /shop\.role === 'owner' && licenceEnabled \? `<p><a class="button secondary" href="#\/owner\/shop\/\$\{slugPath\}\/licence">Licence status<\/a><\/p>` : ''/);
-  assert.match(owner, /if \(section === 'licence' && licenceEnabled\) \{\s*setTabs\('more', shop\.slug\);\s*return licencePages\.open\(shop\);\s*\}/);
+  assert.match(owner, /shop\.role === 'owner' && licenceEnabled \? `<a class="button" href="#\/owner\/shop\/\$\{encodeURIComponent\(shop\.slug\)\}\/licence">Licence<\/a>` : ''/);
+  assert.match(owner, /if \(section === 'licence' && licenceEnabled\) return licencePages\.open\(shop\);/);
   assert.match(owner, /licencePages\.close\(\); \/\/ leaving the licence page/);
   assert.match(owner, /async function signOut\(\) \{\s*licencePages\.close\(\);/);
 });

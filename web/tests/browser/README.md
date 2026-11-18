@@ -35,17 +35,15 @@ the same counts. GitHub Actions results are listed in `docs/STAGE7_HANDOVER.md`.
 | Script | What it checks | Last result |
 |---|---|---|
 | `owner-smoke.cjs` | Owner sign-in, shop details, services, orders, customer address | 39 of 39, exit 0 |
-| `photo-editor-smoke.cjs` | Customer photo editor: passport shape, turn, brightness, upload as JPEG, keep original, cancel, dark theme | All checks passed, exit 0 |
 | `licence-smoke.cjs` | Owner licence screen (Stage 7E): each state, refresh, offline, shop switch, sign-out, staff view, and the Android owner bundle (licence view off) | 33 of 33, exit 0 |
-| `features-smoke.cjs` | Yes/no features, payment QR upload and removal, customer page features and gating | 24 of 24, exit 0 (reason text is provisional, below) |
+| `features-smoke.cjs` | Yes/no features, payment QR upload and removal, customer page features and gating | 23 of 24, exit 1 (one open check, below) |
 | `qr-smoke.cjs` | Shop QR code on screen and as a PNG download, decoded with OpenCV | 12 of 12, exit 0 |
 | `stats-smoke.cjs` | Statistics page: periods, weekly report, actions, CSV export | All checks passed, exit 0 |
 | `decode-qr.py` | Helper used by `qr-smoke.cjs`: decodes a QR image with OpenCV | n/a |
 
-**Reason text (provisional).** `features-smoke.cjs` checks that the greyed-out Colour and Double-sided
-cards say why they are unavailable. The page now adds "(not offered at this shop)" to those labels as a
-provisional default. The wording is still for the owner to confirm, so the check stays as written and is
-not weakened.
+**Open check.** `features-smoke.cjs` checks that the greyed-out Colour and Double-sided cards say
+why they are unavailable. The product shows no reason text on those cards yet, and the wording is
+an owner decision. The check is kept, not weakened, so the script exits 1 until that decision is made.
 
 On commit `a94cba2` the same script showed 22 of 24 in GitHub Actions (run 43605116936). A second check
 also failed there: the customer page had 3px of horizontal scroll at 390 px, from the upload input in
