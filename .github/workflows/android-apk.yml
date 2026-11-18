@@ -149,9 +149,7 @@ jobs:
             adb logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
             adb shell dumpsys package com.printnest.app | grep -E 'versionName|versionCode|primaryCpuAbi' || true
             grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success.'; exit 1; }
-            python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED); z.write(sys.argv[1], "app-debug.apk"); z.close()' mobile/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/artifact-wrapped.zip"
-            adb install "$RUNNER_TEMP/artifact-wrapped.zip" > "$RUNNER_TEMP/zip-install.txt" 2>&1 || true
-            test -s "$RUNNER_TEMP/pid.txt" || { echo 'The app process is not running after launch.'; exit 1; }
+              test -s "$RUNNER_TEMP/pid.txt" || { echo 'The app process is not running after launch.'; exit 1; }
             bash .github/scripts/apk-ui-check.sh "$RUNNER_TEMP/apk-ui"
 
       - name: Post the emulator install and launch results
