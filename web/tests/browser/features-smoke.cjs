@@ -312,6 +312,9 @@ async function until(test, ms = 8000) {
     if (msg.type() === 'error' && !/favicon/i.test(msg.text())) problems.push(`console: ${msg.text()}`);
   });
   await page.route(/supabase\.co/, handleSupabase);
+  // Google Fonts is stubbed: the page links it, and this check must not depend on outside network access.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+    route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   // Later routes win: serve the stored picture from the mock, not a 404.
   await page.route(/supabase\.co\/storage\/v1\/object\/public\//, (route) =>
     route.fulfill({ status: 200, contentType: 'image/png', body: PICTURE })

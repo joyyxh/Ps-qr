@@ -325,6 +325,9 @@ async function scenario(label, { publicBase = null, expectUrl, expectBanner, exp
   const problems = [];
   wire(page, problems);
   await page.route(/supabase\.co/, handleSupabase);
+  // Google Fonts is stubbed: the page links it, and this check must not depend on outside network access.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+    route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   if (publicBase !== null) {
     // config.js ships with a published publicBaseUrl; replace whatever value it has.
     await page.route(/\/config\.js(\?.*)?$/, (route) =>
