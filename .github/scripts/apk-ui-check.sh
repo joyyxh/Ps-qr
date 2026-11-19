@@ -144,6 +144,7 @@ if click_text 'Create an account'; then
   # 3. Back returns to the sign-in screen rather than closing the app.
   adb shell input keyevent KEYCODE_BACK
   sleep 2
+  adb logcat -d -t 800 2>/dev/null | tr -d '\r' | grep -E 'QRquickBack|onBackKeyPressed|Capacitor: App (paused|resumed|stopped)' | sed 's/^/BACKLOG /' | tail -n 20 || true
   if wait_for_signin 30; then
     pass "navigation: Back returns to the sign-in screen"
   else
