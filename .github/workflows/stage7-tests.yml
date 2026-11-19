@@ -57,6 +57,9 @@ jobs:
       - name: Licence migration and RPC suites (clean database, combined chain)
         run: supabase/tests/licence_7c/run_suites.sh 127.0.0.1 5432
 
+      - name: Owner sign-in catch-up (0001-0009 reproduce the missing column; 0010, 0018, 0019 fix it)
+        run: supabase/tests/owner_catch_up/run_catch_up.sh 127.0.0.1 5432
+
   browser-smokes:
     runs-on: ubuntu-latest
     timeout-minutes: 20
