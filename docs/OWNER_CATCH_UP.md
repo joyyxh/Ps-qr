@@ -81,6 +81,10 @@ made when that screen is opened.
 
 ## Steps (need the owner's approval)
 
+The exact SQL, the read-only pre- and post-checks, the gates, the guarded rollback and the local rehearsal
+are in `supabase/deploy/owner_catch_up/RUNBOOK.md`. None of the steps below has been run against the
+hosted project.
+
 1. Run `supabase/tests/owner_catch_up/preflight_hosted.sql` on the live project. Expect every row to be
    `false`.
 2. Apply `0010_print_agents.sql`, then `0018_auto_print.sql`, then `0019_advisor_fixes.sql`, one at a
