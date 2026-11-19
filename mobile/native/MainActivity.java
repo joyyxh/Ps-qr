@@ -1,6 +1,7 @@
 package com.printnest.app;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.webkit.WebView;
 
 import androidx.activity.OnBackPressedCallback;
@@ -23,6 +24,7 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void handleOnBackPressed() {
                 WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+                if (webView != null) { android.webkit.WebBackForwardList list = webView.copyBackForwardList(); Log.d("QRquickBack", "canGoBack=" + webView.canGoBack() + " size=" + list.getSize() + " index=" + list.getCurrentIndex() + " url=" + webView.getUrl()); }
                 if (webView != null && webView.canGoBack()) {
                     webView.goBack();
                     return;
