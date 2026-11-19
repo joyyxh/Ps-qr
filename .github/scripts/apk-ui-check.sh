@@ -45,7 +45,7 @@ diagnose() { # print what the WebView showed, for the log and the artifact
     echo "--- DevTools sockets"
     adb shell cat /proc/net/unix 2>/dev/null | tr -d '\r' | grep -i devtools | head -5 || true
     echo "--- WebView and app log lines"
-    adb logcat -d -t 4000 2>/dev/null | grep -iE "chromium|webview|capacitor|console|uncaught|err_|$PKG" | tail -n 80 || true
+    adb logcat -d -t 4000 2>/dev/null | grep -iE "chromium|webview|capacitor|console|uncaught|err_|QRquickBack|onBackKeyPressed|$PKG" | tail -n 80 || true
   } | tee -a "$OUT/diagnostics.txt"
 }
 
