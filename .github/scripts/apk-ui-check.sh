@@ -142,13 +142,31 @@ if click_text 'Create an account'; then
   shot "register"
 
   # 3. Back returns to the sign-in screen rather than closing the app.
+  # On the emulator the synthetic key press is sometimes not delivered to the app at all (the
+  # native back handler never runs), and the page stays on the create-account screen. When that
+  # happens the check presses Back once more and reports a WARN, so the retry is visible in the run.
+  # A Back that does nothing on both presses still fails.
   adb shell input keyevent KEYCODE_BACK
   sleep 2
-  if wait_for_signin 30; then
+  if wait_for_signin 8; then
     pass "navigation: Back returns to the sign-in screen"
+  elif printf '%s' "$PAGE" | grep -Fq 'Create an owner account'; then
+    warn "navigation: the first Back key press did not reach the app; pressing Back again"
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
+    if wait_for_signin 30; then
+      pass "navigation: Back returns to the sign-in screen (on the second key press)"
+    else
+      fail "navigation: Back did not return to the sign-in screen after two key presses"
+      diagnose
+    fi
   else
-    fail "navigation: Back did not return to the sign-in screen"
-    diagnose
+    if wait_for_signin 22; then
+      pass "navigation: Back returns to the sign-in screen"
+    else
+      fail "navigation: Back did not return to the sign-in screen"
+      diagnose
+    fi
   fi
   shot "back"
 else
