@@ -1,85 +1,90 @@
-# Owner email verification: how it works and what to check in Supabase
+# Owner email verification
 
-Status: the code path is traced and tested with mocked Supabase responses. Actual email
-delivery has **not** been tested from this repository. The sandbox used for these tests
-cannot reach `supabase.co`, so the hosted Auth settings below were not read or changed.
-Nothing here is a claim that a verification email arrives.
+Status (2026-11-19): the app's sign-up, code entry, resend and sign-in are fixed and tested. The
+verification email still does **not** reach owners who are not on the Supabase team, because of
+how the project's email is set up. The app cannot fix that. The dashboard steps below can.
 
-## The code path (web/src/auth.js and web/src/owner.js)
+Nothing in this file claims that a verification email arrives. Only the owner's real test
+(step 6 below) can show that.
 
-| Step | Owner action | Request to Supabase Auth | Success | Failure handled |
-|---|---|---|---|---|
-| Register | Enters email and password, taps Create account | `POST /auth/v1/signup` with `email`, `password`, `redirect_to` | Reply has no session; the code screen opens | A session in the reply (confirmation off) is refused with `confirmation_disabled` |
-| Enter code | Types the 6–10 digit code from the email | `POST /auth/v1/verify` with `type: signup`, `email`, `token` | Pending signup held in memory; owner chooses a password | Wrong or expired code shows a message from `otpErrorMessage` |
-| Resend | Taps Send a new code (after the timer) | `POST /auth/v1/resend` with `type: signup`, `email` | New code screen message | HTTP 429 shows "A code was sent a moment ago" |
-| Sign in before verifying | Signs in with the password | `POST /auth/v1/token?grant_type=password` | Session stored | `email_not_confirmed` starts the resend-and-verify path |
+## Why owners do not get a code (root cause)
 
-Passwords are saved only after the code is verified (`completeSignup`). No session is stored
-between sign-up and verification.
+Supabase's documentation for the built-in email service says:
 
-## Redirect address
+- It is "not meant for production use". It is for testing with the members of the project's team.
+- It "will refuse to deliver messages to addresses that are not part of the project's team".
+- It is limited to 2 emails per hour.
 
-`web/config.js` sets `authRedirectUrl` (and `publicBaseUrl`) to
-`https://joyyxh.github.io/Ps-qr/`. The Android build replaces both with
-`PRINTNEST_PUBLIC_URL` (see `mobile/scripts/copy-web.mjs`). The APK workflow defaults to
-`https://joyyxh.github.io/Ps-qr/` when the repository variable is not set.
+The Auth logs for the project agree (no email addresses are copied here):
 
-Supabase only follows a `redirect_to` that is on its allow-list. Any other value falls back to
-the project's Site URL.
+- On 2026-10-25 at 14:29 UTC, the built-in sender (`noreply@mail.app.supabase.io`) logged a
+  confirmation email, and that owner confirmed by the link 18 seconds later. Earlier confirmations
+  (2026-10-19, 2026-10-21, 2026-10-25) are recorded in the user table; their logs were not examined.
+- At 18:32 UTC the same day, the email limit changed from 2 to 30 per hour. Supabase sets 30 per
+  hour when custom SMTP is switched on. The logs do not say whether custom SMTP is in use now, so
+  check the dashboard (step 1 below).
+- Since then, every sign-up returned success and was logged, but none of those owners confirmed,
+  and no `mail.send` event was logged for them. In the windows checked (2026-10-25, 2026-11-17,
+  2026-11-18 to 19), no owner submitted a code.
+- Supabase reports success when it accepts a sign-up, so the failure happens after the app's request.
 
-## Checklist for the Supabase dashboard (owner to complete, no secrets in this repository)
+Most likely cause: the built-in sender refuses owners whose address is not on the team. If custom
+SMTP is on, the cause is in that setup (sender, provider, or the template). Step 1 tells which.
 
-Open the project in the Supabase dashboard (Authentication section). Record each answer with the
-date and who checked it. Do not paste keys, SMTP passwords or tokens into the repository or
-into chat.
+## What the app does now (web/src/owner.js, web/src/logic.js, web/src/pending-signup.js)
 
-1. **Confirm email is on.** Authentication → Sign In / Providers → Email → "Confirm email"
-   is enabled. If it is off, sign-up returns a session and the app refuses it with
-   `confirmation_disabled`.
-2. **Site URL.** Authentication → URL Configuration → Site URL is the deployed web app
-   (`https://joyyxh.github.io/Ps-qr/` unless the deployment changed).
-3. **Redirect URLs.** The allow-list includes `https://joyyxh.github.io/Ps-qr/` and any
-   other deployed address in `PRINTNEST_PUBLIC_URL`.
-4. **Confirmation email template contains the code.** Authentication → Email Templates →
-   "Confirm signup" must include `{{ .Token }}`. The app asks for the six-to-ten digit code;
-   a template that only has the link leaves the owner with no code to type.
-5. **Sender.** Check whether the project uses the built-in sender or custom SMTP. The built-in
-   sender is rate-limited and is intended for testing; a shop-facing launch needs custom SMTP
-   with a sender address and domain authentication (SPF, DKIM) that the owner controls.
-   Record which one is in use. Do not record the SMTP password.
-6. **Rate limits.** Note the current limits for sign-up and for resend. The app shows the
-   429 message when a resend is too soon.
-7. **Test with a real inbox (owner step).** Register with a mailbox the owner controls,
-   confirm the code arrives, enter it, set a password, sign in. Also try an unverified account
-   to see the resend path. Record the time, the sender, and whether the email landed in spam.
+- A refused address shows: "QRquick cannot send the code to this address yet. Ask QRquick to finish
+  the email setup, then try again." (Supabase code `email_address_not_authorized`.)
+- A coded email limit shows: "Wait about an hour before asking for another code…"
+  (`over_email_send_rate_limit`). A coded request limit shows "Too many requests from this device."
+- An address already registered (`email_exists`, `user_already_exists`) and switched-off email
+  sign-up (`email_provider_disabled`) each get their own message.
+- The code screen keeps the address and the time of the last code for this browser tab, so a
+  reload does not lose the place. The password is never stored. Records older than two hours are
+  dropped, and a damaged record is removed.
+- The code screen says what to do when no email arrives: check spam, press Resend code, and open
+  the link on this device if the email has a link instead of a code.
+- A successful sign-in clears any registration that was waiting for its code.
+- Unchanged and still enforced: a session is never created before the code is accepted, and an
+  unverified owner cannot sign in with the password.
 
-## Read-only check on 2026-11-18
+## Dashboard steps (owner to do; no secrets in this repository or in chat)
 
-Checked with the Supabase and Resend connectors. Counts only: no addresses were read or copied.
+Open the project in the Supabase dashboard. Menu names can change, so use the closest match.
 
-- Supabase project `printnest` has 9 accounts: 3 confirmed and 6 not confirmed.
-- Supabase recorded a confirmation send for 7 of the 9 accounts. The latest was on 2026-11-17 at
-  20:13 UTC. Supabase records that it tried to send. It does not record that the email arrived, or
-  which sender it used.
-- The Resend connector lists no sending domains and no sent emails. So the verification email does
-  not go through that Resend account. Check the sender Supabase uses: the built-in sender, or the
-  SMTP settings in the dashboard.
-- The Supabase connector could not read the Auth logs (its query returned "table does not exist").
-  Read them in the dashboard instead: Logs, then Auth. Look for email or SMTP errors around the
-  times above.
+1. **Which sender is active.** Authentication → Emails → SMTP Settings. Write down whether custom
+   SMTP is switched on, and if it is, the provider and sender address. Do not write down the password.
+   - Off: the built-in sender is in use. It only delivers to team members (step 5a).
+   - On: check that provider's delivery log for the owner's test emails.
+2. **The code is in the email.** Authentication → Emails → Confirm signup. The template must
+   contain `{{ .Token }}`. A template with only the link gives the owner no code to type.
+3. **Email confirmation is on.** Authentication → Sign In / Providers → Email → "Confirm email".
+4. **Redirect addresses.** Authentication → URL Configuration. Site URL and the redirect list include
+   `https://joyyxh.github.io/Ps-qr/` (or the deployed address in `PRINTNEST_PUBLIC_URL`).
+5. **Choose a sender** (one of these):
+   - **a. Testing today:** add each tester to the Supabase organization team (Organization settings →
+     Team). Only team members get built-in email, so this is for testers, not shop owners.
+   - **b. Real owners, no domain needed (free):** custom SMTP through a Google account. Host
+     `smtp.gmail.com`, port 587. Username: that Gmail address. Password: a Google App Password, which
+     needs 2-Step Verification on that account. Enter both in Authentication → Emails → SMTP Settings.
+     Emails then come from that Gmail address. Google limits how many emails one account may send per
+     day, and Supabase allows 30 per hour with custom SMTP. Check Google's current help if these
+     settings differ.
+   - **c. Later, with a domain:** custom SMTP from your own domain, with SPF and DKIM set up.
+6. **Owner test after the change.** Register with a mailbox that is not on the team. Record the time,
+   whether the code arrived, whether it was in spam, and whether it worked.
 
-Status: Supabase tries to send the code, but delivery to a real inbox is still unconfirmed. The
-owner steps below are the next checks.
+## Tests (run from web/)
 
-1. Logs, then Auth: note any email or SMTP error.
-2. Authentication, then Emails, then SMTP settings: note whether the built-in sender or custom SMTP
-   is used. The built-in sender is rate-limited and meant for testing.
-3. Confirm the "Confirm signup" template contains `{{ .Token }}`.
-4. Register with an owner-controlled mailbox and record whether the code arrives, and how long it takes.
+- `npm test`: 238 passing (includes new tests for the messages above and for the pending-registration store).
+- Browser checks, mocked Supabase (`run_smokes.sh owner-smoke.cjs owner-shell-smoke.cjs registration-smoke.cjs`):
+  owner-smoke 43 of 43, owner-shell-smoke 41 of 41, registration-smoke 13 of 13. These check the screens
+  and requests only. They do not show that any email arrives.
 
-## Not verified here
+## Not verified
 
-- Whether the hosted project has "Confirm email" on, what the redirect allow-list contains,
-  what the email template says, and which sender is used. These need the dashboard check above.
-- Whether an email reaches a real inbox. Only the owner's real test (step 7) can show this.
-- Whether the built-in sender limits affect shops at launch.
+- Any real email delivery. The sandbox cannot reach `supabase.co` (its proxy blocks it), and the logs
+  show when Supabase accepts a send, not when an inbox receives it.
+- The current sender, the template text, the redirect list and "Confirm email". There is no Auth
+  settings tool in this environment, so these need the dashboard steps above.
+- Team membership. The Supabase tools here do not list organization members.

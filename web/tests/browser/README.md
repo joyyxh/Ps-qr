@@ -6,7 +6,9 @@ the screens and requests, not the live backend.
 
 They run in GitHub Actions, in `.github/workflows/stage7-tests.yml`:
 
-- job `browser-smokes`: `owner-smoke.cjs`, `qr-smoke.cjs`, `stats-smoke.cjs`, `licence-smoke.cjs` (must pass).
+- job `browser-smokes`: `owner-smoke.cjs`, `owner-shell-smoke.cjs`, `registration-smoke.cjs`, `qr-smoke.cjs`, `stats-smoke.cjs`, `licence-smoke.cjs` (must pass).
+  `registration-smoke.cjs` covers the owner's code screen: a wrong code, the right code, a reload on the code screen,
+  and the messages for a refused address and an email limit. It uses a mock, so it does not prove that email arrives.
 - job `browser-features-open-check`: `features-smoke.cjs`. It has one known open check, below, so this
   job shows as failed until the owner decides the wording. It is marked `continue-on-error`, so the
   workflow run is not failed by it, and the red job row stays visible.

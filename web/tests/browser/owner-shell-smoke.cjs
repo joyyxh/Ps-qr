@@ -187,8 +187,12 @@ async function main() {
     await page.screenshot({ path: shot('verify-390.png'), fullPage: true });
 
     // ----- 2. Sign in and land on Home with five tabs -----
-    // Reload: the same address would not redraw the verification screen.
+    // Reload on the code screen: the address is remembered for this tab, so the code screen comes back.
     await page.reload();
+    await page.locator('h1', { hasText: 'Check your email' }).waitFor();
+    check('a reload keeps the code screen and the address', (await page.locator('#auth-form input[name=token]').count()) === 1 && (await page.getByText(EMAIL).count()) >= 1);
+    // Already verified? goes to sign in with the password.
+    await page.click('[data-switch="signin"]');
     await page.locator('#auth-form').waitFor();
     await page.fill('#auth-form input[name=email]', EMAIL);
     await page.fill('#auth-form input[name=password]', PASSWORD);

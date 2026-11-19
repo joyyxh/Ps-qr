@@ -53,6 +53,8 @@ import { createStatsPages } from './owner-stats.js';
 import { createLicencePages } from './owner-licence.js';
 import { PRINTER_RETRY_MS, browserVisibility, createOrderRefresher, printerRetryDue } from './order-refresh.js';
 import { qrCanvas, qrSvg } from './qr.js';
+import { createPendingSignupStore } from './pending-signup.js';
+import { browserSessionStorage } from './session.js';
 
 const UNIT_OPTIONS = [
   { value: 'per_side', label: 'Per printed side' },
@@ -475,6 +477,21 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   let pendingSentAt = 0; // when the last verification code was sent, in milliseconds
   let pendingPassword = ''; // the password typed at registration, kept in memory until the code is accepted
   let resendTimer = null;
+  // The address and the time of the last code survive a reload of the code screen. The password never does.
+  const pendingStore = createPendingSignupStore(browserSessionStorage());
+
+  function rememberPending() {
+    pendingStore.save(pendingEmail, pendingSentAt);
+  }
+
+  function restorePending() {
+    if (pendingEmail) return;
+    const saved = pendingStore.load();
+    if (saved) {
+      pendingEmail = saved.email;
+      pendingSentAt = saved.sentAtMs;
+    }
+  }
 
   function clearResendTimer() {
     if (resendTimer) clearInterval(resendTimer);
@@ -500,6 +517,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     clearResendTimer();
     pendingPassword = '';
     if (mode === 'register') return renderRegister(notice);
+    if (mode === 'verify') restorePending();
     if (mode === 'verify' && pendingEmail) return renderVerify(notice);
     if (mode === 'forgot') return renderForgotPassword(notice);
     return renderSignInForm(notice);
@@ -538,6 +556,9 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     setBusy(form, true);
     try {
       await auth.signIn(email, password);
+      // Signed in, so any registration still waiting for its code is finished.
+      pendingEmail = '';
+      pendingStore.clear();
       go([]);
     } catch (err) {
       if (err.code === 'email_not_confirmed') {
@@ -555,10 +576,15 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     try {
       await auth.resendSignupCode(email);
       pendingSentAt = Date.now();
+      rememberPending();
       renderVerify(notice);
     } catch (err) {
-      if (err.status === 429) pendingSentAt = Date.now(); // a code went out a moment ago
-      renderVerify(err.status === 429 ? 'A code was sent a moment ago. Enter it, or wait a minute to resend.' : otpErrorMessage(err, 'resend'));
+      // A plain 429 with no error code means a code went out a moment ago. The coded
+      // limits (email limit, request limit) get their own message from otpErrorMessage.
+      const recentlySent = err.status === 429 && !err.code;
+      if (recentlySent) pendingSentAt = Date.now();
+      rememberPending();
+      renderVerify(recentlySent ? 'A code was sent a moment ago. Enter it, or wait a minute to resend.' : otpErrorMessage(err, 'resend'));
     }
   }
 
@@ -600,6 +626,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       pendingEmail = email;
       pendingSentAt = Date.now(); // signing up has just emailed the first code
       pendingPassword = password;
+      rememberPending();
       renderVerify('');
     } catch (err) {
       setError(form, accountErrorMessage(err));
@@ -625,6 +652,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
         </form>
         <p><button type="button" class="link" data-action="resend">Resend code</button></p>
+        <p class="muted small">No email after a few minutes? Check your spam folder, then press Resend code. If the email has a button or link instead of a code, open it on this device.</p>
         <p class="muted small">Already verified? <button type="button" class="link" data-switch="signin">Sign in with your password</button></p>
       </section>`
     );
@@ -657,9 +685,11 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     try {
       await auth.resendSignupCode(pendingEmail);
       pendingSentAt = Date.now();
+      rememberPending();
       renderVerify('A new code is on its way.');
     } catch (err) {
-      if (err.status === 429) pendingSentAt = Date.now();
+      if (err.status === 429 && !err.code) pendingSentAt = Date.now();
+      rememberPending();
       renderVerify(otpErrorMessage(err, 'resend'));
     }
   }
@@ -680,6 +710,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     }
     clearResendTimer();
     pendingEmail = '';
+    pendingStore.clear();
     // The password typed at registration is saved now, so the owner's own password is the
     // one that works. An owner who came here from sign-in chooses one on the next screen.
     const password = pendingPassword;

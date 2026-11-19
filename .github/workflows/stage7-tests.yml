@@ -86,7 +86,7 @@ jobs:
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
           QRQUICK_SMOKE_OUT: ${{ runner.temp }}/smoke-out
-        run: web/tests/browser/run_smokes.sh owner-smoke.cjs qr-smoke.cjs stats-smoke.cjs licence-smoke.cjs
+        run: web/tests/browser/run_smokes.sh owner-smoke.cjs owner-shell-smoke.cjs registration-smoke.cjs qr-smoke.cjs stats-smoke.cjs licence-smoke.cjs
 
       - uses: actions/upload-artifact@v4
         if: always()
