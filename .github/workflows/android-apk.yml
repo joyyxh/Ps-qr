@@ -91,6 +91,19 @@ jobs:
           test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           test -f android/app/src/main/res/values/ic_launcher_background.xml
 
+      - name: Apply the QRquick Back key handling (goes back through the app pages first)
+        # Capacitor 8 does not handle the Back key; without this the Back key closed the app from the
+        # create-account screen. The generated MainActivity is replaced, after checking that it is the
+        # stock one for this package.
+        run: |
+          set -euo pipefail
+          ACTIVITY="$(find android/app/src/main/java -name MainActivity.java | head -n 1)"
+          test -n "$ACTIVITY"
+          grep -q '^package com.printnest.app;' "$ACTIVITY"
+          grep -q 'extends BridgeActivity' "$ACTIVITY"
+          cp native/MainActivity.java "$ACTIVITY"
+          grep -q 'OnBackPressedCallback' "$ACTIVITY"
+
       - name: Build the debug APK
         working-directory: mobile/android
         run: |
