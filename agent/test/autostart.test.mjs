@@ -76,6 +76,36 @@ test('the autostart command writes the file next to the agent and prints the ins
   assert.ok(!text.includes('K'.repeat(43)), 'the token is never printed');
 });
 
+test('without a script, the Windows task and the systemd unit run the executable with "run" only', () => {
+  const exe = '/opt/qrquick/qrquick-print-agent';
+  const unit = systemdUnit({ nodePath: exe, scriptPath: null, workingDir: '/opt/qrquick' });
+  assert.match(unit.content, /^ExecStart="\/opt\/qrquick\/qrquick-print-agent" run$/m);
+  assert.doesNotMatch(unit.content, /\.mjs/);
+  const task = windowsTaskXml({ nodePath: 'C:\\QRquick\\qrquick-print-agent.exe', scriptPath: null, workingDir: 'C:\\QRquick' });
+  assert.match(task.content, /<Command>C:\\QRquick\\qrquick-print-agent\.exe<\/Command>/);
+  assert.match(task.content, /<Arguments>run<\/Arguments>/);
+});
+
+test('in the single-file build the autostart command runs the executable and writes next to it', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'qrq-autostart-exe-'));
+  const agentDir = await mkdtemp(path.join(os.tmpdir(), 'qrq-exe-folder-'));
+  t.after(async () => {
+    await rm(dir, { recursive: true, force: true });
+    await rm(agentDir, { recursive: true, force: true });
+  });
+  await saveConfig(dir, { serverUrl: 'https://x.example.supabase.co/functions/v1/print-agent', token: `qpa_${'K'.repeat(43)}`, shopName: 'Test Shop' });
+  const out = [];
+  const fail = [];
+  const code = await main(['autostart'], {
+    dir, platform: 'linux', agentDir, standalone: true, nodePath: '/opt/qrquick/qrquick-print-agent', out: (line) => out.push(line), fail: (line) => fail.push(line),
+  });
+  assert.equal(code, 0, fail.join('\n'));
+  const written = await readFile(path.join(agentDir, 'autostart', 'qrquick-print-agent.service'), 'utf8');
+  assert.match(written, /^ExecStart="\/opt\/qrquick\/qrquick-print-agent" run$/m);
+  assert.doesNotMatch(written, /\.mjs/);
+  assert.ok(!out.join('\n').includes('K'.repeat(43)), 'the token is never printed');
+});
+
 test('autostart refuses to run before the computer is paired', async (t) => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'qrq-autostart-empty-'));
   t.after(() => rm(dir, { recursive: true, force: true }));

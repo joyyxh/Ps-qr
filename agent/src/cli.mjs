@@ -33,6 +33,16 @@ Setup order: pair, printers, set-printer, doctor, test-print, run, autostart.
 
 const AGENT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// True when this is the single-file build (standalone/build.mjs), which runs without a script file.
+async function isStandaloneExecutable() {
+  try {
+    const sea = await import('node:sea');
+    return sea.isSea();
+  } catch {
+    return false; // Node older than 20.12 has no node:sea module, so it is never the single-file build.
+  }
+}
+
 function platformName(platform) {
   if (platform === 'win32') return 'windows';
   if (platform === 'linux') return 'linux';
@@ -219,14 +229,17 @@ async function run(_args, deps, { dir, out, platform }) {
 async function autostart(_args, deps, { dir, out, platform }) {
   if (!platformName(platform)) throw new Error('Start-at-sign-in is set up for Windows and Linux only.');
   const config = await requireConfig(dir);
-  const agentDir = deps.agentDir ?? AGENT_DIR;
+  // The single-file build starts itself, so the file runs the executable with "run" and no script,
+  // and the files go next to the executable.
+  const standalone = deps.standalone ?? (await isStandaloneExecutable());
+  const agentDir = deps.agentDir ?? (standalone ? path.dirname(process.execPath) : AGENT_DIR);
   const fileDir = path.join(agentDir, 'autostart');
   const user = deps.userId ?? (process.env.USERDOMAIN && process.env.USERNAME
     ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
     : '');
   const file = autostartFiles(platform, {
     nodePath: deps.nodePath ?? process.execPath,
-    scriptPath: path.join(agentDir, 'bin', 'qrquick-print-agent.mjs'),
+    scriptPath: standalone ? null : path.join(agentDir, 'bin', 'qrquick-print-agent.mjs'),
     workingDir: agentDir,
     userId: user,
     fileDir,

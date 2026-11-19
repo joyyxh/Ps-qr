@@ -2,7 +2,8 @@ import path from 'node:path';
 
 // Start-at-login files for the print agent: a Windows Task Scheduler task or a Linux systemd user
 // service. Both run "node <agent>/bin/qrquick-print-agent.mjs run" and restart it after a failure.
-// The files only start the agent. They do not change what the agent prints.
+// In the single-file build there is no script: nodePath is the executable and scriptPath is empty,
+// so both run "<executable> run". The files only start the agent. They do not change what it prints.
 
 export const TASK_NAME = 'QRquick print agent';
 export const SERVICE_NAME = 'qrquick-print-agent';
@@ -54,7 +55,7 @@ export function windowsTaskXml({ nodePath, scriptPath, workingDir, userId = '' }
   <Actions Context="Author">
     <Exec>
       <Command>${xmlEscape(nodePath)}</Command>
-      <Arguments>${xmlEscape(`"${scriptPath}" run`)}</Arguments>
+      <Arguments>${xmlEscape(scriptPath ? `"${scriptPath}" run` : 'run')}</Arguments>
       <WorkingDirectory>${xmlEscape(workingDir)}</WorkingDirectory>
     </Exec>
   </Actions>
@@ -77,7 +78,7 @@ After=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=${workingDir}
-ExecStart=${systemdQuote(nodePath)} ${systemdQuote(scriptPath)} run
+ExecStart=${systemdQuote(nodePath)}${scriptPath ? ` ${systemdQuote(scriptPath)}` : ''} run
 Restart=always
 RestartSec=10
 
