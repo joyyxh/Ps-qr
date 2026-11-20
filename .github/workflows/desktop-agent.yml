@@ -2,8 +2,9 @@ name: Desktop print agent
 
 # Builds the QRquick print agent as one executable for Windows x64 and Linux x64 (Node's single
 # executable applications), so the shop computer needs no Node.js install. Every run tests the agent,
-# builds both executables and runs smoke checks on each. A manual run with "publish" set also creates
-# or updates a public prerelease with direct download links, the same way the Android APK is published.
+# builds both executables, checks each package's layout and runs smoke checks on each, and records a
+# build provenance attestation for each package. A manual run with "publish" set also creates or updates
+# a public prerelease with direct download links and a SHA256SUMS.txt, the same way the Android APK is published.
 
 on:
   workflow_dispatch:
@@ -46,6 +47,10 @@ jobs:
             platform: windows-x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     defaults:
       run:
         shell: bash
@@ -55,6 +60,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        if: matrix.platform == 'windows-x64'
+        with:
+          python-version: '3.12'
 
       - name: Install the build tools (kept in agent/dist/work, not in the agent)
         run: |
@@ -81,6 +90,9 @@ jobs:
             cat "$RUNNER_TEMP/printers.txt" >&2
             exit 1
           fi
+          # Without a console (no terminal here), no arguments print the usage and exit 0, as scripts expect.
+          "$EXE" < /dev/null > "$RUNNER_TEMP/noargs.txt" 2>&1
+          grep -q '^Commands:' "$RUNNER_TEMP/noargs.txt"
           set +e
           "$EXE" not-a-command > /dev/null 2>&1
           CODE=$?
@@ -97,7 +109,18 @@ jobs:
           if [ "${{ matrix.platform }}" = "windows-x64" ]; then
             cp dist/qrquick-print-agent.exe "$PKG/"
             cp standalone/PACKAGE-README.txt "$PKG/README.txt"
-            powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/package/$NAME' -DestinationPath 'dist/downloads/$NAME.zip' -Force"
+            # Python's zipfile always writes "/" between folders. Compress-Archive in Windows PowerShell 5.1
+            # writes "\" instead, which some extractors reject or split into odd file names.
+            python -I - "dist/package" "$NAME" "dist/downloads/$NAME.zip" <<'PY'
+          import os, sys, zipfile
+          base, name, dest = sys.argv[1], sys.argv[2], sys.argv[3]
+          src = os.path.join(base, name)
+          with zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED) as zf:
+              for folder, _dirs, files in os.walk(src):
+                  for file in sorted(files):
+                      path = os.path.join(folder, file)
+                      zf.write(path, os.path.relpath(path, base).replace(os.sep, '/'))
+          PY
             test -s "dist/downloads/$NAME.zip"
           else
             cp dist/qrquick-print-agent "$PKG/"
@@ -106,6 +129,39 @@ jobs:
             tar -C dist/package -czf "dist/downloads/$NAME.tar.gz" "$NAME"
             test -s "dist/downloads/$NAME.tar.gz"
           fi
+
+      - name: Check the package layout
+        run: |
+          set -euo pipefail
+          NAME="qrquick-print-agent-${{ matrix.platform }}"
+          if [ "${{ matrix.platform }}" = "windows-x64" ]; then
+            python -I - "dist/downloads/$NAME.zip" <<'PY'
+          import sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as zf:
+              names = zf.namelist()
+              bad = [n for n in names if '\\' in n]
+              if bad:
+                  sys.exit('Entries with backslashes in their names: ' + ', '.join(bad))
+              for wanted in ('README.txt', 'qrquick-print-agent.exe'):
+                  if not any(n.endswith('/' + wanted) for n in names):
+                      sys.exit('Missing from the zip: ' + wanted)
+              broken = zf.testzip()
+              if broken is not None:
+                  sys.exit('Corrupt entry in the zip: ' + broken)
+              print('\n'.join(names))
+          PY
+          else
+            if tar -tzf "dist/downloads/$NAME.tar.gz" | grep -q -F '\'; then
+              echo 'The tar.gz has backslashes in its names.' >&2
+              exit 1
+            fi
+            tar -tzf "dist/downloads/$NAME.tar.gz"
+          fi
+
+      - name: Record build provenance for the package
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: agent/dist/downloads/*
 
       - name: Upload the package
         uses: actions/upload-artifact@v4
@@ -131,6 +187,13 @@ jobs:
           path: downloads
           merge-multiple: true
 
+      - name: Write the SHA-256 sums file
+        run: |
+          set -euo pipefail
+          cd downloads
+          sha256sum qrquick-print-agent-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Create or update the prerelease
         run: |
           set -euo pipefail
@@ -148,6 +211,9 @@ jobs:
             echo "Built by desktop agent run $GITHUB_RUN_ID: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo
             echo "No Node.js is needed. Each package has README.txt with the install steps."
+            echo "To check a download against SHA256SUMS.txt: \`sha256sum -c SHA256SUMS.txt\` on Linux, or \`certutil -hashfile <file> SHA256\` on Windows."
+            echo "To check that a download was built by this repository: \`gh attestation verify <file> -R $GITHUB_REPOSITORY\`."
+            echo "Browsers and Windows warn about programs that are not signed. README.txt explains how to check the file first."
             echo "Status: tested with fake printers only. It has not yet been tested on a real printer."
           } > "$NOTES"
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then

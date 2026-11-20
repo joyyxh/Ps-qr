@@ -4,6 +4,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { createAgentApi } from './api.mjs';
 import { autostartFiles } from './autostart.mjs';
@@ -61,7 +62,7 @@ async function requireConfig(dir) {
   return config;
 }
 
-async function pair([address, code], deps, { dir, out, platform }) {
+async function pair([address, code], deps, { dir, out, platform, guided = false }) {
   if (!address || !code) throw new Error('Usage: qrquick-print-agent pair <server-address> <pairing-code>');
   const key = platformName(platform);
   if (!key) throw new Error('This print agent runs on Windows and Linux only.');
@@ -80,7 +81,7 @@ async function pair([address, code], deps, { dir, out, platform }) {
     pairedAt: new Date().toISOString(),
   });
   out(`Paired with ${result.shop_name}.`);
-  out('Next: run "printers", then "set-printer <name>", then "doctor" and "test-print".');
+  if (!guided) out('Next: run "printers", then "set-printer <name>", then "doctor" and "test-print".');
   return 0;
 }
 
@@ -258,15 +259,116 @@ async function autostart(_args, deps, { dir, out, platform }) {
   return 0;
 }
 
+// Thrown when the person presses Ctrl+C at a question, or the console input closes before an answer.
+export class SetupCancelled extends Error {
+  constructor() {
+    super('Setup was cancelled.');
+    this.name = 'SetupCancelled';
+  }
+}
+
+// Asks one question on the console. A new interface is made for each question and closed straight after,
+// so the input is released before the agent starts and Ctrl+C reaches the running agent as usual.
+function askConsole(question) {
+  return new Promise((resolve, reject) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    let answered = false;
+    rl.on('SIGINT', () => rl.close());
+    rl.on('close', () => {
+      if (!answered) reject(new SetupCancelled());
+    });
+    rl.question(question, (answer) => {
+      answered = true;
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+// Lists the printers, asks for the fallback printer by number, and saves it. Enter skips the choice.
+async function chooseFallbackPrinter(deps, ctx, ask) {
+  const { out, platform } = ctx;
+  const list = await makeAdapter(deps, platform).listPrinters();
+  if (list.length === 0) {
+    out('No printers were found on this computer. Install the printer, then open this again.');
+    return;
+  }
+  out('Printers on this computer:');
+  list.forEach((p, i) => {
+    const notes = [p.isDefault ? 'system default' : null, p.enabled ? null : 'offline or turned off'].filter(Boolean);
+    out(`  ${i + 1}. ${p.name}${notes.length ? ` (${notes.join(', ')})` : ''}`);
+  });
+  const answer = (await ask(`Number of the printer for QRquick [1-${list.length}], or press Enter to skip: `)).trim();
+  if (answer === '') return;
+  const index = Number(answer);
+  if (!Number.isInteger(index) || index < 1 || index > list.length) {
+    out('That is not a number on the list. Skipped. Choose a printer later with "set-printer".');
+    return;
+  }
+  await setPrinter([list[index - 1].name], deps, ctx);
+}
+
+// Started with no arguments from a console window (double-click on Windows, "Run in Terminal" on Linux).
+// It pairs the computer if needed, asks for the printer, then starts printing, so nobody has to know the
+// command list. The window waits for Enter before it closes, so a failure message can be read.
+async function startScreen(deps, ctx) {
+  const { out, fail } = ctx;
+  const ask = deps.ask ?? askConsole;
+  const startAgent = deps.startAgent ?? (() => run([], deps, ctx));
+  out(`QRquick print agent ${VERSION}`);
+  out('');
+  let code = 0;
+  try {
+    let config = await loadConfig(ctx.dir);
+    if (config?.token) {
+      out(`This computer is paired with ${config.shopName}.`);
+    } else {
+      out('This computer is not connected to a shop yet.');
+      out('Ask the shop owner for the server address and a pairing code from the QRquick owner app.');
+      const address = (await ask('Server address: ')).trim();
+      const pairingCode = (await ask('Pairing code: ')).trim();
+      if (!address || !pairingCode) throw new Error('Both the server address and the pairing code are needed.');
+      await pair([address, pairingCode], deps, { ...ctx, guided: true });
+      config = await loadConfig(ctx.dir);
+    }
+    if (config.printer) {
+      out(`Fallback printer: ${config.printer}`);
+    } else {
+      await chooseFallbackPrinter(deps, ctx, ask);
+    }
+    out('');
+    code = await startAgent();
+  } catch (err) {
+    if (err instanceof SetupCancelled) return 130;
+    fail(err instanceof Error ? err.message : String(err));
+    code = 1;
+  }
+  try {
+    await ask('\nPress Enter to close this window. ');
+  } catch (err) {
+    if (!(err instanceof SetupCancelled)) throw err;
+  }
+  return code;
+}
+
 const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run, autostart };
 
-// Entry point. deps are for tests: dir, platform, out, fail, fetchImpl, run, adapter, download, computerName.
+// Entry point. deps are for tests: dir, platform, out, fail, fetchImpl, run, adapter, download, computerName,
+// and for the guided start: interactive, ask (question -> answer), startAgent (-> exit code).
 export async function main(argv, deps = {}) {
   const out = deps.out ?? ((line) => process.stdout.write(`${line}\n`));
   const fail = deps.fail ?? ((line) => process.stderr.write(`${line}\n`));
   const platform = deps.platform ?? process.platform;
   const dir = deps.dir ?? defaultConfigDir(platform);
-  const [command = 'help', ...args] = argv;
+
+  // No arguments: a person at a console gets the guided start; scripts and pipes get the usage text, as before.
+  if (argv.length === 0) {
+    const interactive = deps.interactive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    if (interactive) return startScreen(deps, { dir, out, fail, platform });
+    out(USAGE);
+    return 0;
+  }
+  const [command, ...args] = argv;
 
   if (command === 'help' || command === '--help' || command === '-h') {
     out(USAGE);

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from '../src/config.mjs';
-import { main } from '../src/cli.mjs';
+import { main, SetupCancelled } from '../src/cli.mjs';
 
 const TOKEN = 'qpa_' + 'K'.repeat(43);
 const SERVER = 'https://x.example.supabase.co/functions/v1/print-agent';
@@ -105,4 +105,82 @@ test('unknown commands and help', async (t) => {
   assert.ok(out.join('\n').includes('Commands:'));
   assert.equal(await main(['frobnicate'], deps), 1);
   assert.match(fail[0], /Unknown command "frobnicate"/);
+});
+
+// Answers the questions in order. A question with no answer left fails the test.
+function scripted(answers) {
+  const asked = [];
+  const ask = async (question) => {
+    asked.push(question);
+    if (answers.length === 0) throw new Error(`unexpected question: ${question}`);
+    return answers.shift();
+  };
+  return { ask, asked };
+}
+
+test('no arguments outside a terminal print the usage and never prompt', async (t) => {
+  const { out, deps } = await setup(t, {
+    interactive: false,
+    ask: async () => { throw new Error('must not prompt'); },
+  });
+  assert.equal(await main([], deps), 0);
+  assert.ok(out.join('\n').includes('Commands:'));
+});
+
+test('no arguments in a terminal: pairs, chooses the printer, starts the agent, and waits before closing', async (t) => {
+  const { dir, out, fail, deps } = await setup(t, { adapter: oneOffice, fetchImpl: pairingFetch([]), computerName: 'SHOP-PC' });
+  const { ask, asked } = scripted([SERVER, 'ABCD-EFGH', '1', '']);
+  let started = 0;
+  const code = await main([], { ...deps, interactive: true, ask, startAgent: async () => { started += 1; return 0; } });
+  assert.equal(code, 0, fail.join('\n'));
+  assert.equal(started, 1);
+  assert.equal(asked.length, 4);
+  assert.match(asked[0], /Server address/);
+  assert.match(asked[1], /Pairing code/);
+  assert.match(asked[2], /Number of the printer/);
+  assert.match(asked[3], /Press Enter to close/);
+  const saved = await loadConfig(dir);
+  assert.equal(saved.token, TOKEN);
+  assert.equal(saved.printer, 'Office');
+  const text = out.join('\n');
+  assert.ok(!text.includes(TOKEN), 'the token is never printed');
+  assert.ok(!text.includes('Next: run'), 'the guided start does not print the command list');
+});
+
+test('no arguments in a terminal: a rejected pairing code is reported, the agent does not start, and the window waits', async (t) => {
+  const rejecting = async () => new Response(
+    JSON.stringify({ code: 'pairing_code_invalid', message: 'That code is not valid or has expired.' }),
+    { status: 400, headers: { 'content-type': 'application/json' } },
+  );
+  const { fail, deps } = await setup(t, { adapter: oneOffice, fetchImpl: rejecting });
+  const { ask, asked } = scripted([SERVER, 'WRONG-CODE', '']);
+  let started = 0;
+  const code = await main([], { ...deps, interactive: true, ask, startAgent: async () => { started += 1; return 0; } });
+  assert.equal(code, 1);
+  assert.equal(started, 0);
+  assert.match(fail.at(-1), /not valid or has expired/);
+  assert.match(asked.at(-1), /Press Enter to close/);
+});
+
+test('no arguments in a terminal on a paired computer with a printer set: starts at once', async (t) => {
+  const { out, fail, deps } = await setup(t, { adapter: oneOffice, fetchImpl: pairingFetch([]) });
+  await main(['pair', SERVER, 'ABCD-EFGH'], deps);
+  await main(['set-printer', 'Office'], deps);
+  const { ask, asked } = scripted(['']);
+  let started = 0;
+  const code = await main([], { ...deps, interactive: true, ask, startAgent: async () => { started += 1; return 0; } });
+  assert.equal(code, 0, fail.join('\n'));
+  assert.equal(started, 1);
+  assert.equal(asked.length, 1, 'only the closing question is asked');
+  assert.ok(out.some((l) => l.includes('paired with Test Print Shop')));
+});
+
+test('no arguments in a terminal: Ctrl+C at a question stops before anything is paired', async (t) => {
+  const { dir, deps } = await setup(t, { adapter: oneOffice, fetchImpl: pairingFetch([]) });
+  const ask = async () => { throw new SetupCancelled(); };
+  let started = 0;
+  const code = await main([], { ...deps, interactive: true, ask, startAgent: async () => { started += 1; return 0; } });
+  assert.equal(code, 130);
+  assert.equal(started, 0);
+  assert.equal((await loadConfig(dir))?.token, undefined);
 });
