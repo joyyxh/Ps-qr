@@ -60,9 +60,10 @@ Linux (Ubuntu or Debian)
 4. If the file will not open, make it runnable: in its Properties, allow it to run as a program, or run
      chmod +x qrquick-print-agent
    in a terminal in that folder.
-5. Right-click qrquick-print-agent and choose "Run in Terminal". The agent needs that terminal window to
-   ask its questions and show its messages. If you double-click it without a terminal, nothing appears.
-   That is expected: use Run in Terminal instead.
+5. Double-click qrquick-print-agent, or right-click it and choose "Run". On most desktops a terminal window
+   opens by itself and the agent runs in it. If no terminal program is installed, the agent shows a
+   notification and stops. Then install one (for example: sudo apt install xterm), or open a terminal in
+   this folder and run ./qrquick-print-agent.
 6. Follow the same steps as on Windows. The terminal asks for the server address, the pairing code and
    the printer. Keep the window open while the shop is open. Press Ctrl+C to stop the agent.
 7. To start the agent automatically at sign-in, run  ./qrquick-print-agent autostart  in a terminal, then

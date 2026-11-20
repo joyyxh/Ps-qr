@@ -1,6 +1,7 @@
 // Command-line front end for the agent. Each command returns an exit code and never
 // prints the agent's token.
 
+import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -351,6 +352,53 @@ async function startScreen(deps, ctx) {
   return code;
 }
 
+// Terminal programs to try, in order, when a Linux desktop starts the agent without a console. Each one
+// takes the command to run after its flag. The first one that starts is used.
+const TERMINAL_PROGRAMS = [
+  ['x-terminal-emulator', ['-e']],
+  ['gnome-terminal', ['--']],
+  ['konsole', ['-e']],
+  ['xfce4-terminal', ['-e']],
+  ['xterm', ['-e']],
+];
+
+// Starts a program without waiting for it. Resolves true only if the program started.
+function startDetached(spawnImpl, file, args) {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawnImpl(file, args, { detached: true, stdio: 'ignore' });
+    } catch {
+      resolve(false);
+      return;
+    }
+    child.once('error', () => resolve(false));
+    child.once('spawn', () => {
+      child.unref();
+      resolve(true);
+    });
+  });
+}
+
+// Opens a new terminal window that runs the command. Resolves true if one of the terminal programs started.
+export async function openTerminalWindow(command, spawnImpl = spawn) {
+  for (const [program, flags] of TERMINAL_PROGRAMS) {
+    if (await startDetached(spawnImpl, program, [...flags, ...command])) return true;
+  }
+  return false;
+}
+
+// Best-effort desktop notification, for a launch that has no window in which to show its message.
+export async function notifyUser(text, spawnImpl = spawn) {
+  await startDetached(spawnImpl, 'notify-send', ['QRquick print agent', text]);
+}
+
+// The command that starts this agent with no arguments: the executable itself, or Node with the script.
+async function selfCommand() {
+  if (await isStandaloneExecutable()) return [process.execPath];
+  return [process.execPath, process.argv[1]];
+}
+
 const COMMANDS = { pair, printers, 'set-printer': setPrinter, doctor, 'test-print': testPrint, run, autostart };
 
 // Entry point. deps are for tests: dir, platform, out, fail, fetchImpl, run, adapter, download, computerName,
@@ -361,10 +409,20 @@ export async function main(argv, deps = {}) {
   const platform = deps.platform ?? process.platform;
   const dir = deps.dir ?? defaultConfigDir(platform);
 
-  // No arguments: a person at a console gets the guided start; scripts and pipes get the usage text, as before.
+  // No arguments. In a console window the guided start runs. A Linux desktop (file manager) starts the agent
+  // with no console, so a terminal window is opened to run it there. Scripts and pipes get the usage text.
   if (argv.length === 0) {
     const interactive = deps.interactive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
     if (interactive) return startScreen(deps, { dir, out, fail, platform });
+    const desktop = deps.desktopSession ?? Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
+    if (platform === 'linux' && desktop) {
+      const opened = await (deps.openTerminal ?? openTerminalWindow)(deps.selfCommand ?? (await selfCommand()));
+      if (opened) return 0;
+      const message = 'No terminal program was found. Open a terminal, go to the agent folder and run ./qrquick-print-agent';
+      fail(message);
+      await (deps.notify ?? notifyUser)(message);
+      return 1;
+    }
     out(USAGE);
     return 0;
   }

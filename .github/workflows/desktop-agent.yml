@@ -91,7 +91,7 @@ jobs:
             exit 1
           fi
           # Without a console (no terminal here), no arguments print the usage and exit 0, as scripts expect.
-          "$EXE" < /dev/null > "$RUNNER_TEMP/noargs.txt" 2>&1
+          env -u DISPLAY -u WAYLAND_DISPLAY "$EXE" < /dev/null > "$RUNNER_TEMP/noargs.txt" 2>&1
           grep -q '^Commands:' "$RUNNER_TEMP/noargs.txt"
           set +e
           "$EXE" not-a-command > /dev/null 2>&1

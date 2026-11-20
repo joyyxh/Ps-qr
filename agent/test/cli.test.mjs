@@ -4,7 +4,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from '../src/config.mjs';
-import { main, SetupCancelled } from '../src/cli.mjs';
+import { EventEmitter } from 'node:events';
+import { main, openTerminalWindow, SetupCancelled } from '../src/cli.mjs';
 
 const TOKEN = 'qpa_' + 'K'.repeat(43);
 const SERVER = 'https://x.example.supabase.co/functions/v1/print-agent';
@@ -121,6 +122,7 @@ function scripted(answers) {
 test('no arguments outside a terminal print the usage and never prompt', async (t) => {
   const { out, deps } = await setup(t, {
     interactive: false,
+    desktopSession: false,
     ask: async () => { throw new Error('must not prompt'); },
   });
   assert.equal(await main([], deps), 0);
@@ -183,4 +185,64 @@ test('no arguments in a terminal: Ctrl+C at a question stops before anything is 
   assert.equal(code, 130);
   assert.equal(started, 0);
   assert.equal((await loadConfig(dir))?.token, undefined);
+});
+
+// A fake spawn: the named program starts, every other program is missing (ENOENT).
+function fakeSpawn(startsProgram, tried) {
+  return (file, args) => {
+    tried.push([file, args]);
+    const child = new EventEmitter();
+    child.unref = () => {};
+    setImmediate(() => {
+      if (file === startsProgram) child.emit('spawn');
+      else child.emit('error', Object.assign(new Error(`spawn ${file} ENOENT`), { code: 'ENOENT' }));
+    });
+    return child;
+  };
+}
+
+test('a Linux desktop launch opens a terminal window that runs the agent, and prints nothing extra', async (t) => {
+  const { out, fail, deps } = await setup(t);
+  let opened = null;
+  const code = await main([], {
+    ...deps,
+    interactive: false,
+    desktopSession: true,
+    selfCommand: ['/opt/qrquick/qrquick-print-agent'],
+    openTerminal: async (command) => { opened = command; return true; },
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(opened, ['/opt/qrquick/qrquick-print-agent']);
+  assert.equal(out.length, 0);
+  assert.equal(fail.length, 0);
+});
+
+test('a Linux desktop launch with no terminal program says how to start the agent, and notifies the person', async (t) => {
+  const { fail, deps } = await setup(t);
+  const notified = [];
+  const code = await main([], {
+    ...deps,
+    interactive: false,
+    desktopSession: true,
+    selfCommand: ['/opt/qrquick/qrquick-print-agent'],
+    openTerminal: async () => false,
+    notify: async (text) => { notified.push(text); },
+  });
+  assert.equal(code, 1);
+  assert.match(fail[0], /No terminal program was found/);
+  assert.equal(notified[0], fail[0]);
+});
+
+test('openTerminalWindow tries each terminal program in turn and uses the first that starts', async () => {
+  const tried = [];
+  const started = await openTerminalWindow(['/opt/qrquick/qrquick-print-agent'], fakeSpawn('konsole', tried));
+  assert.equal(started, true);
+  assert.deepEqual(tried.map(([file]) => file), ['x-terminal-emulator', 'gnome-terminal', 'konsole']);
+  assert.deepEqual(tried.at(-1)[1], ['-e', '/opt/qrquick/qrquick-print-agent']);
+});
+
+test('openTerminalWindow reports false when no terminal program is installed', async () => {
+  const tried = [];
+  assert.equal(await openTerminalWindow(['/x/agent'], fakeSpawn('none', tried)), false);
+  assert.equal(tried.length, 5);
 });
