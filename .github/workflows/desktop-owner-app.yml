@@ -1,0 +1,226 @@
+name: Desktop owner app (Windows and Linux)
+
+# Builds the QRquick owner desktop app for Windows x64 (an NSIS installer) and Linux x64 (an AppImage) from the
+# same web/ source as the website and the Android app, with the production configuration. Every run builds both,
+# checks the packages, and runs the smoke test on each. The packages are uploaded as run artifacts; this workflow
+# creates no GitHub release.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - 'desktop/**'
+      - 'web/**'
+      - '.github/workflows/desktop-owner-app.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: ubuntu-latest
+            platform: linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      # Unsigned builds: no code-signing certificate exists for this project yet.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Record the version and build id
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          {
+            echo "APP_VERSION=$VERSION"
+            echo "BUILD_SHA=$SHORT_SHA"
+            echo "BUILD_ID=$VERSION-$SHORT_SHA"
+          } >> "$GITHUB_ENV"
+          echo "Build id: $VERSION-$SHORT_SHA (commit $GITHUB_SHA)"
+
+      - name: Install the Electron shell and the packager (pinned in desktop/package.json)
+        run: npm install --no-audit --no-fund
+
+      - name: Copy the shared web app with the production configuration
+        run: npm run copy-web
+
+      - name: Install Playwright 1.63.0 for the smoke test (outside the repository)
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
+
+      - name: Install the virtual display and Electron libraries (Linux)
+        if: matrix.platform == 'linux-x64'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libgtk-3-0 libasound2t64 libxss1 libgbm1 libxkbcommon0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libcups2 libatk-bridge2.0-0 libx11-xcb1
+
+      - name: Build the Windows installer and unpacked app
+        if: matrix.platform == 'windows-x64'
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Build the Linux AppImage and unpacked app
+        if: matrix.platform == 'linux-x64'
+        run: npx electron-builder --linux --x64 --publish never
+
+      - name: Check the packages contain the production app only, and no secrets
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.platform }}" = 'windows-x64' ]; then
+            UNPACKED="dist/win-unpacked"
+            test -s dist/QRquick-*-win-x64-setup.exe
+          else
+            UNPACKED="dist/linux-unpacked"
+            test -s dist/QRquick-*-linux-x64.AppImage
+          fi
+          RES="$UNPACKED/resources/app-web"
+          test -f "$RES/index.html"
+          test -f "$RES/src/owner.js" -o -f "$RES/src/app.js"
+          grep -q '"supabaseUrl": "https://qvnwqrevgyootaaunrto.supabase.co"' "$RES/config.js"
+          grep -q '"ownerApp": true' "$RES/config.js"
+          grep -q '"publicBaseUrl": "https://joyyxh.github.io/Ps-qr/"' "$RES/config.js"
+          # Not in the web copy, and not in the packed application archive.
+          if grep -rIl "nbzojqlqkrydcjtogwrb" "$RES" > /dev/null; then echo 'the staging project is in the packaged web copy' >&2; exit 1; fi
+          if grep -rIEl 'sb_secret_|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.' "$RES" > /dev/null; then echo 'a secret-looking key is in the packaged web copy' >&2; exit 1; fi
+          if grep -aq "nbzojqlqkrydcjtogwrb\|sb_secret_" "$UNPACKED/resources/app.asar"; then echo 'the staging project or a secret key is in app.asar' >&2; exit 1; fi
+          test -f "$UNPACKED/resources/app.asar"
+          echo "Packaged web copy: $(find "$RES" -type f | wc -l) files, production project, ownerApp true."
+
+      - name: Run the Linux AppImage itself (it starts and stays running for 25 seconds)
+        if: matrix.platform == 'linux-x64'
+        run: |
+          set -euo pipefail
+          APPIMAGE="$(ls dist/QRquick-*-linux-x64.AppImage | head -n 1)"
+          chmod +x "$APPIMAGE"
+          set +e
+          APPIMAGE_EXTRACT_AND_RUN=1 timeout 25 xvfb-run -a "$APPIMAGE" --no-sandbox > "$RUNNER_TEMP/appimage.log" 2>&1
+          CODE=$?
+          set -e
+          # 124 means the app was still running when the timeout stopped it: the expected result.
+          if [ "$CODE" != 124 ]; then
+            echo "The AppImage exited early with code $CODE." >&2
+            cat "$RUNNER_TEMP/appimage.log" >&2
+            exit 1
+          fi
+          pkill -f 'qrquick-linux-x64.AppImage' || true
+          echo 'The AppImage started and was still running after 25 seconds.'
+
+      - name: Smoke test the Linux app (shipped build, then the test-only staging copy)
+        if: matrix.platform == 'linux-x64'
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
+        run: |
+          set -euo pipefail
+          xvfb-run -a env QRQUICK_EXECUTABLE="$PWD/dist/linux-unpacked/qrquick" QRQUICK_MODE=production \
+            QRQUICK_SMOKE_OUT="$RUNNER_TEMP/desktop-smoke-linux-production" node tests/smoke.cjs
+          npm run copy-web:staging-test
+          xvfb-run -a env QRQUICK_EXECUTABLE="$PWD/dist/linux-unpacked/qrquick" QRQUICK_MODE=staging-probe \
+            QRQUICK_TEST_WEB_DIR="$PWD/test-web" QRQUICK_SMOKE_OUT="$RUNNER_TEMP/desktop-smoke-linux-probe" \
+            node tests/smoke.cjs
+
+      - name: Install the Windows installer silently (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'The Windows installer was not built.' }
+          $target = Join-Path $env:RUNNER_TEMP 'QRquick-install'
+          Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$target") -Wait
+          if (-not (Test-Path (Join-Path $target 'QRquick.exe'))) { throw 'The installer did not install QRquick.exe.' }
+          "QRQUICK_INSTALL=$target" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Installed to $target"
+
+      - name: Smoke test the installed Windows app (shipped build, then the test-only staging copy)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}\pw\node_modules\playwright\index.js
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:QRQUICK_INSTALL 'QRquick.exe'
+          $env:QRQUICK_EXECUTABLE = $exe
+          $env:QRQUICK_MODE = 'production'
+          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-production'
+          node tests/smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'The shipped-build smoke test failed.' }
+          npm run copy-web:staging-test
+          if ($LASTEXITCODE -ne 0) { throw 'The test-only copy could not be built.' }
+          $env:QRQUICK_MODE = 'staging-probe'
+          $env:QRQUICK_TEST_WEB_DIR = (Resolve-Path 'test-web').Path
+          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-probe'
+          node tests/smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'The staging-probe smoke test failed.' }
+
+      - name: Uninstall the Windows app silently and confirm it is removed (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $uninstaller = Join-Path $env:QRQUICK_INSTALL 'Uninstall QRquick.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'The uninstaller is missing.' }
+          Start-Process -FilePath $uninstaller -ArgumentList @('/S') -Wait
+          Start-Sleep -Seconds 3
+          if (Test-Path (Join-Path $env:QRQUICK_INSTALL 'QRquick.exe')) { throw 'QRquick.exe is still installed after uninstalling.' }
+          Write-Host 'Uninstalled.'
+
+      - name: Collect the release files, the checksums and the build information
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          if [ "${{ matrix.platform }}" = 'windows-x64' ]; then
+            cp dist/QRquick-*-win-x64-setup.exe release/
+          else
+            cp dist/QRquick-*-linux-x64.AppImage release/
+          fi
+          cat > release/BUILD-INFO-${{ matrix.platform }}.txt <<EOF
+          QRquick owner desktop app
+          Version: $APP_VERSION
+          Build id: $BUILD_ID
+          Commit: $GITHUB_SHA
+          Platform: ${{ matrix.platform }}
+          Supabase project: qvnwqrevgyootaaunrto (production)
+          QR address: https://joyyxh.github.io/Ps-qr/
+          Signing: unsigned (no code-signing certificate configured)
+          Built (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          (cd release && sha256sum * > SHA256SUMS-${{ matrix.platform }}.txt)
+          cat release/SHA256SUMS-${{ matrix.platform }}.txt
+
+      - name: Upload the desktop app package, checksums and build information
+        uses: actions/upload-artifact@v4
+        with:
+          name: qrquick-desktop-${{ matrix.platform }}-${{ env.BUILD_ID }}
+          path: desktop/release
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload the smoke test results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-smoke-${{ matrix.platform }}-${{ env.BUILD_ID }}
+          path: ${{ runner.temp }}/desktop-smoke-*
+          if-no-files-found: warn
+          retention-days: 14
