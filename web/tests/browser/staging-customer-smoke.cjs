@@ -102,10 +102,11 @@ async function placeOrder(page, method) {
     if (err && err.textContent.trim()) return true;
     return /Order received/.test(document.querySelector('h1')?.textContent || '');
   }, null, { timeout: 60000 });
-  const error = ((await page.textContent('#order-error')) || '').trim();
+  // After a successful order the app replaces the whole screen, so #order-error is gone: read it only if present.
+  const error = await page.evaluate(() => (document.getElementById('order-error')?.textContent || '').trim());
   if (error) return { error };
-  const code = ((await page.textContent('.confirm .code')) || '').trim();
-  const body = ((await page.textContent('.confirm')) || '').replace(/\s+/g, ' ').trim();
+  const code = await page.evaluate(() => (document.querySelector('.confirm .code')?.textContent || '').trim());
+  const body = await page.evaluate(() => (document.querySelector('.confirm')?.textContent || '').replace(/\s+/g, ' ').trim());
   return { code, body };
 }
 
