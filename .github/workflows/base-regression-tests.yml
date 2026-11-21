@@ -1,9 +1,9 @@
 name: Base regression tests
 
 # Adds the regression checks that had been run only on a developer machine or in the hosted SQL editor:
-#   base-sql-suites     the seven base SQL suites (supabase/tests/stage*_tests.sql), run on a clean
+#   base-sql-suites     the eight base SQL suites (supabase/tests/stage*_tests.sql), run on a clean
 #                       PostgreSQL 16 database. Chain: test-only platform stand-ins, migrations
-#                       0001 to 0010 and 0015 to 0019, the development seed. Chain A 0011 to 0014 is not
+#                       0001 to 0010 and 0015 to 0020, the development seed. Chain A 0011 to 0014 is not
 #                       on this branch, and the runner refuses to run if those files appear.
 #   base-node-checks    the two Node suites that need no database: supabase/tests/upload_checks.test.js
 #                       (15 tests) and supabase/tests/print_agent_api_checks.test.js (7 tests).

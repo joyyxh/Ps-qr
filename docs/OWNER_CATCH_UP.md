@@ -50,8 +50,14 @@ No application code changed. The client was already correct; the database was be
 - `.github/workflows/stage7-tests.yml`: the `licence-postgres` job also runs `run_catch_up.sh`.
 - This file.
 
-No new migration is needed. The fix is to apply the three existing, reviewed migrations to the live
-project, in order.
+No new migration is needed for the sign-in fix. The fix is to apply the three existing, reviewed
+migrations to the live project, in order.
+
+**Not covered by this runbook: `0020_upi_order_and_print_hardening.sql`.** It was added afterwards. It
+fixes UPI orders (every UPI order failed with "customer payment method is immutable") and removes
+anon and authenticated EXECUTE on `auto_print_on_approval`. It is not yet in this runbook, `rehearse.sh`,
+`SHA256SUMS`, `ledger.sql` or `rollback.sql`. Live needs it before UPI orders work there. Adding it needs
+the same PostgreSQL 17 rehearsal and owner approval as the three migrations above.
 
 ## Why 0010 must come first
 
