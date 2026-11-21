@@ -1,0 +1,78 @@
+name: Staging owner smoke (real staging backend)
+
+# Opens the owner app from web/ against the qrquick-staging Supabase project and checks: the sign-in screen
+# loads, an unknown account is refused with a readable message (no database error), and, only when the
+# optional secrets are set, registration and every owner dashboard tab.
+#
+# Backend: the REAL qrquick-staging project (nbzojqlqkrydcjtogwrb). Nothing here touches the live project
+# (qvnwqrevgyootaaunrto). The only key used is the staging publishable key, which is designed to be public
+# (it ships in the browser). No service-role key is used anywhere.
+#
+# Optional repository secrets (none are required for the first three checks):
+#   STAGING_OWNER_EMAIL / STAGING_OWNER_PASSWORD    a confirmed staging owner: enables the dashboard checks
+#   STAGING_SIGNUP_EMAIL / STAGING_SIGNUP_PASSWORD  a throwaway address: enables the registration check
+# Without them the script reports the skipped checks as INFO, not as passed.
+
+on:
+  push:
+    branches:
+      - stage7-implementation-2026-11-13
+    paths:
+      - 'web/**'
+      - '.github/workflows/staging-owner-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-owner-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+      STAGING_APP_URL: http://127.0.0.1:5175/
+      STAGING_OWNER_EMAIL: ${{ secrets.STAGING_OWNER_EMAIL }}
+      STAGING_OWNER_PASSWORD: ${{ secrets.STAGING_OWNER_PASSWORD }}
+      STAGING_SIGNUP_EMAIL: ${{ secrets.STAGING_SIGNUP_EMAIL }}
+      STAGING_SIGNUP_PASSWORD: ${{ secrets.STAGING_SIGNUP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright 1.63.0 and Chromium (outside the repository)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Serve web/ on 127.0.0.1:5175
+        run: |
+          nohup python3 -m http.server 5175 --bind 127.0.0.1 --directory web > "$RUNNER_TEMP/server.log" 2>&1 &
+          for _ in $(seq 1 50); do
+            if curl -fsS -o /dev/null http://127.0.0.1:5175/; then
+              echo "web/ is being served"
+              exit 0
+            fi
+            sleep 0.2
+          done
+          echo "the static server did not start"
+          cat "$RUNNER_TEMP/server.log"
+          exit 1
+
+      - name: Staging owner smoke (real staging backend, publishable key only)
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
+          QRQUICK_SMOKE_OUT: ${{ runner.temp }}/staging-owner-smoke
+        run: node web/tests/browser/staging-owner-smoke.cjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: staging-owner-smoke
+          path: ${{ runner.temp }}/staging-owner-smoke
+          if-no-files-found: ignore
+          retention-days: 14
