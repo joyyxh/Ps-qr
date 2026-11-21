@@ -64,9 +64,12 @@ async function main() {
     authRedirectUrl: BASE,
     ownerApp: true,
   })};`;
-  await context.route('**/config.js', (route) =>
-    route.fulfill({ contentType: 'application/javascript', body: configJs })
-  );
+  // STAGING_USE_SERVED_CONFIG=1 keeps the copy's own config.js, so the run tests the file that was built.
+  if (process.env.STAGING_USE_SERVED_CONFIG !== '1') {
+    await context.route('**/config.js', (route) =>
+      route.fulfill({ contentType: 'application/javascript', body: configJs })
+    );
+  }
 
   const page = await context.newPage();
   const pageErrors = [];
@@ -79,6 +82,12 @@ async function main() {
     const heading = (await page.textContent('h1')) || '';
     record('owner sign-in screen loads with the staging configuration', /Shop owner sign in/i.test(heading), heading.trim());
     await page.screenshot({ path: path.join(OUT, '01-signin.png'), fullPage: true });
+    const served = await page.evaluate(() => window.PRINTNEST_CONFIG || null);
+    record(
+      'the loaded config points at the staging project with the owner app on',
+      !!served && served.supabaseUrl === SUPABASE_URL && served.publishableKey === PUBLISHABLE_KEY && served.ownerApp === true,
+      served ? `supabaseUrl ${served.supabaseUrl}, ownerApp ${served.ownerApp}` : 'no config loaded'
+    );
 
     // 2. An unknown account is refused with a readable message, not a database error.
     await page.fill('#auth-form input[name=email]', 'no-such-owner.qrquick@example.com');

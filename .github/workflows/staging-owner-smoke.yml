@@ -49,12 +49,15 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
 
-      - name: Serve web/ on 127.0.0.1:5175
+      - name: Build the staging owner copy (scripts/build-staging-owner-copy.sh)
+        run: scripts/build-staging-owner-copy.sh "$RUNNER_TEMP/staging-owner-copy"
+
+      - name: Serve the staging owner copy on 127.0.0.1:5175
         run: |
-          nohup python3 -m http.server 5175 --bind 127.0.0.1 --directory web > "$RUNNER_TEMP/server.log" 2>&1 &
+          nohup python3 -m http.server 5175 --bind 127.0.0.1 --directory "$RUNNER_TEMP/staging-owner-copy" > "$RUNNER_TEMP/server.log" 2>&1 &
           for _ in $(seq 1 50); do
-            if curl -fsS -o /dev/null http://127.0.0.1:5175/; then
-              echo "web/ is being served"
+            if curl -fsS -o /dev/null http://127.0.0.1:5175/config.js; then
+              echo "the staging owner copy is being served"
               exit 0
             fi
             sleep 0.2
@@ -63,10 +66,11 @@ jobs:
           cat "$RUNNER_TEMP/server.log"
           exit 1
 
-      - name: Staging owner smoke (real staging backend, publishable key only)
+      - name: Staging owner smoke (real staging backend, the copy's own config.js)
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
           QRQUICK_SMOKE_OUT: ${{ runner.temp }}/staging-owner-smoke
+          STAGING_USE_SERVED_CONFIG: '1'
         run: node web/tests/browser/staging-owner-smoke.cjs
 
       - uses: actions/upload-artifact@v4
@@ -75,4 +79,12 @@ jobs:
           name: staging-owner-smoke
           path: ${{ runner.temp }}/staging-owner-smoke
           if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the staging owner copy (host it or open it locally)
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-owner-copy
+          path: ${{ runner.temp }}/staging-owner-copy
+          if-no-files-found: error
           retention-days: 14
