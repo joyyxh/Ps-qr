@@ -42,6 +42,15 @@ if [ -n "$PUBLIC_URL" ] && ! [[ "$PUBLIC_URL" =~ ^https?://[^[:space:]\'\"]+$ ]]
   exit 2
 fi
 
+# STAGING_OWNER_ONLY=1 (default) builds the owner-only app, as the Android app is built.
+# STAGING_OWNER_ONLY=0 builds the full website, with the customer pages and the owner area.
+OWNER_ONLY="${STAGING_OWNER_ONLY:-1}"
+case "$OWNER_ONLY" in
+  1) OWNER_ONLY_JS=true; KIND="owner-only app" ;;
+  0) OWNER_ONLY_JS=false; KIND="full website" ;;
+  *) echo "refused: STAGING_OWNER_ONLY must be 1 or 0" >&2; exit 2 ;;
+esac
+
 rm -rf "$OUT"
 mkdir -p "$OUT"
 cp -R "$WEB"/. "$OUT"/
@@ -55,7 +64,7 @@ window.PRINTNEST_CONFIG = {
   publishableKey: '$STAGING_PUBLISHABLE_KEY',
   publicBaseUrl: '$PUBLIC_URL',
   authRedirectUrl: '$PUBLIC_URL',
-  ownerApp: true,
+  ownerApp: $OWNER_ONLY_JS,
 };
 EOF
 
@@ -67,4 +76,4 @@ if grep -rIlE 'service_role|sb_secret_|qvnwqrevgyootaaunrto' "$OUT" >/dev/null; 
   exit 1
 fi
 
-echo "built staging owner copy at $OUT (backend: $STAGING_SUPABASE_URL)"
+echo "built staging $KIND at $OUT (backend: $STAGING_SUPABASE_URL)"

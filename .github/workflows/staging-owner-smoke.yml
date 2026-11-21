@@ -1,17 +1,18 @@
-name: Staging owner smoke (real staging backend)
+name: Staging app and website smoke (real staging backend)
 
-# Opens the owner app from web/ against the qrquick-staging Supabase project and checks: the sign-in screen
-# loads, an unknown account is refused with a readable message (no database error), and, only when the
-# optional secrets are set, registration and every owner dashboard tab.
+# Builds two copies of web/ that point at the qrquick-staging Supabase project (publishable key only):
+#   - the owner-only app (ownerApp true, as the Android app is built), served on 127.0.0.1:5175
+#   - the full website (customer pages and owner area, ownerApp false), served on 127.0.0.1:5176
+# Then runs the owner checks against the app copy and the customer checks against the website copy.
+# Both tests run against the exact built files (STAGING_USE_SERVED_CONFIG=1), with no mocked backend.
 #
 # Backend: the REAL qrquick-staging project (nbzojqlqkrydcjtogwrb). Nothing here touches the live project
-# (qvnwqrevgyootaaunrto). The only key used is the staging publishable key, which is designed to be public
-# (it ships in the browser). No service-role key is used anywhere.
+# (qvnwqrevgyootaaunrto). The only key used is the staging publishable key, which is designed to be public.
+# No service-role key is used anywhere. The customer check places one cash order on a QA shop per run.
 #
-# Optional repository secrets (none are required for the first three checks):
+# Optional repository secrets (the checks are reported as INFO when they are missing):
 #   STAGING_OWNER_EMAIL / STAGING_OWNER_PASSWORD    a confirmed staging owner: enables the dashboard checks
 #   STAGING_SIGNUP_EMAIL / STAGING_SIGNUP_PASSWORD  a throwaway address: enables the registration check
-# Without them the script reports the skipped checks as INFO, not as passed.
 
 on:
   push:
@@ -19,6 +20,7 @@ on:
       - stage7-implementation-2026-11-13
     paths:
       - 'web/**'
+      - 'scripts/build-staging-owner-copy.sh'
       - '.github/workflows/staging-owner-smoke.yml'
   workflow_dispatch:
 
@@ -26,13 +28,12 @@ permissions:
   contents: read
 
 jobs:
-  staging-owner-smoke:
+  staging-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
       STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
-      STAGING_APP_URL: http://127.0.0.1:5175/
       STAGING_OWNER_EMAIL: ${{ secrets.STAGING_OWNER_EMAIL }}
       STAGING_OWNER_PASSWORD: ${{ secrets.STAGING_OWNER_PASSWORD }}
       STAGING_SIGNUP_EMAIL: ${{ secrets.STAGING_SIGNUP_EMAIL }}
@@ -49,42 +50,71 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
 
-      - name: Build the staging owner copy (scripts/build-staging-owner-copy.sh)
+      - name: Build the owner-only app copy
+        env:
+          STAGING_OWNER_ONLY: '1'
         run: scripts/build-staging-owner-copy.sh "$RUNNER_TEMP/staging-owner-copy"
 
-      - name: Serve the staging owner copy on 127.0.0.1:5175
-        run: |
-          nohup python3 -m http.server 5175 --bind 127.0.0.1 --directory "$RUNNER_TEMP/staging-owner-copy" > "$RUNNER_TEMP/server.log" 2>&1 &
-          for _ in $(seq 1 50); do
-            if curl -fsS -o /dev/null http://127.0.0.1:5175/config.js; then
-              echo "the staging owner copy is being served"
-              exit 0
-            fi
-            sleep 0.2
-          done
-          echo "the static server did not start"
-          cat "$RUNNER_TEMP/server.log"
-          exit 1
+      - name: Build the full website copy
+        env:
+          STAGING_OWNER_ONLY: '0'
+        run: scripts/build-staging-owner-copy.sh "$RUNNER_TEMP/staging-website-copy"
 
-      - name: Staging owner smoke (real staging backend, the copy's own config.js)
+      - name: Serve the two copies (app on 5175, website on 5176)
+        run: |
+          nohup python3 -m http.server 5175 --bind 127.0.0.1 --directory "$RUNNER_TEMP/staging-owner-copy" > "$RUNNER_TEMP/server-app.log" 2>&1 &
+          nohup python3 -m http.server 5176 --bind 127.0.0.1 --directory "$RUNNER_TEMP/staging-website-copy" > "$RUNNER_TEMP/server-web.log" 2>&1 &
+          for port in 5175 5176; do
+            up=0
+            for _ in $(seq 1 50); do
+              if curl -fsS -o /dev/null "http://127.0.0.1:$port/config.js"; then up=1; break; fi
+              sleep 0.2
+            done
+            if [ "$up" != 1 ]; then
+              echo "the server on $port did not start"
+              cat "$RUNNER_TEMP/server-app.log" "$RUNNER_TEMP/server-web.log"
+              exit 1
+            fi
+          done
+          echo "the app copy (5175) and the website copy (5176) are being served"
+
+      - name: Owner checks against the app copy (the copy's own config.js)
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
-          QRQUICK_SMOKE_OUT: ${{ runner.temp }}/staging-owner-smoke
+          QRQUICK_SMOKE_OUT: ${{ runner.temp }}/smoke-owner
+          STAGING_APP_URL: http://127.0.0.1:5175/
           STAGING_USE_SERVED_CONFIG: '1'
         run: node web/tests/browser/staging-owner-smoke.cjs
+
+      - name: Customer checks against the website copy (the copy's own config.js)
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
+          QRQUICK_SMOKE_OUT: ${{ runner.temp }}/smoke-customer
+          STAGING_APP_URL: http://127.0.0.1:5176/
+          STAGING_SHOP_SLUG: qa-print-one
+          STAGING_USE_SERVED_CONFIG: '1'
+        run: node web/tests/browser/staging-customer-smoke.cjs
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: staging-owner-smoke
-          path: ${{ runner.temp }}/staging-owner-smoke
+          name: staging-smoke-output
+          path: ${{ runner.temp }}/smoke-*
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Upload the staging owner copy (host it or open it locally)
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: staging-owner-copy
+          name: staging-owner-app-copy
           path: ${{ runner.temp }}/staging-owner-copy
-          if-no-files-found: error
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: staging-website-copy
+          path: ${{ runner.temp }}/staging-website-copy
+          if-no-files-found: ignore
           retention-days: 14
