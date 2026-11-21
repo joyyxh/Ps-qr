@@ -37,7 +37,7 @@ Rehearsal evidence (section 10) covers the four files.
 | G2 | **Verified backup.** The organisation is on the **free** plan. No platform backup or point-in-time recovery is assumed. The operator runs `backup_and_verify.sh` with `pg_dump` 17 from their own machine, and restores the dump into an empty PostgreSQL 17 database they control. The restored row counts must match section 3, check 5. This package cannot take the backup: it has no database credentials. | OPEN |
 | G3 | **Retention decision.** 0010 implements the rule written in `supabase/functions/cleanup-files/index.ts`: a customer file linked to an order becomes removable 30 days after that order ends. The live `expired_customer_file_paths` (0007) removes only unclaimed expired files, so 0010 adds a new deletion candidate set. The cleanup function is **not deployed**, so applying these migrations deletes nothing. The owner must accept the rule before cleanup is ever deployed. The rule is not changed in this package. | OPEN |
 | G4 | **Atomicity of `apply_migration`.** Supabase's knowledge base says the migration runner wraps each migration file in its own transaction, and that explicit `BEGIN`/`COMMIT` break that wrapper. The article does not confirm this for the MCP `apply_migration` tool. This package therefore assumes nothing: section 6 is the recovery path if a file stops part-way. | ACCEPTED only with section 6 in place |
-| G5 | **Major version.** The hosted server is PostgreSQL **17.11**. The local rehearsals ran on PostgreSQL **16.15** only. Run `rehearse.sh` and `run_catch_up.sh` against a PostgreSQL 17 server: the CI job `owner-catch-up-rehearsal` (`.github/workflows/owner-catch-up-rehearsal.yml`) uses a `postgres:17` service. Then replace the expected values in section 7 with the values from that run. | OPEN |
+| G5 | **Major version.** The hosted server is PostgreSQL **17.11**. The local rehearsals ran on PostgreSQL **16.15** only. Run `rehearse.sh` and `run_catch_up.sh` against a PostgreSQL 17 server: the CI job `owner-catch-up-rehearsal` (`.github/workflows/owner-catch-up-rehearsal.yml`) uses a `postgres:17` service. Then replace the expected values in section 7 with the values from that run. | MET for the rehearsal: run 44881267088 (PostgreSQL 17.12) passed, and its values match section 7. The live apply still needs G1, G2, G3 and G6. |
 | G6 | **Customer tracking limit.** `request_client_key()` uses the first address in `x-forwarded-for`, then `x-real-ip` or `cf-connecting-ip`. If none of these reaches the database, every customer shares one bucket of 30 lookups a minute. A client that sets its own `x-forwarded-for` can also choose its bucket. Neither is verified on the hosted gateway. The owner must accept this, or ask for a change to the key derivation first (a reviewed code change, not part of this package). | OPEN |
 
 ## 3. Pre-checks (read-only; run in this order; save every output with a timestamp)
@@ -111,10 +111,10 @@ Rehearsal evidence (section 10) covers the four files.
 
 ## 7. Expected values
 
-**Status: the PostgreSQL 17 run (G5) has not yet produced these values.** The values below are from the local
-PostgreSQL 16.15 rehearsal of the baseline (migrations 0001 to 0009), 2026-11-21. Replace them with the values
-from the PostgreSQL 17 CI run before any live apply, because `pg_get_functiondef` output can differ between major
-versions. Until then, check 3 and check 4 cannot be used as stop conditions on the hosted project.
+**Status: confirmed on PostgreSQL 17.12.** The CI job `owner-catch-up-rehearsal` (run 44881267088, 2026-11-21)
+produced the same fingerprint and the same function digests as the local PostgreSQL 16.15 run of the baseline
+(migrations 0001 to 0009). The values below are therefore valid for both major versions. Re-check them on the
+live project with check 3 and check 4 before the apply.
 
 Fingerprint of 0001 to 0009 (six kinds compared live; `function` excluded):
 
@@ -165,8 +165,8 @@ Row counts in the rehearsal baseline (0001 to 0009 plus the rehearsal rows): `cu
 - [ ] SHA-256 of the four migrations matches `SHA256SUMS` and branch HEAD.
 - [ ] Web tests pass: `npm test` in `web/` (243 of 243, including the owner-schema contract).
 - [x] `rehearse.sh` and `run_catch_up.sh` pass on PostgreSQL 16.15 with 0020 included (local, 2026-11-21).
-- [ ] `rehearse.sh` and `run_catch_up.sh` pass on PostgreSQL 17 (G5, CI job `owner-catch-up-rehearsal`).
-- [ ] Section 7 replaced with the PostgreSQL 17 values from that job.
+- [x] `rehearse.sh` and `run_catch_up.sh` pass on PostgreSQL 17 (G5, CI run 44881267088).
+- [x] Section 7 checked against the PostgreSQL 17 values from that job: identical.
 - [ ] Backup taken with `pg_dump` 17, and the restore check matches section 3 (G2).
 - [ ] Owner decisions recorded: G1, G3, G6 (G4 accepted with section 6).
 - [ ] Pre-checks saved; every stop condition passed.
@@ -202,7 +202,8 @@ Row counts in the rehearsal baseline (0001 to 0009 plus the rehearsal rows): `cu
   immutability guard (42501); owner payment and approval; auto-print queueing a paid UPI order; and browser
   roles refused on the trigger function.
 - Base SQL suites (eight suites, 282 checks, branch migration chain) pass on PostgreSQL 16.
-- Not run: PostgreSQL 17 (pending: CI job); the hosted project; `apply_migration`; the schema-cache request; a
+- PostgreSQL 17.12 (CI run 44881267088, postgres:17 service): `rehearse.sh`, `run_catch_up.sh` and the base suites pass; the section 7 values match.
+- Not run: the hosted project; `apply_migration`; the schema-cache request; a
   device sign-in.
 
 ## 11. Files

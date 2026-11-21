@@ -1,7 +1,7 @@
 # Owner sign-in fix: database catch-up (0010, 0018, 0019, 0020)
 
 Status (2026-11-21): the fix is written and tested on a clean PostgreSQL 16 database, including the UPI order
-fix in `0020_upi_order_and_print_hardening.sql`. A PostgreSQL 17 rehearsal runs in CI (`owner-catch-up-rehearsal`).
+fix in `0020_upi_order_and_print_hardening.sql`. The PostgreSQL 17 rehearsal in CI (`owner-catch-up-rehearsal`) passes.
 It is **not applied** to the live Supabase project (`qvnwqrevgyootaaunrto`). Applying it needs the owner's
 approval, because it changes the hosted database.
 
@@ -120,7 +120,7 @@ hosted project.
 - `rehearse.sh` on PostgreSQL 16.15: passes. Stage 8: 48 ok. Stage 9 (UPI): 12 ok. Full rollback restores the 0009 state exactly.
 - Stage 9 on the staging project (not live): 12 of 12, rolled back.
 - Base SQL suites: eight suites, 282 checks, on PostgreSQL 16.
-- PostgreSQL 17: runs in CI (`owner-catch-up-rehearsal`). Pending until that run passes.
+- PostgreSQL 17.12: `owner-catch-up-rehearsal` passes (run 44881267088): `rehearse.sh`, `run_catch_up.sh` and the base suites.
 
 2026-11-19 (0010, 0018, 0019):
 
@@ -140,5 +140,5 @@ hosted project.
   preflight results above are read-only catalogue queries.
 - That PostgREST on the live project behaves like the local PostgreSQL 16 cluster, which uses shims for
   the Supabase `auth` schema.
-- PostgreSQL 17 behaviour until the CI rehearsal job has run.
+- PostgreSQL 17.11 (the hosted version) behaviour on the live project; the CI rehearsal ran on 17.12.
 - The owner's real sign-in on a device after the catch-up.
