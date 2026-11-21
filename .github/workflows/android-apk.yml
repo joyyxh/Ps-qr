@@ -16,7 +16,7 @@ on:
         required: false
         type: string
   push:
-    branches: [main]
+    branches: [main, stage7-implementation-2026-11-13]
     paths:
       - 'mobile/**'
       - 'web/**'
@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   build-apk:
@@ -47,6 +48,21 @@ jobs:
       - name: Install Capacitor
         run: npm ci
 
+      - name: Use the stored debug signing key (when the owner has set one)
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          # Gradle signs debug builds with ~/.android/debug.keystore (alias androiddebugkey,
+          # password android). Each runner otherwise creates a new key, so an APK from one
+          # build cannot update an installed copy from another build.
+          if [ -n "$ANDROID_DEBUG_KEYSTORE_BASE64" ]; then
+            mkdir -p "$HOME/.android"
+            echo "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 -d > "$HOME/.android/debug.keystore"
+            echo 'Signing with the stored debug key, so builds can update each other.'
+          else
+            echo '::warning::ANDROID_DEBUG_KEYSTORE_BASE64 is not set. Each build uses a new signing key, so an installed copy must be uninstalled before a newer build can be installed.'
+          fi
+
       - name: Copy the web app into the Android project source
         env:
           PRINTNEST_PUBLIC_URL: ${{ inputs.public_url || vars.PRINTNEST_PUBLIC_URL || 'https://joyyxh.github.io/Ps-qr/' }}
@@ -56,6 +72,10 @@ jobs:
             exit 1
           }
           npm run copy-web
+          grep -q 'ownerApp: true' www/config.js || {
+            echo 'The Android bundle must be the owner-only app (ownerApp: true).' >&2
+            exit 1
+          }
 
       - name: Create the Android project (first build only)
         run: test -d android || npx cap add android
@@ -63,13 +83,121 @@ jobs:
       - name: Sync web files into the Android project
         run: npx cap sync android
 
+      - name: Apply the QRquick launcher icons (replaces the default Capacitor icons)
+        run: |
+          set -euo pipefail
+          test -f branding/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+          cp -R branding/res/. android/app/src/main/res/
+          test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -f android/app/src/main/res/values/ic_launcher_background.xml
+
+      - name: Apply the QRquick Back key handling (goes back through the app pages first)
+        # Capacitor 8 does not handle the Back key; without this the Back key closed the app from the
+        # create-account screen. The generated MainActivity is replaced, after checking that it is the
+        # stock one for this package.
+        run: |
+          set -euo pipefail
+          ACTIVITY="$(find android/app/src/main/java -name MainActivity.java | head -n 1)"
+          test -n "$ACTIVITY"
+          grep -q '^package com.printnest.app;' "$ACTIVITY"
+          grep -q 'extends BridgeActivity' "$ACTIVITY"
+          cp native/MainActivity.java "$ACTIVITY"
+          grep -q 'OnBackPressedCallback' "$ACTIVITY"
+
       - name: Build the debug APK
         working-directory: mobile/android
         run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon
 
+      - name: Inspect APK package, signature, alignment and bundled owner screen
+        working-directory: .
+        run: |
+          set -euo pipefail
+          APK="mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -n "$BUILD_TOOLS"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$BUILD_TOOLS/zipalign" -c -v 4 "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
+          grep -q "package: name='com.printnest.app'" "$RUNNER_TEMP/apk-badging.txt"
+          grep -q "application: label='QRquick'" "$RUNNER_TEMP/apk-badging.txt"
+          unzip -l "$APK" | grep -q 'res/mipmap-anydpi-v26/ic_launcher.xml'
+          # The APK stores density folders with a -v4 suffix (mipmap-xxxhdpi-v4).
+          unzip -l "$APK" | grep -Eq 'res/mipmap-xxxhdpi(-v4)?/ic_launcher_foreground\.png'
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | grep -q 'assets/public/index.html'
+          unzip -l "$APK" | grep -q 'assets/public/src/licence-status.js'
+          {
+            echo "### Android APK inspection"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- APK bytes: $(stat -c '%s' "$APK")"
+            echo "- SHA-256: \`$(sha256sum "$APK" | cut -d ' ' -f 1)\`"
+            echo "- Package: \`com.printnest.app\`"
+            echo "- App label: QRquick (checked in the badging)"
+            echo "- Launcher icons: adaptive QRquick icon present"
+            echo "- Signature verification: passed"
+            echo "- Zip alignment: passed"
+            echo "- Bundled web entry point and owner licence-status module: present"
+            echo "- Native .so files: reported by APK contents only; absence is not treated as a failure for this Capacitor app"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Give the emulator hardware acceleration (KVM)
+        # Without KVM the emulator runs x86 in software. The first boot took about seven minutes,
+        # system services stopped responding, and the WebView renderer crashed during the screen
+        # checks. The runner user needs access to /dev/kvm; this makes the emulator use it.
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules || true
+          sudo udevadm trigger --subsystem-match=misc || true
+          test -e /dev/kvm || { echo '/dev/kvm does not exist on this runner; the emulator would run in software.' >&2; exit 1; }
+          sudo chmod 0666 /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm || { echo '/dev/kvm is not usable; the emulator would run in software.' >&2; exit 1; }
+          ls -l /dev/kvm
+
+      - name: Install and launch APK on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          # The checks wait for the page rather than timing animations. Disabling animations
+          # runs extra settings calls, which failed on this runner with a broken pipe.
+          disable-animations: false
+          script: |
+            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/install.txt" 2>&1
+            cat "$RUNNER_TEMP/install.txt"
+            adb shell monkey -p com.printnest.app -c android.intent.category.LAUNCHER 1 > "$RUNNER_TEMP/monkey.txt" 2>&1
+            cat "$RUNNER_TEMP/monkey.txt"
+            sleep 20
+            adb shell pidof com.printnest.app > "$RUNNER_TEMP/pid.txt" 2>&1 || true
+            adb logcat -d -t 3000 > "$RUNNER_TEMP/logcat.txt" 2>&1 || true
+            adb shell dumpsys package com.printnest.app | grep -E 'versionName|versionCode|primaryCpuAbi' || true
+            grep -q '^Success' "$RUNNER_TEMP/install.txt" || { echo 'adb install did not report Success.'; exit 1; }
+            test -s "$RUNNER_TEMP/pid.txt" || { echo 'The app process is not running after launch.'; exit 1; }
+            bash .github/scripts/apk-ui-check.sh "$RUNNER_TEMP/apk-ui"
+
+      - name: Post the emulator install and launch results
+        if: always()
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/apk-emulator-report.sh
+
+      - name: Upload the emulator screen checks and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qrquick-ui-check
+          path: ${{ runner.temp }}/apk-ui
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Upload the APK
+        # Runs even when the emulator screen checks fail, so the built APK is kept. The run
+        # still shows the failed check, so the APK is never reported as fully verified.
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qrquick-debug-apk

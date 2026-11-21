@@ -13,6 +13,8 @@ import {
   isOtpCode,
   otpErrorMessage,
   resendWaitSeconds,
+  EMAIL_LIMIT_TEXT,
+  EMAIL_NOT_AUTHORIZED_TEXT,
 } from '../src/logic.js';
 
 const config = {
@@ -454,4 +456,52 @@ test('accountErrorMessage explains a wrong password, an existing account, closed
   assert.match(accountErrorMessage(Object.assign(new Error('Signups not allowed for this instance'), { code: 'signup_disabled' })), /cannot be created right now/);
   assert.match(accountErrorMessage(Object.assign(new Error('weak'), { code: 'weak_password' })), /harder to guess/);
   assert.match(accountErrorMessage(new TypeError('Failed to fetch')), /internet connection/);
+});
+
+test('a coded email limit, a request limit and an address the built-in sender refuses each get a message that says what to do', () => {
+  const limit = Object.assign(new Error('email rate limit exceeded'), { status: 429, code: 'over_email_send_rate_limit' });
+  assert.equal(otpErrorMessage(limit, 'resend'), EMAIL_LIMIT_TEXT);
+  assert.equal(accountErrorMessage(limit), EMAIL_LIMIT_TEXT);
+  assert.match(EMAIL_LIMIT_TEXT, /Wait about an hour/);
+
+  const requests = Object.assign(new Error('too many requests'), { status: 429, code: 'over_request_rate_limit' });
+  assert.match(otpErrorMessage(requests, 'resend'), /Too many requests from this device/);
+
+  const refused = Object.assign(new Error('Email address "owner@example.com" is not authorized'), {
+    status: 400,
+    code: 'email_address_not_authorized',
+  });
+  assert.equal(otpErrorMessage(refused, 'resend'), EMAIL_NOT_AUTHORIZED_TEXT);
+  assert.equal(accountErrorMessage(refused), EMAIL_NOT_AUTHORIZED_TEXT);
+  // The same sentence is recognised from the server's wording when no code is given.
+  const wordingOnly = Object.assign(new Error('Email address "owner@example.com" is not authorized'), { status: 400 });
+  assert.equal(otpErrorMessage(wordingOnly, 'resend'), EMAIL_NOT_AUTHORIZED_TEXT);
+});
+
+test('account messages for an address that is already registered and for switched-off email sign-up', () => {
+  assert.match(accountErrorMessage(Object.assign(new Error('x'), { code: 'email_exists' })), /already exists/);
+  assert.match(accountErrorMessage(Object.assign(new Error('x'), { code: 'email_provider_disabled' })), /switched off/);
+});
+
+test('a resend the server refuses with the built-in sender keeps no session and shows the setup message', async () => {
+  const { auth, storage } = setup([
+    {
+      status: 400,
+      body: { code: 400, error_code: 'email_address_not_authorized', msg: 'Email address "owner@example.com" is not authorized' },
+    },
+  ]);
+  await assert.rejects(auth.resendSignupCode('owner@example.com'), (err) => {
+    assert.equal(err.code, 'email_address_not_authorized');
+    assert.equal(otpErrorMessage(err, 'resend'), EMAIL_NOT_AUTHORIZED_TEXT);
+    return true;
+  });
+  assert.equal(storage._data.has(SESSION_KEY), false, 'no session is stored');
+});
+
+test('a resend the email limit refuses from the server code gets the wait-an-hour message', async () => {
+  const { auth } = setup([{ status: 429, body: { code: 429, error_code: 'over_email_send_rate_limit', msg: 'rate limit' } }]);
+  await assert.rejects(auth.resendSignupCode('owner@example.com'), (err) => {
+    assert.match(otpErrorMessage(err, 'resend'), /Wait about an hour/);
+    return true;
+  });
 });

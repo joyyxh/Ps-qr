@@ -2,7 +2,18 @@
 // Supabase is replaced by an in-memory mock (page.route), so this checks the
 // front end only: rendering, navigation, which token each call carries, and
 // escaping. It does not test the database (see supabase/tests).
-const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+const path = require('path');
+const os = require('os');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+// Output folder for screenshots and PNGs. Set QRQUICK_SMOKE_OUT to choose it.
+const OUT_DIR = process.env.QRQUICK_SMOKE_OUT || path.join(os.tmpdir(), 'qrquick-smoke');
+require('fs').mkdirSync(OUT_DIR, { recursive: true });
+// CHROMIUM_PATH names a Chromium binary. Unset, Playwright uses its own browser.
+const launchOptions = () => {
+  const options = { args: ['--no-sandbox'] };
+  if (process.env.CHROMIUM_PATH) options.executablePath = process.env.CHROMIUM_PATH;
+  return options;
+};
 
 const BASE = 'http://127.0.0.1:5173/';
 const SHOP_ID = 'bbbbbbbb-0000-0000-0000-000000000001';
@@ -237,6 +248,15 @@ async function handleSupabase(route) {
     shop.features = { ...shop.features, ...body.p_features };
     return json(200, shop.features);
   }
+  // Automatic sending of paid orders (migration 0018): the owner switch, off by default.
+  if (url.pathname === '/rest/v1/rpc/set_auto_print') {
+    const shop = state.shops.find((s) => s.id === body.p_shop_id);
+    if (!shop) return json(403, { code: '42501', message: 'you do not have permission to change this shop' });
+    shop.auto_print_enabled = body.p_enabled === true;
+    return json(200, { auto_print_enabled: shop.auto_print_enabled });
+  }
+  // Printing computers and recent print jobs (migration 0010). This mock has no paired computer.
+  if (url.pathname === '/rest/v1/rpc/owner_print_status') return json(200, { is_owner: true, agents: [], jobs: [] });
   if (url.pathname === '/rest/v1/rpc/set_payment_qr') {
     const shop = state.shops.find((s) => s.id === body.p_shop_id);
     if (!shop) return json(403, { code: '42501', message: 'you do not have permission to change this shop' });
@@ -270,10 +290,7 @@ async function waitText(page, text, timeout = 8000) {
 }
 
 (async () => {
-  const browser = await chromium.launch({
-    executablePath: '/opt/pw-browsers/chromium',
-    args: ['--no-sandbox'],
-  });
+  const browser = await chromium.launch(launchOptions());
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
@@ -288,12 +305,20 @@ async function waitText(page, text, timeout = 8000) {
   page.on('console', (msg) => {
     const text = msg.text();
     // The browser logs every 4xx response. 400 (wrong password) and 409 (taken address)
-    // are triggered on purpose above, so only other console errors count.
-    const expected = /Failed to load resource: the server responded with a status of (400|409)/.test(text);
+    // are triggered on purpose above. A 404 is reported below with its address instead.
+    const expected = /Failed to load resource: the server responded with a status of (400|404|409)/.test(text);
     if (msg.type() === 'error' && !expected && !/favicon/i.test(text)) problems.push(`console: ${text}`);
+  });
+  page.on('response', (res) => {
+    // A 404 means the page asked for something the mock does not answer: name the request.
+    if (res.status() === 404) problems.push(`404 ${res.request().method()} ${res.url()}`);
   });
 
   await page.route(/supabase\.co/, handleSupabase);
+  // Google Fonts is stubbed too: the page links it, and the test must not depend on
+  // outside network access (the CI sandbox cannot reach it).
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+    route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
 
   // 1. Signed out: sign-in form.
   await page.goto(`${BASE}#/owner`);
@@ -312,10 +337,10 @@ async function waitText(page, text, timeout = 8000) {
   await page.click('#auth-form button[type=submit]');
   await waitText(page, 'Your shops');
   await waitText(page, 'Demo Xerox Centre');
-  const stored = await page.evaluate(() => sessionStorage.getItem('printnest.owner.session'));
+  const stored = await page.evaluate(() => sessionStorage.getItem('qrquick.owner.session'));
   const localKeys = await page.evaluate(() => Object.keys(localStorage));
   check('owner session is kept in sessionStorage', Boolean(stored));
-  check('owner session is not kept in localStorage', localKeys.every((k) => !k.includes('printnest')));
+  check('owner session is not kept in localStorage', localKeys.every((k) => !k.includes('owner.session')));
   check('stored session does not contain the password', stored && !stored.includes('correct-horse'));
   const memberCalls = state.requests.filter((r) => r.path.startsWith('/rest/v1/shop_memberships'));
   check(
@@ -324,17 +349,24 @@ async function waitText(page, text, timeout = 8000) {
   );
 
   // 4. Open the shop: details, services, hidden service shown to owner.
-  await page.click('text=Demo Xerox Centre');
+  await page.click('a[href="#/owner/shop/demo-xerox"]:has-text("Demo Xerox Centre")');
   await waitText(page, 'Open for orders');
   const rows = await page.locator('table.breakdown tbody tr').count();
   check('owner sees all services, including hidden ones', rows === 2, `rows=${rows}`);
   check('hidden service is labelled', (await page.getByText('hidden from customers').count()) === 1);
+  // The customer page address and the QR code are on the More tab.
+  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+  await page.locator('input[readonly]').waitFor();
   const pageAddress = await page.locator('input[readonly]').inputValue();
   check('customer page address is shown', pageAddress.endsWith('#/s/demo-xerox'), pageAddress);
+  await page.goto(`${BASE}#/owner/shop/demo-xerox`);
+  await waitText(page, 'Open for orders');
 
-  await page.screenshot({ path: '/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/owner-shop-phone.png', fullPage: true });
+  await page.screenshot({ path: path.join(OUT_DIR, 'owner-shop-phone.png'), fullPage: true });
 
-  // 5. Close the shop: PATCH with only is_open, with the owner token.
+  // 5. Close the shop: PATCH with only is_open, with the owner token. The switch is on the More tab.
+  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+  await waitText(page, 'Open for orders');
   const beforePatch = state.requests.length;
   await page.click('[data-action="toggle-open"]');
   await waitText(page, 'Closed. Customers can see prices');
@@ -342,6 +374,8 @@ async function waitText(page, text, timeout = 8000) {
   check('toggle sends only is_open', toggle && JSON.stringify(toggle.body) === '{"is_open":false}', JSON.stringify(toggle?.body));
   check('toggle carries the owner token', toggle && toggle.auth.startsWith('Bearer owner-token-'));
   check('shop state changed in the database mock', state.shops[0].is_open === false);
+  await page.goto(`${BASE}#/owner/shop/demo-xerox`);
+  await waitText(page, 'Closed for orders');
 
   // 6. Edit a service price: typed rupees become paise.
   await page.click(`button[data-edit="${SVC_DOC}"]`);
@@ -375,7 +409,9 @@ async function waitText(page, text, timeout = 8000) {
   check('new colour-only service saved with paise', added && added.colour_price_paise === 4000 && added.bw_price_paise === null);
   check('new service is tied to this shop', added && added.shop_id === SHOP_ID);
 
-  // 9. Shop name with HTML is shown as text, not markup.
+  // 9. Shop name with HTML is shown as text, not markup. Shop details are on the More tab.
+  await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+  await page.locator('#details-form').waitFor();
   await page.fill('input[name=name]', 'Tom & <b>Jerry</b> <img src=x onerror="window.__xss=1">');
   await page.click('#details-form button[type=submit]');
   await waitText(page, 'Shop details saved.');
@@ -391,7 +427,7 @@ async function waitText(page, text, timeout = 8000) {
     'customer note is shown as text, not markup',
     (await page.locator('#app i').count()) === 0 && (await page.getByText('<i>Please staple</i>').count()) === 1
   );
-  await page.screenshot({ path: '/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad/owner-orders-phone.png', fullPage: true });
+  await page.screenshot({ path: path.join(OUT_DIR, 'owner-orders-phone.png'), fullPage: true });
 
   const beforeApprove = state.requests.length;
   await page.click('button[data-order-id="ord-1"][data-next="approved"]');
@@ -408,9 +444,11 @@ async function waitText(page, text, timeout = 8000) {
       approve.auth.startsWith('Bearer owner-token-'),
     approve?.path
   );
+  // owner.js leaves "printing" out of the buttons on purpose: Send to printer starts printing.
   check(
     'approved order offers the next steps, not reject',
-    (await page.locator('button[data-order-id="ord-1"][data-next="printing"]').count()) === 1 &&
+    (await page.locator('button[data-order-id="ord-1"][data-next="ready"]').count()) === 1 &&
+      (await page.locator('button[data-order-id="ord-1"][data-next="printing"]').count()) === 0 &&
       (await page.locator('button[data-order-id="ord-1"][data-next="rejected"]').count()) === 0
   );
 
@@ -435,6 +473,22 @@ async function waitText(page, text, timeout = 8000) {
   check('a rejected order offers no buttons', (await page.locator('button[data-order-id="ord-2"]').count()) === 0);
   check('the rejected order shows its status', (await page.getByText('Rejected', { exact: true }).count()) === 1);
 
+  // 9b. Automatic sending: off by default, and turning it on saves through the owner's RPC.
+  const autoSwitch = page.locator('[data-auto-print]');
+  check('automatic sending is off by default', (await autoSwitch.count()) === 1 && !(await autoSwitch.isChecked()));
+  const requestsBeforeSwitch = state.requests.length;
+  await autoSwitch.check();
+  await waitText(page, 'Automatic sending is on for this shop.');
+  const switchSaved = state.requests
+    .slice(requestsBeforeSwitch)
+    .find((r) => r.path === '/rest/v1/rpc/set_auto_print');
+  check(
+    'turning it on saves through set_auto_print for this shop',
+    switchSaved && switchSaved.body.p_shop_id === SHOP_ID && switchSaved.body.p_enabled === true,
+    JSON.stringify(switchSaved?.body)
+  );
+  check('the switch stays on after the list reloads', await page.locator('[data-auto-print]').isChecked());
+
   // 10. Create a second shop.
   await page.evaluate(() => {
     location.hash = '#/owner/new';
@@ -448,7 +502,10 @@ async function waitText(page, text, timeout = 8000) {
   await page.locator('#service-form').waitFor();
   const created = state.requests.find((r) => r.path === '/rest/v1/rpc/create_shop');
   check('create shop sends slug and details to create_shop', created && created.body.p_slug === 'second-copy' && created.body.p_name === 'Second Copy Shop');
-  check('new shop opens on its manager page', (await page.locator('input[readonly]').inputValue()).endsWith('#/s/second-copy'));
+  check('new shop opens on its prices page', (await page.getByRole('heading', { name: 'Services and prices' }).count()) === 1);
+  await page.goto(`${BASE}#/owner/shop/second-copy/more`);
+  await page.locator('input[readonly]').waitFor();
+  check('new shop shows its customer page address on More', (await page.locator('input[readonly]').inputValue()).endsWith('#/s/second-copy'));
 
   // 11. Taken web address gives a clear message.
   await page.evaluate(() => {
@@ -466,7 +523,7 @@ async function waitText(page, text, timeout = 8000) {
   await page.evaluate(() => {
     location.hash = '#/s/demo-xerox';
   });
-  await page.getByText('Add a print item', { exact: false }).first().waitFor();
+  await page.getByText('Add file to order', { exact: false }).first().waitFor();
   const customerCalls = state.requests.slice(beforeCustomer);
   check(
     'customer page sends no token',
@@ -477,12 +534,12 @@ async function waitText(page, text, timeout = 8000) {
 
   // 13. Sign out clears the session.
   await page.evaluate(() => {
-    location.hash = '#/owner';
+    location.hash = '#/owner/shop/demo-xerox/more';
   });
-  await page.getByText('Your shops').first().waitFor();
+  await page.getByRole('heading', { name: 'Account' }).waitFor();
   await page.click('[data-action="signout"]');
   await page.locator('#auth-form').waitFor();
-  const afterSignOut = await page.evaluate(() => sessionStorage.getItem('printnest.owner.session'));
+  const afterSignOut = await page.evaluate(() => sessionStorage.getItem('qrquick.owner.session'));
   check('sign out clears the stored session', afterSignOut === null);
 
   // 14. Layout: no horizontal scroll at phone width on the owner page.

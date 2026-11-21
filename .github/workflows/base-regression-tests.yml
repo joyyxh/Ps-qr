@@ -1,0 +1,69 @@
+name: Base regression tests
+
+# Adds the regression checks that had been run only on a developer machine or in the hosted SQL editor:
+#   base-sql-suites     the eight base SQL suites (supabase/tests/stage*_tests.sql), run on a clean
+#                       PostgreSQL 16 database. Chain: test-only platform stand-ins, migrations
+#                       0001 to 0010 and 0015 to 0020, the development seed. Chain A 0011 to 0014 is not
+#                       on this branch, and the runner refuses to run if those files appear.
+#   base-node-checks    the two Node suites that need no database: supabase/tests/upload_checks.test.js
+#                       (15 tests) and supabase/tests/print_agent_api_checks.test.js (7 tests).
+#
+# Nothing here uses hosted Supabase, staging, production data, a physical printer or any credential.
+# The PostgreSQL service is a throwaway container for this job only. Its password protects nothing
+# outside the job. stage7-tests.yml and unit-tests.yml are separate and unchanged by this file.
+#
+# Versions: PostgreSQL 16 (service image), Node 22, psql from the runner image.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  base-sql-suites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-throwaway-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -h 127.0.0.1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGPASSWORD: ci-throwaway-password
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure a psql client is available
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+
+      - name: Base SQL suites (seven files, clean database, branch migration chain)
+        run: supabase/tests/base/run_base_suites.sh 127.0.0.1 5432
+
+  base-node-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Upload checks and print-agent checks (no database)
+        run: node --test supabase/tests/upload_checks.test.js supabase/tests/print_agent_api_checks.test.js

@@ -47,6 +47,13 @@ export function escapeHtml(value) {
 }
 
 // Upload limits. These mirror the upload-file function, which checks again from the bytes.
+// True when "Passport photos" is switched on but no active service with a passport name exists,
+// so customers have nothing to order.
+export function passportNeedsService(shop, services = []) {
+  return shop?.features?.passport_photos === true
+    && !services.some((service) => service.is_active !== false && /passport/i.test(service.name ?? ''));
+}
+
 export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 export const UPLOAD_ACCEPT = 'application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png';
 const UPLOAD_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
@@ -382,6 +389,16 @@ export function printingNotice({ agents = [], jobs = [] }) {
   const waiting = jobs.filter((job) => job.status === 'queued').length;
   if (!waiting) return 'No printing computer is connected right now.';
   return `No printing computer is connected. ${waiting} job${waiting === 1 ? ' is' : 's are'} waiting.`;
+}
+
+// The text under the automatic-sending switch on the printing page. Nothing prints unless the
+// order is approved AND paid; the switch only saves the press of Send to printer.
+export function autoPrintSummary(enabled) {
+  if (enabled === true) {
+    return 'On. An approved, paid order sends its files to the printing computer straight away. ' +
+      'Orders approved before you switched this on still need Send to printer.';
+  }
+  return 'Off. Press Send to printer for each approved, paid order.';
 }
 
 // ---------- owner: statistics, payments and CSV ----------
@@ -841,13 +858,31 @@ export function isNewPassword(value) {
   return String(value ?? '').length >= PASSWORD_MIN_LENGTH;
 }
 
+// Supabase's built-in email sender delivers only to addresses on the project's team and
+// refuses every other address. Until custom email (SMTP) is set up, no code can reach
+// such an owner, so the message says so instead of asking them to wait for a code.
+export const EMAIL_NOT_AUTHORIZED_TEXT =
+  'QRquick cannot send the code to this address yet. Ask QRquick to finish the email setup, then try again.';
+// Supabase allows only a few emails to one address each hour (2 with the built-in sender).
+export const EMAIL_LIMIT_TEXT =
+  'Emails have already been sent to this address. Wait about an hour before asking for another code, then check your inbox and spam folder.';
+
+function isEmailNotAuthorized(err) {
+  return err?.code === 'email_address_not_authorized' || /email address .*not authorized/i.test(String(err?.message ?? ''));
+}
+
 // Turns a failed verify or resend into a sentence for the owner. Supabase reports an
 // expired code and a wrong code with the same message, so both get the same advice.
 export function otpErrorMessage(err, stage = 'verify') {
   if (err instanceof TypeError) return CONNECTION_TEXT;
   const text = String(err?.message ?? '');
   const status = err?.status;
+  if (isEmailNotAuthorized(err)) return EMAIL_NOT_AUTHORIZED_TEXT;
+  if (err?.code === 'over_email_send_rate_limit') return EMAIL_LIMIT_TEXT;
   if (status === 429) {
+    if (err?.code === 'over_request_rate_limit') {
+      return 'Too many requests from this device. Wait a few minutes, then try again.';
+    }
     return stage === 'resend'
       ? 'Too many codes have been requested. Wait a minute, then try again.'
       : 'Too many attempts. Wait a few minutes, then request a new code.';
@@ -865,12 +900,17 @@ export function accountErrorMessage(err) {
   if (err instanceof TypeError) return CONNECTION_TEXT;
   const code = err?.code;
   const text = String(err?.message ?? '');
+  if (isEmailNotAuthorized(err)) return EMAIL_NOT_AUTHORIZED_TEXT;
+  if (code === 'over_email_send_rate_limit') return EMAIL_LIMIT_TEXT;
   if (err?.status === 429) return 'Too many attempts. Wait a few minutes, then try again.';
   if (code === 'invalid_credentials' || /invalid login/i.test(text)) {
     return 'That email and password do not match an account.';
   }
-  if (code === 'user_already_exists' || /already (registered|exists)/i.test(text)) {
+  if (code === 'user_already_exists' || code === 'email_exists' || /already (registered|exists)/i.test(text)) {
     return 'An account with this email already exists. Sign in with your password instead.';
+  }
+  if (code === 'email_provider_disabled') {
+    return 'Sign-up with email and password is switched off for this project. Ask QRquick for help.';
   }
   if (code === 'signup_disabled' || /signups? not allowed/i.test(text)) {
     return 'New owner accounts cannot be created right now. Ask QRquick for help.';

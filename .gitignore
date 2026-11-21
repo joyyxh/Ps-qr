@@ -1,6 +1,7 @@
 # Dependencies and generated output (rebuilt by the tools, never committed)
 node_modules/
 mobile/node_modules/
+agent/dist/
 mobile/www/
 mobile/android/
 mobile/ios/

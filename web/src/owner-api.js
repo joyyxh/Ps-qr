@@ -97,7 +97,7 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
       const rows = await request(
         'GET',
         `shop_memberships?user_id=eq.${enc(userId)}` +
-          '&select=role,shop:shops(id,slug,name,phone,address,is_open,features,payment_qr_path,cash_payment_timing,minimum_order_paise)'
+          '&select=role,shop:shops(id,slug,name,phone,address,is_open,features,payment_qr_path,cash_payment_timing,minimum_order_paise,auto_print_enabled)'
       );
       return rows
         .filter((row) => row.shop)
@@ -251,6 +251,16 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
       return rows[0];
     },
 
+    // ----- licence status (read only) -----
+
+    // The owner's view of the shop's licence (migration 0016). This is the only licence
+    // read the browser makes: it never queries the licence tables and has no write call.
+    // The database returns {ok:false, code:'forbidden'} unless the caller owns the shop,
+    // and {ok:true, active, no_expiry, access_end, next_start} otherwise (decision D).
+    shopLicenceStatus(shopId) {
+      return request('POST', 'rpc/shop_licence_status', { body: { p_shop_id: shopId } });
+    },
+
     // ----- automatic printing -----
 
     // The printing computers of this shop and its recent print jobs.
@@ -277,6 +287,12 @@ export function createOwnerApi({ config, auth, fetchImpl = globalThis.fetch }) {
     // Queues the files of a paid order and moves the order to printing. Safe to repeat.
     approveForPrint(orderId) {
       return request('POST', 'rpc/approve_order_for_print', { body: { p_order_id: orderId } });
+    },
+
+    // Automatic sending of paid orders to the printing computer (migration 0018). Off by default.
+    // Returns { auto_print_enabled }. Only the shop owner can change it.
+    setAutoPrint(shopId, enabled) {
+      return request('POST', 'rpc/set_auto_print', { body: { p_shop_id: shopId, p_enabled: enabled === true } });
     },
 
     // Only a failed job, or a job that may have printed (confirmMayHavePrinted true), can be retried.

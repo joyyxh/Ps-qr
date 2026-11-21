@@ -6,25 +6,24 @@ server-calculated price, and get a tracking code. Shop owners manage their shop,
 prices, features, payment QR, orders and statistics, from the web or from the
 Android app. Each shop is isolated from every other shop.
 
-## Status (18 Oct 2026)
+## Status (15 Nov 2026 — PR branch review)
 
-| Stage | What it covers | State |
+This status reflects the repository branch `stage7-implementation-2026-11-13`, not a production release. The branch is under review in draft PR #3 and has not been merged or deployed.
+
+| Stage | Scope | Current verified status |
 |---|---|---|
-| 1. Backend foundation | Tenants, services, orders, row level security, server-side pricing, order tracking | Built and tested in the live Supabase project |
-| 2. Customer page | Shop page, service choice, live server quote, place order, track order | Built and unit tested. Checked in headless Chromium against a mocked backend |
-| 3. Owner sign-in and shop setup | Owner sign-in, your shops, create a shop, shop details, open and close switch, service and price editor, shop QR code | Built. Database checks pass on the live project, and the owner screens pass a browser check with a mocked backend. The stage 3 database checks have not been re-run since migration 0003 |
-| 4. Files | Upload, server-side PDF page counting, private storage, owner download | Built. Migration `0003` is applied to the live project. Both edge functions are deployed but have not been called live (see below). Image crop and passport layout are not built |
-| 5. Owner orders | Order list (open or all), approve, reject, start printing, mark ready, mark completed, cancel, download each order's file | Built. Database checks pass on the live project. Owners refresh the list by hand; live updates are not built |
-| 5b. Statistics and payment records | Earnings and revenue (day, week, month, year), order statistics, cancellations, payments (cash or online), popular services, recent activity, CSV export | Built. Migration `0006` is applied to the live project and its 54 database checks pass. The browser check with a mocked backend passes at phone width |
-| 5c. Shop features and payment QR | Yes/no features (colour printing, double-sided, and six more), payment QR upload, features and payment QR shown to customers | Built. Migrations `0004` and `0005` are in the repo. Browser check with a mocked backend passes. Not re-checked on the live project in this session |
-| 5d. Android app and installable web app | Capacitor app built in GitHub Actions, and an install-to-home-screen web app | Built, **not yet built or run**. See "What is not verified" |
-| 6. Local print agent | Simulated printer first, then Windows | Not started |
-| 7. Payments and licences | One-time licence checkout, Stripe | Not started (Stripe is installed but not connected) |
-| 8. Privacy and hardening | Automatic file deletion, rate limits, audit log | Not started. Until this stage, uploaded files are kept until someone removes them by hand |
+| 1. Backend foundation | Tenant isolation, services, pricing, order tracking and core database rules | Implemented. The base SQL regression workflow passes on a disposable PostgreSQL test database. This is not a fresh verification of the hosted Supabase project. |
+| 2. Customer page | Shop page, quote, upload, order placement and tracking | Implemented. QR/customer browser checks run in CI. The features smoke remains 23/24 because the owner has not approved explanatory wording for the disabled Colour and Double-sided options. |
+| 3. Owner sign-in and shop setup | Owner authentication, shop setup, services, prices and QR | Implemented. Owner browser smoke and base regression checks pass in CI. Hosted authentication and production state are not re-certified by these tests. |
+| 4. Files | Upload validation, page counting, private storage and owner file access | Implemented in source with automated checks. Live edge-function behaviour and current hosted storage configuration have not been re-verified in this review. |
+| 5. Orders and shop operations | Order lifecycle, payment records, statistics, features and payment QR | Implemented in source. Base regression and statistics browser checks pass. The customer-options wording check remains open as noted above. |
+| 5d. Android owner app | Capacitor wrapper for the owner web app | Build workflow exists. A new workflow now checks APK signature, alignment, package identity and bundled owner licence screen, then attempts emulator installation and launch. The result for the current commit is pending; do not treat an older APK as a fixed release. |
+| 6. Local print agent | Pairing, printer discovery/selection, job claiming and desktop printing | Agent and Windows/Linux adapters are implemented with automated fake-adapter tests. Real Windows/CUPS and physical-printer verification have not been performed. Print status must remain truthful when delivery to the printer is uncertain. |
+| 7. Licences and platform administration | Licence foundation/admin RPCs (7B/7C), admin panel (7D), owner status (7E), enforcement (7F) | 7B/7C, 7D and read-only 7E are implemented and locally/CI tested. 7F is not built; enforcement is OFF. Chain A integration, legal/owner decisions, staging verification and hosted migration approval remain blockers. Payments, gateways and trials remain deferred. |
 
-Phase 1 research (competitor pages, cost model, licence terms) is **not done yet**.
-I did not visit the competitor sites in this session, so the comparison in the
-brief is still open.
+**Current CI evidence:** the latest completed run before the Android-workflow change passed the Unit, Base Regression and Stage 7 database/browser workflows at commit `f8e2cae`. New runs are in progress for the subsequent commit. A passing CI run does not establish hosted deployment, Android device compatibility, or physical-printer operation.
+
+**Release rule:** do not apply migrations to hosted Supabase, deploy, enable licence enforcement, or describe automatic printing as production-ready based only on these local/CI results. See `docs/STAGE7_HANDOVER.md`, `docs/PRINTING_STATUS.md` and `STAGE7_DECISIONS.md` for the detailed gates and evidence.
 
 ## Connectors chosen
 
@@ -60,7 +59,7 @@ printnest/
 │   │   └── checks.js                           pure checks, also tested in Node
 │   ├── functions/owner-file-link/index.ts      signed link for an owner's order file (verify_jwt on)
 │   ├── seed/demo_seed.sql                      dev-only test owners and shops
-│   ├── tests/stage1_isolation_tests.sql        29 database checks, rolled back
+│   ├── tests/stage1_isolation_tests.sql        30 database checks, rolled back
 │   ├── tests/stage3_owner_tests.sql            30 owner permission checks, rolled back
 │   ├── tests/stage4_files_tests.sql            23 file checks, rolled back
 │   ├── tests/stage5_orders_tests.sql           23 order checks, rolled back
@@ -179,7 +178,7 @@ requirement for this flow.
 ## What is verified
 
 - **Database checks, live project:**
-  - Stage 1: 29 checks in `supabase/tests/stage1_isolation_tests.sql`, all pass after
+  - Stage 1: 30 checks in `supabase/tests/stage1_isolation_tests.sql`, all pass after
     migration 0003. The fixtures now create uploaded-file rows, and the whole run is in
     one transaction that rolls back. The earlier run had found a tracking-code bug, which
     is fixed.
@@ -299,8 +298,11 @@ requirement for this flow.
   in, up to 10 MB each. Unclaimed files expire from use after one day, but nothing
   deletes them from storage yet. Stage 8 adds the cleanup and limits. Claimed files are
   kept until then too. Watch the free plan's storage quota until Stage 8.
-- **No passport photo layout or image crop** yet. A passport photo is uploaded as an
-  image and priced as one page. The layout and crop are not built.
+- **No passport photo layout yet.** A customer can crop a JPEG or PNG to a passport, square or
+  4 × 6 shape and adjust brightness and contrast before upload (in the browser, not on the server).
+  The page is still priced as one page: there is no sheet layout that fits several passport photos
+  on one A4 page. The owner must add a priced "Passport photo sheet" service before customers can
+  order one (Prices tab).
 - **Tracking codes can be guessed.** There are 32^8 combinations, but nothing yet
   rate-limits `track_order`, `place_order` or the upload. Rate limiting is needed before
   launch.
@@ -456,7 +458,7 @@ so regenerate and reprint.
 3. **Database:** re-run `stage3_owner_tests.sql` after migration 0003, and confirm
    migrations 0004 and 0005 on the live project (bucket settings and storage policies).
 4. **Stage 4, still open:** deploy-test the two edge functions on the live project with a
-   real PDF and a real owner account. Passport photo layout and image crop. Confirm the
+   real PDF and a real owner account. Passport photo sheet layout. Confirm the
    page count with the print agent once Stage 6 exists.
 5. **Stage 3, still open:** staff invitations (for now an owner can add a member only by
    user ID, with no invite flow).

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   agentStatusLabel,
+  autoPrintSummary,
   canSendToPrint,
   itemsToSend,
   latestJobsByItem,
@@ -165,4 +166,16 @@ test('the order list asks for the order item id, which the print lines need', as
   const api = createOwnerApi({ config, auth: signedIn, fetchImpl });
   await api.listOrders('shop-1');
   assert.match(calls[0].url, /order_items\(id,service_name/);
+});
+
+test('automatic sending text says the switch saves the press, not the approval', () => {
+  const on = autoPrintSummary(true);
+  assert.match(on, /^On\./);
+  assert.match(on, /approved, paid order/);
+  assert.match(on, /still need Send to printer/);
+  const off = autoPrintSummary(false);
+  assert.equal(off, 'Off. Press Send to printer for each approved, paid order.');
+  // A missing value is treated as off, never as on.
+  assert.equal(autoPrintSummary(undefined), off);
+  assert.equal(autoPrintSummary(null), off);
 });

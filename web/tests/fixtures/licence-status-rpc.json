@@ -1,0 +1,63 @@
+{
+  "_source": "Captured 2026-11-08 from the local throwaway PostgreSQL 16.15 cluster (stage7c_local), by running the migration 0012 shop_licence_status function text inside a transaction that ends in ROLLBACK. public.shop_licence_state was replaced with a stub that returns a fixed state, so only the owner RPC body and its JSON output were exercised. The coverage algorithm was not run. This is not a run against a Supabase project. File renumbered from 0012 to 0016 on 2026-11-14 (D-MIG Option B). The function body is unchanged.",
+  "cases": {
+    "owner_active_dated": {
+      "ok": true,
+      "active": true,
+      "no_expiry": false,
+      "access_end": "2027-12-31T18:30:00+00:00",
+      "next_start": null
+    },
+    "owner_active_lifetime": {
+      "ok": true,
+      "active": true,
+      "no_expiry": true,
+      "access_end": null,
+      "next_start": null
+    },
+    "owner_scheduled": {
+      "ok": true,
+      "active": false,
+      "no_expiry": false,
+      "access_end": null,
+      "next_start": "2026-12-01T18:30:00+00:00"
+    },
+    "owner_expired": {
+      "ok": true,
+      "active": false,
+      "no_expiry": false,
+      "access_end": null,
+      "next_start": null
+    },
+    "owner_revoked": {
+      "ok": true,
+      "active": false,
+      "no_expiry": false,
+      "access_end": null,
+      "next_start": null
+    },
+    "owner_none": {
+      "ok": true,
+      "active": false,
+      "no_expiry": false,
+      "access_end": null,
+      "next_start": null
+    },
+    "staff_same_shop": {
+      "ok": false,
+      "code": "forbidden"
+    },
+    "stranger": {
+      "ok": false,
+      "code": "forbidden"
+    },
+    "anon_no_claims": {
+      "ok": false,
+      "code": "forbidden"
+    },
+    "null_shop_id": {
+      "ok": false,
+      "code": "forbidden"
+    }
+  }
+}

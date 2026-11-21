@@ -1,0 +1,190 @@
+# Stage 7 handover (branch `stage7-implementation-2026-11-13`, 2026-11-14)
+
+Status: **Stage 7 is NOT complete.** This branch contains the Stage 7B/7C licence database, the 7D admin panel, the 7E owner licence status, the fail-closed print agent (P5), the approved D-MIG Option B numbering, unit-test CI, and the cleanup schedule removed. Stage 7F (refusal, kill switch, held-file release, lock and signature tests) is **not built**. Chain A is **not integrated**. Enforcement is **OFF**, and nothing on this branch turns it on.
+
+Nothing here has been applied to a hosted database, deployed, merged into `main`, or run against staging or a physical printer.
+
+## What is on this branch
+
+| Area | What it contains | Where |
+|---|---|---|
+| D-MIG Option B | Licence migrations `0015_licence_foundation.sql`, `0016_licence_admin_rpcs.sql`, `0017_licence_admin_read_rpcs.sql`. Chain A numbers 0011 to 0014 are reserved for Chain A. 0018 is reserved for 7F. | `supabase/migrations/`, `docs/STAGE7_MIGRATION_MAP.md` |
+| 7B/7C database | Licence tables, guards, admin RPCs, read RPCs. Local harness. | `supabase/migrations/0015` to `0017`, `supabase/tests/licence_7c/` |
+| 7D admin | Static admin panel with its tests | `admin/` |
+| 7E owner status | Owner licence-status screen, contract checks, tests | `web/src/owner-licence.js`, `web/src/licence-status.js`, `web/tests/licence-status.test.js`, `docs/STAGE7E_LICENCE_STATUS.md` |
+| Browser checks | Five Playwright scripts, with the greyed-out check kept open | `web/tests/browser/` |
+| P5 fail-closed agent | Prints only after an explicit server confirmation. Commit `a1a91f1` is kept unchanged and merged. | `agent/src/worker.mjs`, `agent/test/worker.test.mjs` |
+| Decision records | Replaced with the newer copies from the audit package (2026-11-09 wording and Stage 7F decisions §13C). Each has a dated renumbering note. Historical text is unchanged. | `OWNER_DECISION_SHEET.md`, `STAGE7_DECISIONS.md` |
+| CI | Runs the agent, web and admin unit tests, the PostgreSQL licence suites and the mocked browser checks, on push and pull request. `base-regression-tests.yml` also runs the seven base SQL suites and the two Node suites, which were local-only before. | `.github/workflows/unit-tests.yml`, `.github/workflows/stage7-tests.yml`, `.github/workflows/base-regression-tests.yml` |
+| Cleanup workflow | Schedule removed (reversible Option B). Manual run kept. | `.github/workflows/cleanup-files.yml` |
+
+## Tests run (local, 2026-11-14, exact results)
+
+| Suite | Result |
+|---|---|
+| agent `node --test` (includes P5 fail-closed test) | 62 pass, 0 fail |
+| web `npm test` | 212 pass, 0 fail |
+| admin `npm test` | 72 pass, 0 fail |
+| Combined chain on a throwaway PostgreSQL 16.15 cluster (platform stand-ins, origin 0001 to 0010, licence 0015 to 0017, test defaults, staging row) | Applied with no error |
+| licence `rpc_tests.py` on that chain | 282 pass, 0 fail |
+| licence `read_api_tests.py` on that chain | 125 pass, 0 fail |
+| licence `hash_vectors.py` | 0 failures |
+| Browser `owner-smoke.cjs` (Playwright Chromium) | 39 of 39 |
+| Browser `qr-smoke.cjs` | 12 of 12 |
+| Browser `features-smoke.cjs` | **23 of 24.** The open check is "the greyed-out boxes say why". No approved wording exists (owner decision). The check is kept, not weakened. |
+| Browser `stats-smoke.cjs` | All checks passed |
+| Browser `licence-smoke.cjs` | 33 of 33 |
+
+The same suites also ran in GitHub Actions on commit `d3889e5` (section 5). The features smoke there shows 23 of 24: only the greyed-out wording check fails.
+
+Not run: staging (EX-02 not granted), hosted database checks, physical printer checks, the 7F lock tests (item 33), and the live signature tests (item 25). GitHub Actions unit-test CI subsequently passed on 2026-11-14 (run 43603382278; agent, web and admin jobs all successful).
+
+## Test harness changes (for owner review)
+
+- `supabase/tests/licence_7c/combined/`: a platform stand-in file, a combined reset script that loads every migration in `supabase/migrations/`, and a test-only defaults file. The defaults give the licence tests' bare `insert into public.shops (id)` a valid slug and name. They are not product migrations.
+- `reset_local.sh` and `reset_combined_local.sh` now create the test database with `encoding 'UTF8' template template0`. A server default of `SQL_ASCII` makes `normalize()` fail, and Supabase is UTF8.
+- `supabase/tests/base/00_base_platform_shims.sql` (commit `0c5848e`): a test-only stand-in for Supabase's platform surface, used by the base SQL suites in CI. It is reconstructed from assumed Supabase behaviour and has not been checked against a live project. It provides the `auth` and `storage` schemas and columns, `auth.uid()` and `auth.jwt()`, the `anon`, `authenticated` and `service_role` roles, default table and sequence privileges in `public`, client grants on the storage tables, and a guard that refuses direct SQL deletes from `storage.objects` and `storage.buckets` with SQLSTATE 42501. Only stage6 S41 asserts that guard. It does not emulate Supabase's default EXECUTE privileges on functions; the migrations grant those explicitly. Owner review should confirm each item against the hosted project before anyone relies on it.
+- `supabase/tests/base/run_base_suites.sh` and `check_results.py` (commit `0c5848e`): the runner and the checker. The runner refuses non-local hosts and any `001[1-4]_*.sql` migration (Chain A). It builds one template from the shims, migrations 0001 to 0010 and 0015 to 0017, and the dev-only seed `supabase/seed/demo_seed.sql`, then runs each suite on a fresh copy of that template. The checker fails a suite on any row that is not ok, on a short result set, or on a bad header. Any psql error also fails the suite.
+
+## Not done, and why
+
+### 1. Chain A integration is blocked by a missing commit (external)
+
+- Chain A is local `main` commit `37e4623` ("Add owner email-code registration and password setup"). It was never pushed. The commit object is **not** in any repository, reflog, bundle or audit artifact searched (see `docs/STAGE7_CHAIN_A_RECOVERY.md` for the full list).
+- Partial recovery only. The four migrations `0011` to `0014` are recovered as read-only copies, and all four match the hashes in `origin/audit-package-2026-11-13` `info-files/MANIFEST.sha256`. The combined `chainA_0011_0014.sql` also matches the four files concatenated in order. The recovered `web/src/owner.js` copy (`chainA-owner.js.txt`, 1,826 lines, SHA-256 `9d7ad49f7dbda113850c4f22399de12d259db614000d5193e1a6147444693131`) matches the audit manifest. These artifacts have verified provenance against that audit manifest, **not** against the missing `37e4623` commit object. They are **not** integrated on this branch.
+- Not recovered: the Chain A-specific `web/src/owner-api.js`, stylesheet, `web/package.json`, `logic.js`, `auth.js`, customer screens, browser tests, and rollbacks for `0013` and `0014`. Base/current-branch versions of `owner-api.js` and `styles.css` exist on remote refs, but they are not Chain A variants. The `mut-claim/` copies of `0011` and `0012` are mutants and must not be used.
+- Integration is not performed. The compatibility conflict is confirmed by code and SQL inspection (not by database execution): migration `0001` removes table-level `UPDATE` on `shops` for `authenticated`; `0009` grants column-level update on `cash_payment_timing`; and `0013` revokes that column grant. The current owner app's `onSaveCashPolicy` calls `validateCashPolicy`, which always returns `cash_payment_timing`, and passes it through `updateShop`/`SHOP_FIELDS`. After `0013`, saving “Cash and order rules” therefore fails with a permission error. Other shop saves do not send this column. The recovered Chain A `owner.js` copy contains no `cash_payment_timing` references, consistent with the intended removal. The missing Chain A `owner-api.js` must be recovered before integration; changing `0013` to retain the setting would require an owner decision.
+- Consequences: P4 and U6 cannot be reconciled with Chain A's versions of those files. 7F's refusal sits on Chain A's functions, so it cannot be built on a correct base yet.
+- **Owner action:** push local `main` commit `37e4623` to a branch, or send a git bundle or a patch of `4d97e40..37e4623`. That is the only source that unblocks integration.
+
+### 2. Stage 7F: not built
+
+| Item | Status | Blocker |
+|---|---|---|
+| Refusal at mark time (D-Q4, Option A working default) | Not built | Chain A (above). Also: the owner's confirmation that a refusal does not increment `claim_count` is recorded as not given (STAGE7_DECISIONS §13F, CF-2). |
+| Release of a held job (`agent_release_licence_hold`) | Not built | Same as refusal |
+| Kill switch (D-I32) | Not built | Design is a draft, approval pending |
+| Held-file release and auto-fail (M1) | Not built | **C-1: lawyer review, not done. External, mandatory.** |
+| Hold start (Q2, prior-ACTIVE rule) | Decided, not used | Used only once M1 is approved |
+| Hold start for shops never ACTIVE (D-HS) | Open | Owner decision |
+| Staff held text, approve-refusal text (D-Q5) | Working default text, not built | No refusal path to display it yet |
+| Customer label for held orders (D-Q5b) | Open | Needs C-1 first |
+| Lock tests (item 33) | Not built | Placement decided 2026-11-09. Code and two-session tests not approved. Staging-only per the plan. |
+| Live signature tests (item 25) | Not done | Hosted owner-dashboard check |
+| Migration `0018` | Not created (reserved) | Depends on the items above |
+
+Enforcement stays OFF. The C-3 decision (enforcement held back) is recorded in §13C, but STAGE7_DECISIONS §13F (CF-1) says written owner confirmation is still needed.
+
+### 3. Owner decisions and external gates still open
+
+- **C-1**: lawyer answer on the held-file release rule (external, mandatory).
+- **EX-02**: staging project approval (not granted). Staging checks and the two-session tests (RB-12) are not run.
+- **S-4**: the 180-second signed file link window. Recommended to accept or reduce. Not accepted.
+- **S-5**: physical printer runtime. The agent is tested with fake adapters only.
+- **RB-01 / C-6**: admin identity and MFA. **RB-02**: hosting. Deployment is blocked until these are decided.
+- **EX-15**: owner approval of the merge order and the PR to `main`. This PR is not merged.
+- **Greyed-out wording**: the features smoke check stays open (23 of 24 locally and in CI). Owner decision.
+- **Phone-width overflow** (customer page, upload input): fixed in `d3889e5` (section 5). It had failed only in CI. No owner decision is needed.
+- **D-R18-T2**: R18 test 2 expectation, pending.
+- **RB-11**: definition not located in the records.
+
+### 4. Cleanup workflow
+
+- Repository change made: the cron schedule was removed from `cleanup-files.yml` (owner-recommended Option B). Manual dispatch remains. The earlier scheduled runs failed (22 of 22) because the secrets were empty, and nothing was deleted. A manual run with both secrets set would **delete** expired customer files, so it needs the owner's retention approval first.
+- Runtime state not changed: `gh workflow disable cleanup-files.yml -R joyyxh/Ps-qr` has not been run, because this session's `gh` token is invalid. Until the owner or an authenticated session runs it, GitHub still shows the workflow as active.
+
+### 5. CI
+
+- `unit-tests.yml` (unchanged): jobs `agent`, `web` and `admin` (`node --test` and `npm test`, Node 22). On commit `a94cba2`, push run [43605116842](https://github.com/joyyxh/Ps-qr/actions/runs/43605116842) and pull_request run [43605120293](https://github.com/joyyxh/Ps-qr/actions/runs/43605120293) both succeeded.
+- `stage7-tests.yml` (added in commit `a94cba2`): three jobs, run on push, pull_request and manual dispatch. It uses no hosted Supabase credentials, staging, production data or printer. The PostgreSQL service is a throwaway container for that job only.
+
+- `base-regression-tests.yml` (added in commit `0c5848e`): two jobs, run on push, pull_request and manual dispatch. Neither uses hosted Supabase credentials, staging, production data or a printer. The PostgreSQL service is a throwaway container for that job only. Neither job uses `continue-on-error`.
+
+Results on `0c5848e`, from the GitHub API and the job logs, checked 2026-11-14:
+
+| Job | What it runs | Versions | Result |
+|---|---|---|---|
+| `base-sql-suites` | `supabase/tests/base/run_base_suites.sh 127.0.0.1 5432`. Seven suites, each on a fresh database built from the shims, migrations 0001 to 0010 and 0015 to 0017, and the dev-only seed. | `postgres:16` service; psql 18.6 client | success. 250 of 250 checks ok: stage1 30, stage3 30, stage4 23, stage5 23, stage6 42, stage7 54, stage8 48. 0 not ok. |
+| `base-node-checks` | `node --test supabase/tests/upload_checks.test.js supabase/tests/print_agent_api_checks.test.js` | Node 22 | success. 22 tests, 22 pass, 0 fail (upload 15, print-agent 7). |
+
+Counts are from the push run's job logs. The pull_request run has the same two jobs, and both succeeded.
+
+Workflow runs for `0c5848e`:
+
+- push: [43632725327](https://github.com/joyyxh/Ps-qr/actions/runs/43632725327). Both base jobs success.
+- pull_request: [43632730564](https://github.com/joyyxh/Ps-qr/actions/runs/43632730564). Both base jobs success.
+
+Results on `d3889e5` (earlier head, Stage 7 workflow), from the GitHub API and the job logs, checked 2026-11-14:
+
+| Job | What it runs | Versions | Result |
+|---|---|---|---|
+| `licence-postgres` | `supabase/tests/licence_7c/run_suites.sh 127.0.0.1 5432`. The combined migration chain (0001 to 0010, then 0015 to 0017) is reloaded before each suite. | `postgres:16` service (server 16.16); psql 18.6 client | success. `rpc_tests.py` 282 passed, 0 failed. `read_api_tests.py` 125 passed, 0 failed. `hash_vectors.py` 0 failures. |
+| `browser-smokes` | `web/tests/browser/run_smokes.sh owner-smoke.cjs qr-smoke.cjs stats-smoke.cjs licence-smoke.cjs` | Node 22; Python 3.13; Playwright 1.63.0; opencv-python-headless 5.0.0.93 | success. owner 39 of 39; qr 12 of 12; stats exit 0, no FAIL lines; licence 33 of 33. |
+| `browser-features-open-check` (`continue-on-error: true`) | `web/tests/browser/run_smokes.sh features-smoke.cjs` | as above | job red, as designed: **23 of 24, exit 1**. The only FAIL is the greyed-out wording check. |
+
+Workflow runs for `d3889e5`:
+
+- push: [43609029853](https://github.com/joyyxh/Ps-qr/actions/runs/43609029853). Workflow conclusion success. Its features job is red, and `continue-on-error` keeps the run green.
+- pull_request: [43609036187](https://github.com/joyyxh/Ps-qr/actions/runs/43609036187). Same results.
+- Unit tests: push [43609029899](https://github.com/joyyxh/Ps-qr/actions/runs/43609029899) and pull_request [43609036182](https://github.com/joyyxh/Ps-qr/actions/runs/43609036182), both success.
+
+Earlier runs on `a94cba2` (push [43605116936](https://github.com/joyyxh/Ps-qr/actions/runs/43605116936), pull_request [43605120287](https://github.com/joyyxh/Ps-qr/actions/runs/43605120287)) showed the features smoke at 22 of 24. Those runs are kept as history.
+
+**Features smoke in CI: 23 of 24, exit 1.**
+
+- FAIL "the greyed-out boxes say why". The known open check (owner wording decision). Unchanged, and not marked as passed.
+- PASS "customer page has no horizontal scroll at phone width (overflow=0px)". This check failed in CI on `a94cba2` (overflow=3px) and is fixed in `d3889e5`.
+
+**Phone-width overflow: cause and fix (`d3889e5`, `web/styles.css` only).**
+
+- Cause: the rule `.upload-dropzone input { width:auto; }` (from the original redesign, commit `e9f726f`) sizes the customer file input to the browser's intrinsic width. Locally that width is 348px, and the dropzone is 308px wide. The input therefore ran to the 390px viewport edge (right edge exactly 390). On the CI runner the input was 3px wider, so the page overflowed by 3px. Measured here, the input width changes with the font (348px with the page font, 333px with a monospace font), so the margin depended on the installed fonts. The font changed only how wide the input was; the rule was the cause.
+- Fix: the dropzone grid uses `grid-template-columns: minmax(0,1fr)`, and the input has `max-width:100%`. The input is capped at the dropzone width in any font, and at 390px the icon and text are centred in the box.
+- Unchanged: at 1100px the dropzone is pixel-identical to before (checked by a screenshot byte comparison).
+- Rejected: removing the `width:auto` rule alone stretches the input across the whole box, which changes the desktop look. `max-width:100%` alone did not work, because the grid column still grew to the input's width.
+- Correction: an earlier version of this section said the input had no CSS rule and blamed the fonts. Both were wrong. The rule existed, and the fix is in the rule.
+
+**Workflow label note (resolved).** The step label and comments in `.github/workflows/stage7-tests.yml` that said "two outstanding CI failures" and "22 of 24" (from `d811a23`) are corrected on this branch. The current file says one outstanding check and 23 of 24.
+
+Now in CI (`base-regression-tests.yml`, commit `0c5848e`): the seven base SQL suites `supabase/tests/stage1_isolation_tests.sql`, `stage3_owner_tests.sql`, `stage4_files_tests.sql`, `stage5_orders_tests.sql`, `stage6_features_tests.sql`, `stage7_stats_tests.sql` and `stage8_print_tests.sql`, and the two Node suites `supabase/tests/upload_checks.test.js` and `print_agent_api_checks.test.js`. Nothing from that list remains local-only.
+
+Filenames: an earlier list of local-only files named `stage4_stats_tests.sql`, `stage5_qr_tests.sql`, `stage6_printer_tests.sql` and `stage7_payment_tests.sql`. None of those files exists. The names above are the real ones. There is no stage2 file.
+
+Still local only (no workflow or package script runs these):
+
+- `hash_vectors.py --update`. It rewrites the pinned oracle and must never run in CI.
+- Staging and hosted Supabase checks (EX-02 not granted).
+- Physical printer checks (S-5).
+- 7F lock tests (item 33) and live signature tests (item 25).
+- The fixed 2030 dates in `rpc_tests.py` and `hash_vectors.json` will need review before 2030.
+
+## Record conflicts found during this work
+
+These were taken from the decision records as they were read during this work. Only the item marked as checked was re-verified in the final pass.
+
+- D-MIG: resolved in the records. `STAGE7_DECISIONS.md` section 13G and `OWNER_DECISION_SHEET.md` record the owner's 2026-11-14 approval, and the earlier "NOT APPROVED" statements are marked SUPERSEDED. `GATE_REGISTER.md` row 20 is not in this repository, so the owner must update it there.
+- P5: the 2026-11-12 README says "no commit". Commit `a1a91f1` and merge `86b4b99` are now on this branch.
+- C-3: §13C and §14.3 say decided (hold back). §13F CF-1 says written confirmation is needed. OWNER_DECISION_SHEET Part 8 says "both OPEN".
+- F17: PREP §6 and §7 say `v_last_end` can include future periods. The 2026-11-13 README says it cannot on the path that computes it. Not re-checked in the final pass; the `0015` coverage query (around lines 466 to 512) should be read against it.
+- M1 status: §12B.2 and §12B.6 say PROPOSAL. §14.5 says IMPLEMENTATION GATE.
+- Item 33 plan §7 says rollback would drop "the approve payment check". Checked: base 0010 lines 461 to 463 contain that check (`verify the payment before printing`), so the claim needs review.
+
+## Provenance of recovered inputs (SHA-256, verified against the publication index)
+
+| Input | SHA-256 |
+|---|---|
+| P2 (7B/7C database, pre-renumbering) | `0b51ad5e4065edbb8d1cd43fb1c291d7d6e0b01766e3102a715501d871da20a7` |
+| P3 (7D admin) | `cc56fd707ad09a7bbb09c44bd9bae8695b8c5ab21be74ce2ea6ee25d00942a43` |
+| P4 (7E web) | `7119a05ca701d536cf073324cd4c13aa87ac375104430a10e0071d4298ab5c10` |
+| U6 (browser smoke and layout) | `f19cd2381a5eed65c604a62751855f7f995155da809820332f5f761f0f64be26` |
+| P5 (agent, superseded by commit `a1a91f1`) | `d1bb8fe3325bf194986db85980e662351957c49dd1c139f1f5e5dd5a722f813e` |
+
+The P2 to P5 patches were recovered from `audit_handover_2026-11-13/units/` on branch `audit-package-2026-11-13`. Their hashes match the publication index. Base commit: `5c82d37` on `stage7-payments`.
+
+## Next steps, in order
+
+1. Owner: push or bundle Chain A commit `37e4623`.
+2. Owner: decide D-Q4 (confirm CF-2), D-I32, D-HS, S-4, C-3 written confirmation, and approve or reject item 33.
+3. Owner: legal review through C-1. Nothing held-file related may be enabled before it.
+4. Owner: run `gh workflow disable cleanup-files.yml -R joyyxh/Ps-qr` (or approve the repository change as it stands), and confirm the first `unit-tests.yml` run.
+5. Engineering, after step 1: integrate Chain A, reconcile P4 and U6 against it, then build 7F's refusal on top of Chain A's functions and write `0018`.
+6. External, separate approvals only: staging (EX-02), hosted migration checks, physical printer (S-5), and the release decision (EX-15, RB-01, RB-02).

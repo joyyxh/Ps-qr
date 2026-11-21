@@ -11,7 +11,7 @@
 
 - [ ] Customer can open a valid shop QR without registering, logging in, or providing an email address.
 - [ ] Customer can select PDF, JPG/JPEG, and PNG files; reject unsupported, oversized, malformed, or interrupted uploads safely.
-- [ ] Customer can configure supported black-and-white/colour, single/double-sided, copies, page range/selected pages, paper size, orientation, fit-to-page, crop, and image adjustments, with sensible defaults and preview where practical.
+- [ ] Customer can configure supported black-and-white/colour, single/double-sided, copies, page range/selected pages, paper size, orientation, fit-to-page, and image adjustments, with sensible defaults and preview where practical. (Crop and brightness/contrast for JPEG and PNG pictures are built in the customer page; passport sheet layout and PDF cropping are not.)
 - [ ] Customer sees server-measured pages and server-calculated price before submission; no client price or total is trusted.
 - [ ] Customer can choose UPI or cash; UPI is only marked payment-verification-pending until an owner verifies it; cash remains pending according to shop policy.
 - [ ] Customer receives a secure unguessable tracking token and can see order status without an account.

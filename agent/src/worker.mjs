@@ -255,7 +255,12 @@ export function createWorker({
       // Note first, so a crash between here and the printer is seen on restart.
       await journal.setActive({ ...jobRef, state: 'starting', at: now() });
       try {
-        await api.markPrinting(jobRef);
+        const confirmation = await api.markPrinting(jobRef);
+        if (confirmation?.ok !== true) {
+          const err = new Error('The server did not confirm that printing started.');
+          err.code = 'not_confirmed';
+          throw err;
+        }
       } catch (err) {
         // Nothing has been sent to the printer. The server requeues the job when the lease ends,
         // or it has already moved on. Do not report a failure: that would invite a reprint.

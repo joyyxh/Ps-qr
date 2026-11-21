@@ -2,6 +2,8 @@ import { createApi } from './api.js';
 import { createAuth } from './auth.js';
 import { createOwnerApi } from './owner-api.js';
 import { createOwnerPages } from './owner.js';
+import { isPhotoFile } from './photo-edit.js';
+import { openPhotoEditor } from './photo-editor.js';
 import { browserSessionStorage, createSessionStore } from './session.js';
 import {
   buildItem,
@@ -122,6 +124,12 @@ function renderHome() {
           <a class="button button-large" href="#/scan">Scan shop QR <span aria-hidden="true">↗</span></a>
           <a class="button secondary button-large" href="#/owner">Add your shop</a>
         </div>
+        <ol class="step-strip" aria-label="How QRquick works, in four steps">
+          <li><span>1</span><div><b>Scan</b><small>the shop QR</small></div></li>
+          <li><span>2</span><div><b>Upload</b><small>your file</small></div></li>
+          <li><span>3</span><div><b>Pay</b><small>cash or UPI</small></div></li>
+          <li><span>4</span><div><b>Pick up</b><small>when ready</small></div></li>
+        </ol>
       </div>
       <div class="qr-home-art" aria-hidden="true"><span class="qr-art-square">▦</span><span class="qr-art-paper">▤</span></div>
     </section>
@@ -281,7 +289,7 @@ function shopTemplate() {
         <label class="field-label">Copies
           <input name="copies" type="number" min="1" max="100" value="1" inputmode="numeric" required />
         </label>
-        <div class="choice-grid"><label class="choice-card"><input name="colour" id="colour" type="checkbox" ${shopOffersColour(shop) ? '' : 'disabled'} /><span><strong>Colour</strong><small>Vibrant colour printing</small></span></label><label class="choice-card"><input name="duplex" id="duplex" type="checkbox" ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /><span><strong>Double-sided</strong><small>Save paper on every sheet</small></span></label></div>
+        <div class="choice-grid"><label class="choice-card"><input name="colour" id="colour" type="checkbox" ${shopOffersColour(shop) ? '' : 'disabled'} /><span><strong>Colour${shopOffersColour(shop) ? '' : ' (not offered at this shop)'}</strong><small>Vibrant colour printing</small></span></label><label class="choice-card"><input name="duplex" id="duplex" type="checkbox" ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /><span><strong>Double-sided${shopOffersDoubleSided(shop) ? '' : ' (not offered at this shop)'}</strong><small>Save paper on every sheet</small></span></label></div>
         <button type="submit" id="add-item" disabled>Add file to order <span aria-hidden="true">→</span></button>
       </form>
       <p class="muted small">Your file is stored privately and only this shop can open it. Automatic deletion is not switched on yet.</p>
@@ -325,9 +333,10 @@ function shopTemplate() {
 }
 
 // The features this shop has switched on, for example "Colour printing, Stapling".
+// Passport photos are ordered from the services list, so they are not repeated here.
 function offeredFeaturesHtml() {
   const labels = catalog
-    .filter((feature) => shop.features?.[feature.key] === true)
+    .filter((feature) => feature.key !== 'passport_photos' && shop.features?.[feature.key] === true)
     .map((feature) => escapeHtml(feature.label));
   return labels.length ? `<p class="small"><strong>Also offered here:</strong> ${labels.join(', ')}</p>` : '';
 }
@@ -414,9 +423,27 @@ async function onFileChosen(event) {
     return;
   }
 
+  // A JPEG or PNG can be cropped and adjusted first. The customer may also keep it as it is.
+  let toUpload = file;
+  if (isPhotoFile(file)) {
+    const edited = await openPhotoEditor(file);
+    if (seq !== uploadSeq) return; // the customer picked another file meanwhile
+    if (!edited) {
+      input.value = '';
+      return;
+    }
+    const editProblem = checkUploadFile(edited);
+    if (editProblem) {
+      input.value = '';
+      setText('item-error', editProblem);
+      return;
+    }
+    toUpload = edited;
+  }
+
   setText('upload-status', 'Uploading and checking the file…');
   try {
-    const upload = await api.uploadFile(shop.slug, file);
+    const upload = await api.uploadFile(shop.slug, toUpload);
     if (seq !== uploadSeq) return; // the customer picked another file meanwhile
     pendingUpload = upload;
     setText('upload-status', `${upload.original_name} · ${plural(upload.page_count, 'page')} · ready to add`);
@@ -628,9 +655,13 @@ async function lookupOrder(code) {
       out.innerHTML = '<p class="error">No order found with that code.</p>';
       return;
     }
+    const shopAndDate = [order.shop_name, new Date(order.created_at).toLocaleString('en-IN')]
+      .filter(Boolean)
+      .map(escapeHtml)
+      .join(' · ');
     out.innerHTML = `
       <div class="status">
-        <p class="muted">${escapeHtml(order.shop_name)} · ${escapeHtml(new Date(order.created_at).toLocaleString('en-IN'))}</p>
+        <p class="muted">${shopAndDate}</p>
         <p class="code">${escapeHtml(order.tracking_code)}</p>
         <p><strong>${escapeHtml(statusLabel(order.status))}</strong></p>
         <p>Total ${formatPaise(order.total_paise)}</p>
