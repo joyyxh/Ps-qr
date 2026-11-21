@@ -101,6 +101,14 @@ async function main() {
     record('unknown owner is refused with a readable message', refusal.length > 0 && !COLUMN_ERROR.test(refusal), refusal);
     await page.screenshot({ path: path.join(OUT, '02-refused.png'), fullPage: true });
 
+    // 2b. The Android Back path, checked on the page itself: on create-account, window.qrquickBack returns to sign in.
+    await page.goto(BASE + '?run=back#/owner/register', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => /Create an owner account/.test(document.querySelector('h1')?.textContent || ''), null, { timeout: 30000 });
+    const handled = await page.evaluate(() => (typeof window.qrquickBack === 'function' ? window.qrquickBack() : 'missing'));
+    await page.waitForFunction(() => /Shop owner sign in/.test(document.querySelector('h1')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+    const afterBack = ((await page.textContent('h1')) || '').trim();
+    record('Back from create-account returns to owner sign in (qrquickBack)', handled === true && /Shop owner sign in/i.test(afterBack), `handled ${handled}, now "${afterBack}"`);
+
     // 3. Registration: the code screen appears, or the restricted-recipient message shows.
     if (SIGNUP_EMAIL && SIGNUP_PASSWORD) {
       // A query string makes each load a full navigation, so the sign-in state from step 2 is not reused.

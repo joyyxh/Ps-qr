@@ -1,6 +1,7 @@
 package com.printnest.app;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.webkit.WebView;
 
 import androidx.activity.OnBackPressedCallback;
@@ -26,12 +27,14 @@ public class MainActivity extends BridgeActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
+                Log.i("QRquick", "back: the native Back callback ran");
                 WebView webView = getBridge() != null ? getBridge().getWebView() : null;
                 if (webView == null) {
                     closeAppIfNothingToBackTo(this);
                     return;
                 }
                 webView.evaluateJavascript("window.qrquickBack ? window.qrquickBack() : false", value -> {
+                    Log.i("QRquick", "back: the page answered " + value);
                     if ("true".equals(value)) {
                         return; // the page went back to its sign-in screen
                     }
