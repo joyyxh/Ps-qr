@@ -2,12 +2,15 @@
 # LOCAL OR CI THROWAWAY DATABASE ONLY. Never point this at Supabase or any hosted project.
 #
 # Reproduces the owner sign-in failure "column shops_1.auto_print_enabled does not exist" and checks
-# the catch-up that fixes it, on a clean PostgreSQL 16 database:
+# the catch-up that fixes it, on a clean PostgreSQL server (CI: 16 in stage7-tests.yml; the rehearsal
+# on 17 is rehearse.sh):
 #   1. Hosted state: migrations 0001 to 0009 only (the live project stopped at 0009).
 #   2. The owner's sign-in query must FAIL with "auto_print_enabled does not exist".
-#   3. Apply the catch-up, in order: 0010 (print tables), 0018 (the switch), 0019 (advisor fixes).
+#   3. Apply the catch-up, in order: 0010 (print tables), 0018 (the switch), 0019 (advisor fixes),
+#      0020 (UPI orders; browser roles lose EXECUTE on the auto-print trigger function).
 #   4. The same query must now succeed.
 #   5. The auto-print RPCs and the browser-role rules must behave as the migrations say.
+#   6. Browser roles and PUBLIC have no EXECUTE on auto_print_on_approval.
 #
 # Usage: run_catch_up.sh <host-or-socket-dir> [port]
 # Password: export PGPASSWORD for a server that requires one (CI uses a throwaway password).
@@ -51,8 +54,8 @@ grep -q "auto_print_enabled does not exist" <<<"$out" \
   || fail "the owner query failed, but not with the reported error: $out"
 echo "   reproduced: $(grep -m1 'does not exist' <<<"$out")"
 
-echo "== 3. apply the catch-up: 0010, 0018, 0019"
-for name in 0010_print_agents 0018_auto_print 0019_advisor_fixes; do
+echo "== 3. apply the catch-up: 0010, 0018, 0019, 0020"
+for name in 0010_print_agents 0018_auto_print 0019_advisor_fixes 0020_upi_order_and_print_hardening; do
   run_sql -f "$MIG/${name}.sql"
   echo "   applied $name"
 done
@@ -66,5 +69,14 @@ echo "   owner query returns the shop"
 echo "== 5. auto-print RPCs and browser-role rules"
 run_sql -v owner_id="$OWNER_ID" -v stranger_id="$STRANGER_ID" -v shop_id="$SHOP_ID" -f "$HERE/03_auto_print_rpc.sql" \
   || fail "auto-print checks failed"
+
+echo "== 6. migration 0020: browser roles and PUBLIC have no EXECUTE on the auto-print trigger function"
+priv="$(run_sql -At -c "select (has_function_privilege('anon', 'public.auto_print_on_approval()', 'EXECUTE')
+  or has_function_privilege('authenticated', 'public.auto_print_on_approval()', 'EXECUTE')
+  or exists (select 1 from pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+             where p.oid = 'public.auto_print_on_approval()'::regprocedure
+               and a.grantee = 0 and a.privilege_type = 'EXECUTE'))::text")"
+[ "$priv" = "false" ] || fail "auto_print_on_approval is executable by a browser role or PUBLIC"
+echo "   auto_print_on_approval: no EXECUTE for anon, authenticated or PUBLIC"
 
 echo "== catch-up check passed on a clean database"

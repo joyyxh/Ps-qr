@@ -6,10 +6,10 @@
 #
 #   1. Baseline: migrations 0001-0009, the owner and demo seeds, and one order with a claimed file.
 #   2. Reproduction: the owner's sign-in query fails with the reported error.
-#   3. Apply 0010, 0018, 0019, each in its own transaction. Existing rows must be unchanged.
-#   4. Owner query succeeds; auto-print checks pass; Stage 8 suite reports 48 ok and 0 not ok, and
-#      leaves no rows behind.
-#   5. Idempotency: re-running 0018 and 0019 changes nothing; re-running 0010 is refused, changes nothing.
+#   3. Apply 0010, 0018, 0019, 0020, each in its own transaction. Existing rows must be unchanged.
+#   4. Owner query succeeds; auto-print checks pass; Stage 8 suite reports 48 ok and 0 not ok; the UPI
+#      suite (stage9_upi) reports 12 ok and 0 not ok; both leave no rows behind.
+#   5. Idempotency: re-running 0018, 0019 and 0020 changes nothing; re-running 0010 is refused, changes nothing.
 #   6. Failure drill: a 0010 that stops part-way is undone exactly by rollback.sql.
 #   7. Full rollback restores the 0009 state exactly; the catch-up then re-applies to the same state.
 #   8. Rollback guard: refuses while automatic printing is on, and changes nothing.
@@ -55,8 +55,8 @@ same() { # $1, $2 = labels: every snapshot must be identical
     cmp -s "$OUT/$1.$k" "$OUT/$2.$k" || fail "$k differs between $1 and $2 (see $OUT)"
   done
 }
-apply_catch_up() { # $1 = database: 0010, 0018, 0019, each in its own transaction
-  for name in 0010_print_agents 0018_auto_print 0019_advisor_fixes; do
+apply_catch_up() { # $1 = database: 0010, 0018, 0019, 0020, each in its own transaction
+  for name in 0010_print_agents 0018_auto_print 0019_advisor_fixes 0020_upi_order_and_print_hardening; do
     q "$1" -1 -f "$MIG/$name.sql"
   done
 }
@@ -92,16 +92,16 @@ set -e
 grep -q "auto_print_enabled does not exist" <<<"$out" || fail "wrong error: $out"
 echo "   reproduced: $(grep -m1 'does not exist' <<<"$out")"
 
-say "3. apply 0010, 0018, 0019, each in its own transaction"
+say "3. apply 0010, 0018, 0019, 0020, each in its own transaction"
 apply_catch_up "$DB"
 snap "$DB" caught_up
 cmp -s "$OUT/baseline.digests" "$OUT/caught_up.digests" || fail "existing rows changed during the catch-up"
 echo "   existing rows unchanged (8 tables, 0009 columns)"
 changed="$({ diff "$OUT/baseline.functions" "$OUT/caught_up.functions" || true; } | sed -n 's/^< \([^|]*\)|.*/\1/p' | sort -u | xargs)"
-[ "$changed" = "expired_customer_file_paths track_order" ] || fail "unexpected functions changed: '$changed'"
+[ "$changed" = "expired_customer_file_paths place_order track_order" ] || fail "unexpected functions changed: '$changed'"
 echo "   functions replaced: $changed; all others new"
 
-say "4. owner query, auto-print checks, Stage 8 suite"
+say "4. owner query, auto-print checks, Stage 8 and Stage 9 suites"
 q "$DB" -v owner_id="$OWNER_ID" -f "$TESTS/owner_catch_up/02_owner_shops_probe.sql" > "$OUT/owner_probe.txt"
 grep -q "catch-up-shop" "$OUT/owner_probe.txt" || fail "the owner query returned no shop"
 q "$DB" -v owner_id="$OWNER_ID" -v stranger_id="$STRANGER_ID" -v shop_id="$SHOP_ID" \
@@ -110,15 +110,20 @@ psql -X -d "$DB" -v ON_ERROR_STOP=1 -A -t -F'|' -f "$TESTS/stage8_print_tests.sq
 read -r ok bad < <(awk -F'|' 'NF>=3 && $2=="t"{o++} NF>=3 && $2=="f"{b++} END{print o+0, b+0}' "$OUT/stage8.txt")
 [ "$ok" -eq 48 ] && [ "$bad" -eq 0 ] || fail "Stage 8: $ok ok, $bad not ok (see $OUT/stage8.txt)"
 echo "   Stage 8: $ok ok, $bad not ok"
+psql -X -d "$DB" -v ON_ERROR_STOP=1 -A -t -F'|' -f "$TESTS/stage9_upi_tests.sql" > "$OUT/stage9.txt"
+read -r ok9 bad9 < <(awk -F'|' 'NF>=3 && $2=="t"{o++} NF>=3 && $2=="f"{b++} END{print o+0, b+0}' "$OUT/stage9.txt")
+[ "$ok9" -eq 12 ] && [ "$bad9" -eq 0 ] || fail "Stage 9 (UPI): $ok9 ok, $bad9 not ok (see $OUT/stage9.txt)"
+echo "   Stage 9 (UPI): $ok9 ok, $bad9 not ok"
 snap "$DB" after_stage8
 same caught_up after_stage8
-echo "   Stage 8 left no rows behind"
+echo "   Stage 8 and Stage 9 left no rows behind"
 
 say "5. idempotency"
 q "$DB" -1 -f "$MIG/0018_auto_print.sql"
 q "$DB" -1 -f "$MIG/0019_advisor_fixes.sql"
-snap "$DB" rerun_018_019
-same caught_up rerun_018_019
+q "$DB" -1 -f "$MIG/0020_upi_order_and_print_hardening.sql"
+snap "$DB" rerun_018_020
+same caught_up rerun_018_020
 set +e
 q "$DB" -1 -f "$MIG/0010_print_agents.sql" 2> "$OUT/rerun_0010.err"; st=$?
 set -e
@@ -126,7 +131,7 @@ set -e
 grep -q "already exists" "$OUT/rerun_0010.err" || fail "0010 re-run failed for another reason: $(cat "$OUT/rerun_0010.err")"
 snap "$DB" rerun_0010
 same caught_up rerun_0010
-echo "   0018 and 0019 re-run: no change. 0010 re-run: refused at its first statement, no change"
+echo "   0018, 0019 and 0020 re-run: no change. 0010 re-run: refused at its first statement, no change"
 
 say "6. failure drill: 0010 stops part-way; rollback.sql undoes exactly that"
 recreate "$DRILL" "$BASE"

@@ -1,6 +1,6 @@
 -- READ-ONLY PREFLIGHT. Safe to run on a hosted project: it only reads the catalogue.
--- Run it before the catch-up and again after it. Before: the rows marked 'before' show false.
--- After the catch-up (0010, 0018, 0019) every row must be true.
+-- Run it before the catch-up and again after it. Before the catch-up every row is false.
+-- After the catch-up (0010, 0018, 0019, 0020) every row must be true.
 
 select 'shops.auto_print_enabled (0018)' as check_name,
        exists (select 1 from information_schema.columns
@@ -18,4 +18,11 @@ union all select 'orders_auto_print trigger (0018)',
        exists (select 1 from pg_trigger t join pg_class c on c.oid = t.tgrelid
                 where c.relname = 'orders' and t.tgname = 'orders_auto_print' and not t.tgisinternal)
 union all select 'shop_memberships_user_id_idx (0019, optional)',
-       exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'shop_memberships_user_id_idx');
+       exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'shop_memberships_user_id_idx')
+union all select '_place_order_core(text,jsonb,text,text) function (0020)',
+       to_regprocedure('public._place_order_core(text, jsonb, text, text)') is not null
+union all select 'auto_print_on_approval() not executable by anon or authenticated (0020)',
+       case when to_regprocedure('public.auto_print_on_approval()') is null then false
+            else not has_function_privilege('anon', 'public.auto_print_on_approval()', 'EXECUTE')
+                 and not has_function_privilege('authenticated', 'public.auto_print_on_approval()', 'EXECUTE')
+       end;
