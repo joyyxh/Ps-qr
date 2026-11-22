@@ -15,9 +15,10 @@ OUT="$RUNNER_TEMP"
   echo "## Process id after launch"
   cat "$OUT/pid.txt" 2>/dev/null || echo "(none)"
   echo
-  APK="$GITHUB_WORKSPACE/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+  # The workflow sets APK_PATH for the build mode (debug, release or test-release).
+  APK="$GITHUB_WORKSPACE/${APK_PATH:-mobile/android/app/build/outputs/apk/debug/app-debug.apk}"
   echo "## Built APK"
-  echo "- File: app-debug.apk"
+  echo "- File: $(basename "$APK")"
   echo "- Bytes: $(stat -c %s "$APK" 2>/dev/null || echo missing)"
   echo "- SHA-256: $(sha256sum "$APK" 2>/dev/null | cut -d' ' -f1)"
   echo "- Commit: $GITHUB_SHA"

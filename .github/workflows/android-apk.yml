@@ -1,7 +1,14 @@
 name: Android APK
 
-# Builds the QRquick debug APK in the cloud, so no Android tools are needed on
-# the developer's computer. Download the result from the run's "Artifacts" list.
+# Builds the QRquick Android APK in the cloud, so no Android tools are needed on the developer's computer.
+#
+# Modes. A push always builds the debug APK. A manual run chooses one of these:
+#   debug         default. Signed with the debug key. For testing only, not for distribution.
+#   release       release=true. Signed with the QRquick release key from the repository secrets.
+#                 The run stops when the secrets are missing; it never falls back to the debug key.
+#   test-release  test_signing=true. Pipeline test only: a throwaway key is made for this run and discarded.
+#                 The artifact is named TEST-ONLY and must not be distributed.
+# See docs/RELEASE.md for the secrets and the steps to create the release key.
 #
 # One-time setup in the GitHub repository:
 #   Settings > Secrets and variables > Actions > Variables > New repository variable
@@ -15,6 +22,16 @@ on:
         description: 'Deployed HTTPS web-app URL (used when the repository variable is unavailable)'
         required: false
         type: string
+      release:
+        description: 'Release build, signed with the QRquick release key from the repository secrets'
+        required: false
+        type: boolean
+        default: false
+      test_signing:
+        description: 'TEST ONLY: sign with a throwaway key made in this run. Not for distribution.'
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main, stage7-implementation-2026-11-13]
     paths:
@@ -30,6 +47,9 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      QRQUICK_VERSION_NAME: '1.0.0'
+      QRQUICK_VERSION_CODE: ${{ github.run_number }}
     defaults:
       run:
         working-directory: mobile
@@ -48,7 +68,48 @@ jobs:
       - name: Install Capacitor
         run: npm ci
 
+      - name: Choose the build mode and the APK file
+        id: mode
+        env:
+          WANT_RELEASE: ${{ inputs.release }}
+          WANT_TEST: ${{ inputs.test_signing }}
+        run: |
+          set -euo pipefail
+          if [ "$WANT_TEST" = "true" ]; then
+            MODE=test-release
+          elif [ "$WANT_RELEASE" = "true" ]; then
+            MODE=release
+          else
+            MODE=debug
+          fi
+          SHORT="${GITHUB_SHA::7}"
+          case "$MODE" in
+            debug)
+              APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+              ARTIFACT=qrquick-debug-apk
+              ;;
+            release)
+              APK=mobile/android/app/build/outputs/apk/release/app-release.apk
+              ARTIFACT="qrquick-release-apk-$QRQUICK_VERSION_NAME-$SHORT"
+              ;;
+            test-release)
+              APK=mobile/android/app/build/outputs/apk/release/app-release.apk
+              ARTIFACT="TEST-ONLY-qrquick-signing-test-apk-$SHORT"
+              ;;
+          esac
+          {
+            echo "mode=$MODE"
+            echo "APK_PATH=$APK"
+            echo "APK_ARTIFACT=$ARTIFACT"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "APK_PATH=$APK"
+            echo "APK_ARTIFACT=$ARTIFACT"
+          } >> "$GITHUB_ENV"
+          echo "Build mode: $MODE. APK: $APK. Artifact: $ARTIFACT."
+
       - name: Use the stored debug signing key (when the owner has set one)
+        if: steps.mode.outputs.mode == 'debug'
         env:
           ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
@@ -62,6 +123,50 @@ jobs:
           else
             echo '::warning::ANDROID_DEBUG_KEYSTORE_BASE64 is not set. Each build uses a new signing key, so an installed copy must be uninstalled before a newer build can be installed.'
           fi
+
+      - name: Prepare the signing key (release and test builds only)
+        if: steps.mode.outputs.mode != 'debug'
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEY_DIR="$RUNNER_TEMP/qrquick-signing"
+          mkdir -p "$KEY_DIR"
+          chmod 700 "$KEY_DIR"
+          if [ "$MODE" = "test-release" ]; then
+            # A throwaway key for testing the pipeline. It exists only for this run and is never uploaded.
+            TEST_PASSWORD="$(openssl rand -hex 24)"
+            keytool -genkeypair -keystore "$KEY_DIR/release.p12" -storetype PKCS12 -storepass "$TEST_PASSWORD" \
+              -alias qrquick-test -keyalg RSA -keysize 2048 -validity 7 \
+              -dname "CN=QRquick TEST ONLY, O=Pipeline test, C=IN" > /dev/null 2>&1
+            ALIAS=qrquick-test
+            STORE_PASS="$TEST_PASSWORD"
+            KEY_PASS="$TEST_PASSWORD"
+            echo '::warning::A TEST-ONLY signing key was made for this run. The APK must not be distributed.'
+          else
+            for name in RELEASE_KEYSTORE_BASE64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+              if [ -z "${!name}" ]; then
+                echo "The repository secret for $name is not set. The release APK is not built without the QRquick release key. See docs/RELEASE.md." >&2
+                exit 1
+              fi
+            done
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$KEY_DIR/release.p12"
+            ALIAS="$RELEASE_KEY_ALIAS"
+            STORE_PASS="$RELEASE_KEYSTORE_PASSWORD"
+            KEY_PASS="$RELEASE_KEY_PASSWORD"
+          fi
+          test -s "$KEY_DIR/release.p12"
+          {
+            echo "QRQUICK_KEYSTORE_FILE=$KEY_DIR/release.p12"
+            echo "QRQUICK_KEYSTORE_PASSWORD=$STORE_PASS"
+            echo "QRQUICK_KEY_ALIAS=$ALIAS"
+            echo "QRQUICK_KEY_PASSWORD=$KEY_PASS"
+          } >> "$GITHUB_ENV"
+          echo 'The signing key is ready for this run (its values are not printed).'
 
       - name: Copy the web app into the Android project source
         env:
@@ -79,6 +184,14 @@ jobs:
 
       - name: Create the Android project (first build only)
         run: test -d android || npx cap add android
+
+      - name: Add the signing and version settings to the Android build
+        # Copies native/release-signing.gradle next to the app and applies it. Debug builds are not changed.
+        run: |
+          set -euo pipefail
+          cp native/release-signing.gradle android/app/release-signing.gradle
+          grep -q "apply from: 'release-signing.gradle'" android/app/build.gradle || echo "apply from: 'release-signing.gradle'" >> android/app/build.gradle
+          grep -q "apply from: 'release-signing.gradle'" android/app/build.gradle
 
       - name: Sync web files into the Android project
         run: npx cap sync android
@@ -104,21 +217,41 @@ jobs:
           cp native/MainActivity.java "$ACTIVITY"
           grep -q 'OnBackPressedCallback' "$ACTIVITY"
 
-      - name: Build the debug APK
+      - name: Build the APK
         working-directory: mobile/android
-        run: |
-          chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
-
-      - name: Inspect APK package, signature, alignment and bundled owner screen
-        working-directory: .
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
         run: |
           set -euo pipefail
-          APK="mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+          chmod +x ./gradlew
+          if [ "$MODE" = "debug" ]; then TASK=assembleDebug; else TASK=assembleRelease; fi
+          ./gradlew "$TASK" --no-daemon
+
+      - name: Inspect APK package, signature, alignment, bundled config and owner screen
+        working-directory: .
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          set -euo pipefail
+          APK="$APK_PATH"
           test -s "$APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           test -n "$BUILD_TOOLS"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signer.txt"
+          if [ "$MODE" != "debug" ]; then
+            if grep -q 'CN=Android Debug' "$RUNNER_TEMP/signer.txt"; then
+              echo 'The APK is signed with the Android debug key. A release APK must not be.' >&2
+              exit 1
+            fi
+          fi
+          if [ "$MODE" = "release" ] && grep -q 'TEST ONLY' "$RUNNER_TEMP/signer.txt"; then
+            echo 'The release APK carries the test key.' >&2
+            exit 1
+          fi
+          if [ "$MODE" = "test-release" ] && ! grep -q 'TEST ONLY' "$RUNNER_TEMP/signer.txt"; then
+            echo 'The test APK is not signed with the test key.' >&2
+            exit 1
+          fi
           "$BUILD_TOOLS/zipalign" -c -v 4 "$APK"
           "$BUILD_TOOLS/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/apk-badging.txt"
           grep -q "package: name='com.printnest.app'" "$RUNNER_TEMP/apk-badging.txt"
@@ -129,17 +262,33 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'assets/public/index.html'
           unzip -l "$APK" | grep -q 'assets/public/src/licence-status.js'
+          # The bundled web app is the owner app on the production project, with no staging reference or secret text.
+          unzip -p "$APK" assets/public/config.js > "$RUNNER_TEMP/bundled-config.js"
+          grep -q "supabaseUrl: 'https://qvnwqrevgyootaaunrto.supabase.co'" "$RUNNER_TEMP/bundled-config.js"
+          grep -q 'ownerApp: true' "$RUNNER_TEMP/bundled-config.js"
+          BAD=0
+          while IFS= read -r f; do
+            if unzip -p "$APK" "$f" | grep -aq 'nbzojqlqkrydcjtogwrb\|sb_secret_\|service_role'; then
+              echo "A staging reference or secret text is in $f" >&2
+              BAD=$((BAD + 1))
+            fi
+          done < <(unzip -Z1 "$APK" | grep '^assets/public/')
+          test "$BAD" -eq 0
           {
             echo "### Android APK inspection"
+            echo "- Mode: \`$MODE\`"
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- APK bytes: $(stat -c '%s' "$APK")"
             echo "- SHA-256: \`$(sha256sum "$APK" | cut -d ' ' -f 1)\`"
-            echo "- Package: \`com.printnest.app\`"
+            echo "- Package: \`com.printnest.app\`, versionName $QRQUICK_VERSION_NAME, versionCode $QRQUICK_VERSION_CODE"
+            echo "- Signer: $(grep -m1 'Signer #1 certificate DN' "$RUNNER_TEMP/signer.txt" | sed 's/^Signer #1 certificate DN: //')"
             echo "- App label: QRquick (checked in the badging)"
             echo "- Launcher icons: adaptive QRquick icon present"
             echo "- Signature verification: passed"
             echo "- Zip alignment: passed"
+            echo "- Bundled config: production project, owner app, no staging reference or secret text"
             echo "- Bundled web entry point and owner licence-status module: present"
+            if [ "$MODE" = "test-release" ]; then echo "- **TEST ONLY: signed with a throwaway key. Not for distribution.**"; fi
             echo "- Native .so files: reported by APK contents only; absence is not treated as a failure for this Capacitor app"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -166,7 +315,7 @@ jobs:
           # runs extra settings calls, which failed on this runner with a broken pipe.
           disable-animations: false
           script: |
-            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/install.txt" 2>&1
+            adb install -r "$APK_PATH" > "$RUNNER_TEMP/install.txt" 2>&1
             cat "$RUNNER_TEMP/install.txt"
             adb shell monkey -p com.printnest.app -c android.intent.category.LAUNCHER 1 > "$RUNNER_TEMP/monkey.txt" 2>&1
             cat "$RUNNER_TEMP/monkey.txt"
@@ -189,7 +338,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: qrquick-ui-check
+          name: qrquick-ui-check-${{ steps.mode.outputs.mode }}
           path: ${{ runner.temp }}/apk-ui
           if-no-files-found: warn
           retention-days: 30
@@ -200,7 +349,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: qrquick-debug-apk
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: ${{ env.APK_ARTIFACT }}
+          path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 30

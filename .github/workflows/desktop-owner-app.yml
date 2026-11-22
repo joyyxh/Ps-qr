@@ -4,9 +4,29 @@ name: Desktop owner app (Windows and Linux)
 # same web/ source as the website and the Android app, with the production configuration. Every run builds both,
 # checks the packages, and runs the smoke test on each. The packages are uploaded as run artifacts; this workflow
 # creates no GitHub release.
+#
+# Two kinds of run, which are never mixed:
+#   TEST (every push, and a manual run with no inputs). Named TEST. Not for distribution. The Windows installer
+#        is unsigned.
+#   RELEASE (manual only, release=true). The Windows installer and the app inside it are signed with the QRquick
+#        code-signing certificate from the repository secrets. The Windows build stops when those secrets are
+#        missing, and the signature must be valid. See docs/RELEASE.md.
+#   test_signing=true (manual only). Signs the Windows build with a throwaway self-signed certificate, to test the
+#        signing step. Named TEST. Windows does not trust that certificate.
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'RELEASE: sign the Windows app with the QRquick code-signing certificate from the repository secrets'
+        required: false
+        type: boolean
+        default: false
+      test_signing:
+        description: 'TEST ONLY: sign the Windows app with a throwaway self-signed certificate made in this run'
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [stage7-implementation-2026-11-13]
     paths:
@@ -30,8 +50,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      # Unsigned builds: no code-signing certificate exists for this project yet.
+      # Electron-builder signs only with the certificate this workflow passes in (CSC_LINK), never one it finds.
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # The staging project is used only by the test-only copy that the smoke test drives. It is never packed.
       STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
       STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
     defaults:
@@ -46,17 +67,29 @@ jobs:
         with:
           node-version: 22
 
-      - name: Record the version and build id
+      - name: Record the version, the build id and the distribution label
+        env:
+          WANT_RELEASE: ${{ inputs.release }}
+          WANT_TEST_SIGNING: ${{ inputs.test_signing }}
         run: |
           set -euo pipefail
           VERSION="$(node -p "require('./package.json').version")"
           SHORT_SHA="${GITHUB_SHA::7}"
+          if [ "$WANT_RELEASE" = "true" ]; then
+            DIST=RELEASE
+            SIGNING=release-cert
+          else
+            DIST=TEST
+            if [ "$WANT_TEST_SIGNING" = "true" ]; then SIGNING=test-cert; else SIGNING=none; fi
+          fi
           {
             echo "APP_VERSION=$VERSION"
             echo "BUILD_SHA=$SHORT_SHA"
             echo "BUILD_ID=$VERSION-$SHORT_SHA"
+            echo "DIST_LABEL=$DIST"
+            echo "SIGNING_MODE=$SIGNING"
           } >> "$GITHUB_ENV"
-          echo "Build id: $VERSION-$SHORT_SHA (commit $GITHUB_SHA)"
+          echo "Build id: $VERSION-$SHORT_SHA (commit $GITHUB_SHA). Distribution: $DIST. Windows signing: $SIGNING."
 
       - name: Install the Electron shell and the packager (pinned in desktop/package.json)
         run: npm install --no-audit --no-fund
@@ -75,6 +108,37 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y xvfb libnss3 libgtk-3-0 libasound2t64 libxss1 libgbm1 libxkbcommon0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libcups2 libatk-bridge2.0-0 libx11-xcb1
+
+      - name: Prepare the Windows signing certificate (Windows; skipped for unsigned test builds)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        env:
+          WIN_CSC_BASE64: ${{ secrets.WIN_CSC_BASE64 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:SIGNING_MODE -eq 'none') {
+            Write-Host 'Unsigned test build: no certificate is prepared, so electron-builder will not sign.'
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'qrquick-codesign.pfx'
+          if ($env:SIGNING_MODE -eq 'release-cert') {
+            if (-not $env:WIN_CSC_BASE64 -or -not $env:WIN_CSC_KEY_PASSWORD) {
+              throw 'The Windows code-signing secrets (WIN_CSC_BASE64, WIN_CSC_KEY_PASSWORD) are not set. A release installer is not built unsigned. See docs/RELEASE.md.'
+            }
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WIN_CSC_BASE64))
+            $password = $env:WIN_CSC_KEY_PASSWORD
+            Write-Host 'The QRquick code-signing certificate is ready for this run.'
+          } else {
+            # A throwaway self-signed certificate for testing the signing step. Windows does not trust it.
+            $password = [guid]::NewGuid().ToString('N')
+            $cert = New-SelfSignedCertificate -Subject 'CN=QRquick TEST ONLY' -Type CodeSigningCert `
+              -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddDays(2) -KeyExportPolicy Exportable
+            Export-PfxCertificate -Cert $cert -FilePath $pfx -Password (ConvertTo-SecureString -String $password -AsPlainText -Force) | Out-Null
+            Write-Host 'A throwaway test certificate was made for this run.'
+          }
+          "CSC_LINK=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CSC_KEY_PASSWORD=$password" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build the Windows installer and unpacked app
         if: matrix.platform == 'windows-x64'
@@ -96,16 +160,39 @@ jobs:
           fi
           RES="$UNPACKED/resources/app-web"
           test -f "$RES/index.html"
-          test -f "$RES/src/owner.js" -o -f "$RES/src/app.js"
-          grep -q '"supabaseUrl": "https://qvnwqrevgyootaaunrto.supabase.co"' "$RES/config.js"
-          grep -q '"ownerApp": true' "$RES/config.js"
-          grep -q '"publicBaseUrl": "https://joyyxh.github.io/Ps-qr/"' "$RES/config.js"
+          test -f "$RES/src/app.js"
+          # config.js is JavaScript (supabaseUrl: '...'), so accept either quote style or a JSON-style key.
+          grep -Eq "supabaseUrl[\"']?[[:space:]]*:[[:space:]]*[\"']https://qvnwqrevgyootaaunrto[.]supabase[.]co[\"']" "$RES/config.js"
+          grep -Eq "ownerApp[\"']?[[:space:]]*:[[:space:]]*true" "$RES/config.js"
+          grep -Eq "publicBaseUrl[\"']?[[:space:]]*:[[:space:]]*[\"']https://joyyxh[.]github[.]io/Ps-qr/[\"']" "$RES/config.js"
           # Not in the web copy, and not in the packed application archive.
           if grep -rIl "nbzojqlqkrydcjtogwrb" "$RES" > /dev/null; then echo 'the staging project is in the packaged web copy' >&2; exit 1; fi
           if grep -rIEl 'sb_secret_|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.' "$RES" > /dev/null; then echo 'a secret-looking key is in the packaged web copy' >&2; exit 1; fi
           if grep -aq "nbzojqlqkrydcjtogwrb\|sb_secret_" "$UNPACKED/resources/app.asar"; then echo 'the staging project or a secret key is in app.asar' >&2; exit 1; fi
           test -f "$UNPACKED/resources/app.asar"
           echo "Packaged web copy: $(find "$RES" -type f | wc -l) files, production project, ownerApp true."
+
+      - name: Check the Windows signature (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'The Windows installer was not built.' }
+          $files = @($installer.FullName)
+          $exe = Join-Path (Get-Location) 'dist/win-unpacked/QRquick.exe'
+          if (Test-Path $exe) { $files += $exe }
+          foreach ($file in $files) {
+            $sig = Get-AuthenticodeSignature -FilePath $file
+            Write-Host "$(Split-Path $file -Leaf): $($sig.Status) - $($sig.StatusMessage)"
+            if ($env:SIGNING_MODE -eq 'release-cert') {
+              if ($sig.Status -ne 'Valid') { throw "The release file $file is not validly signed (status $($sig.Status))." }
+            } elseif ($env:SIGNING_MODE -eq 'test-cert') {
+              if (-not $sig.SignerCertificate) { throw "The test file $file was not signed." }
+            } else {
+              if ($sig.SignerCertificate) { throw "The unsigned test file $file unexpectedly has a signature." }
+            }
+          }
 
       - name: Run the Linux AppImage itself (it starts and stays running for 25 seconds)
         if: matrix.platform == 'linux-x64'
@@ -185,33 +272,43 @@ jobs:
           if (Test-Path (Join-Path $env:QRQUICK_INSTALL 'QRquick.exe')) { throw 'QRquick.exe is still installed after uninstalling.' }
           Write-Host 'Uninstalled.'
 
-      - name: Collect the release files, the checksums and the build information
+      - name: Collect the package, the checksums and the build information
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
           mkdir -p release
-          if [ "${{ matrix.platform }}" = 'windows-x64' ]; then
+          if [ "$PLATFORM" = 'windows-x64' ]; then
             cp dist/QRquick-*-win-x64-setup.exe release/
+            case "$SIGNING_MODE" in
+              release-cert) SIGN_LINE='Code signing: Windows Authenticode, QRquick certificate (checked in this run)' ;;
+              test-cert) SIGN_LINE='Code signing: TEST ONLY, self-signed certificate that Windows does not trust. Not for distribution.' ;;
+              *) SIGN_LINE='Code signing: none (unsigned test build). Not for distribution.' ;;
+            esac
           else
             cp dist/QRquick-*-linux-x64.AppImage release/
+            SIGN_LINE='Code signing: none for the AppImage on Linux. Check the file against SHA256SUMS.'
+            if [ "$DIST_LABEL" = 'TEST' ]; then SIGN_LINE="$SIGN_LINE Not for distribution."; fi
           fi
-          cat > release/BUILD-INFO-${{ matrix.platform }}.txt <<EOF
+          cat > "release/BUILD-INFO-$PLATFORM.txt" <<EOF
           QRquick owner desktop app
+          Distribution: $DIST_LABEL
           Version: $APP_VERSION
           Build id: $BUILD_ID
           Commit: $GITHUB_SHA
-          Platform: ${{ matrix.platform }}
+          Platform: $PLATFORM
+          $SIGN_LINE
           Supabase project: qvnwqrevgyootaaunrto (production)
           QR address: https://joyyxh.github.io/Ps-qr/
-          Signing: unsigned (no code-signing certificate configured)
           Built (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
-          (cd release && sha256sum * > SHA256SUMS-${{ matrix.platform }}.txt)
-          cat release/SHA256SUMS-${{ matrix.platform }}.txt
+          (cd release && sha256sum * > "SHA256SUMS-$PLATFORM.txt")
+          cat "release/SHA256SUMS-$PLATFORM.txt"
 
       - name: Upload the desktop app package, checksums and build information
         uses: actions/upload-artifact@v4
         with:
-          name: qrquick-desktop-${{ matrix.platform }}-${{ env.BUILD_ID }}
+          name: qrquick-desktop-${{ matrix.platform }}-${{ env.BUILD_ID }}-${{ env.DIST_LABEL }}
           path: desktop/release
           if-no-files-found: error
           retention-days: 30
@@ -220,7 +317,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-smoke-${{ matrix.platform }}-${{ env.BUILD_ID }}
+          name: desktop-smoke-${{ matrix.platform }}-${{ env.BUILD_ID }}-${{ env.DIST_LABEL }}
           path: ${{ runner.temp }}/desktop-smoke-*
           if-no-files-found: warn
           retention-days: 14

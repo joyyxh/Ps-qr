@@ -211,7 +211,7 @@ adb logcat -d -t 4000 > "$OUT/logcat-tail.txt" 2>/dev/null || true
   cat "$RESULTS"
   echo '```'
   echo ""
-  echo "Screenshots, page snapshots and the WebView log tail are in the qrquick-ui-check artifact."
+  echo "Screenshots, page snapshots and the WebView log tail are in the qrquick-ui-check-<mode> artifact of this run."
 } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
 echo "Checks failed: $FAILED"

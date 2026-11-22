@@ -1,0 +1,55 @@
+// QRquick Android signing and version settings.
+//
+// The android-apk workflow copies this file into android/app/ and applies it at the end of
+// app/build.gradle. Debug builds keep the debug key: this file changes nothing for them.
+//
+// Release builds take the keystore from environment variables, which the workflow fills from
+// the repository secrets (see docs/RELEASE.md). A release build with no keystore stops here.
+// It is never signed with the debug key and never left unsigned.
+//
+//   QRQUICK_KEYSTORE_FILE       absolute path to the PKCS12 keystore
+//   QRQUICK_KEYSTORE_PASSWORD   keystore password
+//   QRQUICK_KEY_ALIAS           key alias inside the keystore
+//   QRQUICK_KEY_PASSWORD        key password
+//   QRQUICK_VERSION_CODE        integer, must increase for every release a phone should update to
+//   QRQUICK_VERSION_NAME        for example 1.0.0
+
+def releaseKeystore = System.getenv('QRQUICK_KEYSTORE_FILE')
+
+android {
+    defaultConfig {
+        def versionCodeText = System.getenv('QRQUICK_VERSION_CODE')
+        if (versionCodeText) {
+            versionCode Integer.parseInt(versionCodeText)
+        }
+        def versionNameText = System.getenv('QRQUICK_VERSION_NAME')
+        if (versionNameText) {
+            versionName versionNameText
+        }
+    }
+
+    if (releaseKeystore) {
+        signingConfigs {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv('QRQUICK_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('QRQUICK_KEY_ALIAS')
+                keyPassword System.getenv('QRQUICK_KEY_PASSWORD')
+            }
+        }
+        buildTypes {
+            release {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def releaseRequested = graph.allTasks.any { it.name == 'assembleRelease' || it.name == 'bundleRelease' }
+    if (releaseRequested && !releaseKeystore) {
+        throw new GradleException(
+            'No release keystore is set (QRQUICK_KEYSTORE_FILE). A release build is not made without the QRquick release key.'
+        )
+    }
+}

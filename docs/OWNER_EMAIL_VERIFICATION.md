@@ -1,11 +1,12 @@
 # Owner email verification
 
-Status (2026-11-19): the app's sign-up, code entry, resend and sign-in are fixed and tested. The
-verification email still does **not** reach owners who are not on the Supabase team, because of
-how the project's email is set up. The app cannot fix that. The dashboard steps below can.
+Status (2026-11-22): the app's sign-up, code entry, resend and sign-in are fixed and tested. The
+verification email still does **not** reach owners who are not on the Supabase team, because the
+project's email sender is not set up for real owners. The app cannot fix that. The dashboard steps
+below can.
 
-Nothing in this file claims that a verification email arrives. Only the owner's real test
-(step 6 below) can show that.
+Nothing in this file claims that a verification email arrives. Only the owner's real test (step 9
+below) can show that.
 
 ## Why owners do not get a code (root cause)
 
@@ -48,31 +49,85 @@ SMTP is on, the cause is in that setup (sender, provider, or the template). Step
 - Unchanged and still enforced: a session is never created before the code is accepted, and an
   unverified owner cannot sign in with the password.
 
+## Choose the sender
+
+| Option | Use it for | Limits |
+|---|---|---|
+| Team members only (built-in sender) | Testers who are members of the Supabase organization team | Not for shop owners. 2 emails per hour. |
+| **Your own domain + Resend SMTP (recommended)** | Real owners | You buy the domain. Check Resend's current plan limits before choosing a plan. The sender address must be on your verified domain. |
+| A Gmail account with an App Password (stop-gap only) | A short test while the domain is not ready | Sends as a personal Gmail address, which owners will see. Google limits how many emails one account may send per day. It can be blocked or locked by Google. Do not use it for customers. |
+
+The Resend account reached from this environment had **no verified domain** on 2026-11-22. Steps
+A to D below are the owner's work.
+
 ## Dashboard steps (owner to do; no secrets in this repository or in chat)
 
 Open the project in the Supabase dashboard. Menu names can change, so use the closest match.
 
-1. **Which sender is active.** Authentication → Emails → SMTP Settings. Write down whether custom
-   SMTP is switched on, and if it is, the provider and sender address. Do not write down the password.
-   - Off: the built-in sender is in use. It only delivers to team members (step 5a).
-   - On: check that provider's delivery log for the owner's test emails.
-2. **The code is in the email.** Authentication → Emails → Confirm signup. The template must
-   contain `{{ .Token }}`. A template with only the link gives the owner no code to type.
-3. **Email confirmation is on.** Authentication → Sign In / Providers → Email → "Confirm email".
-4. **Redirect addresses.** Authentication → URL Configuration. Site URL and the redirect list include
+### A. Buy the domain and verify it with Resend
+
+1. Buy a domain from any registrar. Choose one that matches the business. The owner decides the
+   name.
+2. In Resend, open Domains → Add domain, enter the domain, and choose a sending subdomain if Resend
+   suggests one. Resend shows the DNS records to add (SPF and DKIM records). **Copy the records from
+   the Resend page, not from this file.**
+3. Add those records at the DNS host. Wait until Resend shows the domain as **Verified**.
+
+### B. Create a Resend API key
+
+4. In Resend, open API Keys → Create API key. Give it **Sending access** only, and limit it to the
+   verified domain if Resend offers that. Copy the key once, and store it in a password manager.
+
+### C. Set Supabase to send through Resend
+
+5. Supabase: Authentication → Emails → SMTP Settings. Turn on custom SMTP and enter:
+
+   | Field | Value |
+   |---|---|
+   | Sender email | `no-reply@<your verified domain>` |
+   | Sender name | `QRquick` |
+   | Host | `smtp.resend.com` |
+   | Port | `465` (SSL) |
+   | Username | `resend` |
+   | Password | the Resend API key from step 4 |
+
+   Save. Do not paste the key into chat or into any file in this repository.
+
+6. Supabase: Authentication → Emails → Confirm signup. **The template must contain `{{ .Token }}`**,
+   which is the six-digit code the app asks for. A template with only the link gives the owner no
+   code to type. Suggested text:
+
+   > Your QRquick code is **{{ .Token }}**. Enter it in the app to finish creating your account.
+   > If you did not ask for this, ignore this email.
+
+7. Supabase: Authentication → Rate Limits. The email limit is set per project (30 per hour is the
+   default with custom SMTP). Raise it only as far as the Resend plan allows, and check Resend's
+   own limits.
+
+### D. Confirm the sign-in settings
+
+8. Supabase: Authentication → Sign In / Providers → Email. Email sign-up is **on**, and "Confirm
+   email" is **on**. Do not turn "Confirm email" off to get around a problem. The app depends on it.
+   Supabase: Authentication → URL Configuration. The Site URL and the redirect list include
    `https://joyyxh.github.io/Ps-qr/` (or the deployed address in `PRINTNEST_PUBLIC_URL`).
-5. **Choose a sender** (one of these):
-   - **a. Testing today:** add each tester to the Supabase organization team (Organization settings →
-     Team). Only team members get built-in email, so this is for testers, not shop owners.
-   - **b. Real owners, no domain needed (free):** custom SMTP through a Google account. Host
-     `smtp.gmail.com`, port 587. Username: that Gmail address. Password: a Google App Password, which
-     needs 2-Step Verification on that account. Enter both in Authentication → Emails → SMTP Settings.
-     Emails then come from that Gmail address. Google limits how many emails one account may send per
-     day, and Supabase allows 30 per hour with custom SMTP. Check Google's current help if these
-     settings differ.
-   - **c. Later, with a domain:** custom SMTP from your own domain, with SPF and DKIM set up.
-6. **Owner test after the change.** Register with a mailbox that is not on the team. Record the time,
-   whether the code arrived, whether it was in spam, and whether it worked.
+
+### E. Test with an address that is not on the team
+
+9. Register with a mailbox that is not on the team. Record the time, whether the code arrived,
+   whether it was in spam, and whether the code worked. If nothing arrives, check **Resend →
+   Emails** (the send status and any bounce) and **Supabase → Logs → Auth** (the `mail.send`
+   events). The two logs show different things: Supabase shows when it accepted the send, Resend
+   shows what happened after.
+
+## If the test fails
+
+- Resend shows "domain not verified" or the send is rejected: the DNS records in step 2 are not
+  complete, or the sender address is not on the verified domain.
+- Resend shows the send as delivered but nothing arrives: check spam, then the DMARC and SPF
+  settings in Resend's domain page.
+- Supabase shows `mail.send` but Resend shows nothing: the SMTP host, port, username or key in
+  step 5 is wrong.
+- The email has no code: the template in step 6 is missing `{{ .Token }}`.
 
 ## Tests (run from web/)
 
@@ -87,4 +142,6 @@ Open the project in the Supabase dashboard. Menu names can change, so use the cl
   show when Supabase accepts a send, not when an inbox receives it.
 - The current sender, the template text, the redirect list and "Confirm email". There is no Auth
   settings tool in this environment, so these need the dashboard steps above.
+- The Resend domain. No domain was verified in the Resend account reached from this environment on
+  2026-11-22.
 - Team membership. The Supabase tools here do not list organization members.
