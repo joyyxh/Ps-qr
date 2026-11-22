@@ -20,11 +20,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare the public site (app files only)
+        run: |
+          set -euo pipefail
+          test ! -e site || { echo 'site/ already exists in the checkout; refusing to publish it' >&2; exit 1; }
+          mkdir site
+          (cd web && cp -R index.html styles.css config.js manifest.webmanifest icons src sw.js ../site/)
+          # Only the app is published: no tests, test fixtures, package files or browser test scripts.
+          UNWANTED="$(find site \( -name 'package.json' -o -name '*.test.js' -o -name '*.cjs' -o -name '*.py' -o -path '*/tests/*' \))"
+          if [ -n "$UNWANTED" ]; then
+            echo "refused: a test or build file would be published:" >&2
+            echo "$UNWANTED" >&2
+            exit 1
+          fi
+          # The public site uses the production project, customer mode, and holds no staging reference or secret key.
+          grep -q "supabaseUrl: 'https://qvnwqrevgyootaaunrto.supabase.co'" site/config.js
+          grep -q "ownerApp: false" site/config.js
+          if grep -rIEl 'nbzojqlqkrydcjtogwrb|sb_secret_|service_role|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.' site; then
+            echo "refused: a staging reference or a secret-looking value is in the public site" >&2
+            exit 1
+          fi
+          echo "Public site: $(find site -type f | wc -l) files"
       - name: Publish web app to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: ./web
+          publish_dir: ./site
           force_orphan: true
           commit_message: "Publish QRquick web ${{ github.sha }}"
