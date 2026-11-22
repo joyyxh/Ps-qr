@@ -150,7 +150,7 @@ jobs:
           else
             for name in RELEASE_KEYSTORE_BASE64 RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
               if [ -z "${!name}" ]; then
-                echo "The repository secret for $name is not set. The release APK is not built without the QRquick release key. See docs/RELEASE.md." >&2
+                echo "The repository secret ANDROID_$name is not set. The release APK is not built without the QRquick release key. See docs/RELEASE.md." >&2
                 exit 1
               fi
             done
