@@ -234,8 +234,21 @@ jobs:
           $installer = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1
           if (-not $installer) { throw 'The Windows installer was not built.' }
           $target = Join-Path $env:RUNNER_TEMP 'QRquick-install'
-          Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$target") -Wait
-          if (-not (Test-Path (Join-Path $target 'QRquick.exe'))) { throw 'The installer did not install QRquick.exe.' }
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$target") -Wait -PassThru
+          Write-Host "Installer exit code: $($process.ExitCode). Installer size: $((Get-Item $installer.FullName).Length) bytes."
+          # The installer can return before its files are written (it may hand off to a child process), so wait for
+          # the app and its uninstaller to appear, up to three minutes.
+          $deadline = (Get-Date).AddSeconds(180)
+          while ((Get-Date) -lt $deadline -and -not ((Test-Path (Join-Path $target 'QRquick.exe')) -and (Test-Path (Join-Path $target 'Uninstall QRquick.exe')))) {
+            Start-Sleep -Seconds 3
+          }
+          if (-not (Test-Path (Join-Path $target 'QRquick.exe'))) {
+            $found = Get-ChildItem -Path $env:RUNNER_TEMP, "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'QRquick.exe' -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName
+            Write-Host "QRquick.exe was found at: $(if ($found) { $found -join '; ' } else { 'no location under RUNNER_TEMP or LOCALAPPDATA\Programs' })"
+            $contents = if (Test-Path $target) { (Get-ChildItem $target | Select-Object -ExpandProperty Name) -join ', ' } else { 'the target folder does not exist' }
+            Write-Host "Target folder contents: $contents"
+            throw "The installer did not install QRquick.exe into $target (installer exit code $($process.ExitCode))."
+          }
           "QRQUICK_INSTALL=$target" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Installed to $target"
 
