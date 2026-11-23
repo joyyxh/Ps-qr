@@ -94,7 +94,7 @@ function newSession() {
     access_token: `owner-token-${tokenCounter}`,
     refresh_token: 'refresh-1',
     expires_in: 3600,
-    user: { id: 'owner-1', email: 'owner@example.com' },
+    user: { id: 'owner-1', username: 'owner_demo' },
   };
 }
 
@@ -136,15 +136,20 @@ async function handleSupabase(route) {
   const shopFields = (shop) => ({ ...shop });
 
   // ----- Auth -----
-  if (url.pathname === '/auth/v1/token') {
-    const grant = url.searchParams.get('grant_type');
-    if (grant === 'password') {
-      if (body.password !== 'correct-horse') {
-        return json(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
-      }
-      return json(200, newSession());
+  // Owner sign-in goes through the owner-auth function, which checks the username and password.
+  if (url.pathname === '/functions/v1/owner-auth/signin') {
+    if (body.username !== 'owner_demo' || body.password !== 'correct-horse') {
+      return json(401, { code: 'invalid_credentials', message: 'That username or password is not right.' });
     }
-    if (grant === 'refresh_token') return json(200, newSession());
+    return json(200, { username: 'owner_demo', session: newSession() });
+  }
+  if (url.pathname === '/functions/v1/owner-auth/policies') {
+    const terms = { version: '2026-11-22.1', title: 'Terms and Conditions', effective_at: '2026-11-22T00:00:00Z' };
+    return json(200, { terms, privacy: { ...terms, title: 'Privacy Policy' } });
+  }
+  if (url.pathname === '/auth/v1/token') {
+    if (url.searchParams.get('grant_type') === 'refresh_token') return json(200, newSession());
+    return json(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' });
   }
   if (url.pathname === '/auth/v1/logout') return json(204, null);
 
@@ -304,9 +309,9 @@ async function waitText(page, text, timeout = 8000) {
   page.on('pageerror', (err) => problems.push(`pageerror: ${err.message}`));
   page.on('console', (msg) => {
     const text = msg.text();
-    // The browser logs every 4xx response. 400 (wrong password) and 409 (taken address)
+    // The browser logs every 4xx response. 401 (wrong password) and 409 (taken address)
     // are triggered on purpose above. A 404 is reported below with its address instead.
-    const expected = /Failed to load resource: the server responded with a status of (400|404|409)/.test(text);
+    const expected = /Failed to load resource: the server responded with a status of (400|401|404|409)/.test(text);
     if (msg.type() === 'error' && !expected && !/favicon/i.test(text)) problems.push(`console: ${text}`);
   });
   page.on('response', (res) => {
@@ -326,10 +331,10 @@ async function waitText(page, text, timeout = 8000) {
   check('signed out shows the owner sign-in form', (await page.locator('#auth-form').count()) === 1);
 
   // 2. Wrong password shows a clear message and stays signed out.
-  await page.fill('#auth-form input[name=email]', 'owner@example.com');
+  await page.fill('#auth-form input[name=username]', 'owner_demo');
   await page.fill('#auth-form input[name=password]', 'wrong-password');
   await page.click('#auth-form button[type=submit]');
-  await waitText(page, 'do not match an account');
+  await waitText(page, 'That username or password is not right.');
   check('wrong password shows a clear message', true);
 
   // 3. Correct password: shop list, session kept for this tab only.

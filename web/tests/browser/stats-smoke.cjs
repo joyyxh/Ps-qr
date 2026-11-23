@@ -37,7 +37,7 @@ const state = {
   ],
 };
 
-const session = () => ({ access_token: `owner-token-${Date.now()}`, refresh_token: 'r', expires_in: 3600, user: { id: 'owner-1', email: 'owner@example.com' } });
+const session = () => ({ access_token: `owner-token-${Date.now()}`, refresh_token: 'r', expires_in: 3600, user: { id: 'owner-1', username: 'owner_demo' } });
 
 function nextDay(day) {
   const d = new Date(`${day}T00:00:00Z`);
@@ -79,10 +79,14 @@ async function handle(route) {
   state.requests.push({ method: req.method(), path: url.pathname, query: url.search, body });
   const json = (status, data) => route.fulfill({ status, headers: { ...CORS, 'Content-Type': 'application/json' }, body: data === null ? '' : JSON.stringify(data) });
 
-  if (url.pathname === '/auth/v1/token') {
-    if (body.password !== 'correct-horse') return json(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
-    return json(200, session());
+  // Owner sign-in is username and password, through the owner-auth function (no email).
+  if (url.pathname === '/functions/v1/owner-auth/signin') {
+    if (body.username !== 'owner_demo' || body.password !== 'correct-horse') {
+      return json(401, { code: 'invalid_credentials', message: 'That username or password is not right.' });
+    }
+    return json(200, { username: 'owner_demo', session: session() });
   }
+  if (url.pathname === '/auth/v1/token') return json(200, session());
   if (url.pathname === '/auth/v1/logout') return json(204, null);
   if (url.pathname === '/rest/v1/shop_memberships') return json(200, [{ role: 'owner', shop: SHOP }]);
   if (url.pathname === '/rest/v1/services') return json(200, []);
@@ -142,7 +146,7 @@ function check(label, ok, detail = '') {
   // Sign in through the real form.
   await page.goto(`${BASE}#/owner`);
   await page.locator('#auth-form').waitFor();
-  await page.fill('#auth-form input[name=email]', 'owner@example.com');
+  await page.fill('#auth-form input[name=username]', 'owner_demo');
   await page.fill('#auth-form input[name=password]', 'correct-horse');
   await page.click('#auth-form button[type=submit]');
   await text('Demo Xerox Centre').waitFor();

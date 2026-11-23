@@ -1,5 +1,9 @@
 # Owner email verification
 
+> **Superseded for owner accounts.** Owners no longer sign up, sign in or recover with email. They use a
+> username and a password, with ten one-time recovery codes. See `docs/AUTH_REDESIGN.md`. The steps below
+> still matter only for the legacy email endpoints that remain on the project (blocker B8 in that file).
+
 Status (2026-11-22): the app's sign-up, code entry, resend and sign-in are fixed and tested. The
 verification email still does **not** reach owners who are not on the Supabase team, because the
 project's email sender is not set up for real owners. The app cannot fix that. The dashboard steps

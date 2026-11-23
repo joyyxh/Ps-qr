@@ -10,9 +10,9 @@ name: Staging app and website smoke (real staging backend)
 # (qvnwqrevgyootaaunrto). The only key used is the staging publishable key, which is designed to be public.
 # No service-role key is used anywhere. The customer check places one cash order on a QA shop per run.
 #
-# Optional repository secrets (the checks are reported as INFO when they are missing):
-#   STAGING_OWNER_EMAIL / STAGING_OWNER_PASSWORD    a confirmed staging owner: enables the dashboard checks
-#   STAGING_SIGNUP_EMAIL / STAGING_SIGNUP_PASSWORD  a throwaway address: enables the registration check
+# Optional repository secrets (the dashboard checks are reported as INFO when they are missing):
+#   STAGING_OWNER_USERNAME / STAGING_OWNER_PASSWORD  a staging owner account: enables the dashboard checks
+# Account creation and recovery are checked by the live API job (owner-auth-staging.yml), not here.
 
 on:
   push:
@@ -34,10 +34,8 @@ jobs:
     env:
       STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
       STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
-      STAGING_OWNER_EMAIL: ${{ secrets.STAGING_OWNER_EMAIL }}
+      STAGING_OWNER_USERNAME: ${{ secrets.STAGING_OWNER_USERNAME }}
       STAGING_OWNER_PASSWORD: ${{ secrets.STAGING_OWNER_PASSWORD }}
-      STAGING_SIGNUP_EMAIL: ${{ secrets.STAGING_SIGNUP_EMAIL }}
-      STAGING_SIGNUP_PASSWORD: ${{ secrets.STAGING_SIGNUP_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 

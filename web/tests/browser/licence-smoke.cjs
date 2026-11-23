@@ -41,7 +41,7 @@ const SESSION = {
   access_token: 'owner-token',
   refresh_token: 'refresh-1',
   expires_at: Math.floor(now / 1000) + 3600,
-  user: { id: 'owner-1', email: 'owner@example.com' },
+  user: { id: 'owner-1', username: 'owner_demo' },
 };
 
 function shopRow(shop) {

@@ -9,12 +9,12 @@
 //   The database stores and enforces them.
 
 import {
-  accountErrorMessage,
-  isEmailAddress,
-  isNewPassword,
-  isOtpCode,
-  otpErrorMessage,
-  resendWaitSeconds,
+  signUpErrorMessage,
+  signInErrorMessage,
+  resetErrorMessage,
+  regenerateErrorMessage,
+  passwordChecklist,
+  recoveryCodesText,
   CANCEL_REASONS,
   cancelReasonLabel,
   checkPaymentQrFile,
@@ -53,8 +53,7 @@ import { createStatsPages } from './owner-stats.js';
 import { createLicencePages } from './owner-licence.js';
 import { PRINTER_RETRY_MS, browserVisibility, createOrderRefresher, printerRetryDue } from './order-refresh.js';
 import { qrCanvas, qrSvg } from './qr.js';
-import { createPendingSignupStore } from './pending-signup.js';
-import { browserSessionStorage } from './session.js';
+import { checkPassword, checkUsername, normalizeRecoveryCode, normalizeUsername } from './owner-rules.js';
 
 const UNIT_OPTIONS = [
   { value: 'per_side', label: 'Per printed side' },
@@ -300,7 +299,8 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
       <section class="card">
         <h2>Account</h2>
-        <p class="small"><span class="muted">Signed in as</span> <strong class="summary-email">${escapeHtml(user?.email ?? '')}</strong></p>
+        <p class="small"><span class="muted">Signed in as</span> <strong>${escapeHtml(user?.username ?? '')}</strong></p>
+        <p><a class="button secondary" href="#/owner/security">Recovery codes</a></p>
         ${shop.role === 'owner' && licenceEnabled ? `<p><a class="button secondary" href="#/owner/shop/${slugPath}/licence">Licence status</a></p>` : ''}
         <p><button type="button" class="danger" data-action="signout">Sign out</button></p>
       </section>`;
@@ -429,18 +429,13 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     show('<p class="muted">Loading…</p>');
     const [page = '', value = '', section = ''] = parts;
     try {
-      // A verified owner who has not chosen a password yet goes no further (see completeSignup).
-      if (auth.hasPendingSignup()) {
-        setTabs(null);
-        return renderSetPassword();
-      }
+      // Recovery codes of a new account or a reset are shown once, before anything else opens.
+      const pending = auth.pendingCodes();
+      if (pending) return renderRecoveryCodes({ ...pending, onDone: finishPendingCodes });
       const session = await auth.getSession();
       // Protected: every owner page needs a session. Signed-out screens show no tabs.
       if (!session) return renderSignIn(signInScreen(page));
-      if (page === 'reset') {
-        setTabs(null);
-        return renderResetPassword();
-      }
+      if (page === 'security') return renderSecurity(session.user);
       if (page === 'new') {
         setTabs('home');
         return renderNewShop();
@@ -467,40 +462,16 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('[data-action="retry"]', 'click', () => render(current));
   }
 
-  // ---------- sign in, registration and verification ----------
-  // An owner signs in with email and password. A new owner registers with email and
-  // password, then enters the one-time code emailed to them before the account opens.
-  // An owner whose email is still unverified is sent a new code when they sign in.
-  // Customers never reach these screens.
-
-  let pendingEmail = ''; // the address waiting for a verification code
-  let pendingSentAt = 0; // when the last verification code was sent, in milliseconds
-  let pendingPassword = ''; // the password typed at registration, kept in memory until the code is accepted
-  let resendTimer = null;
-  // The address and the time of the last code survive a reload of the code screen. The password never does.
-  const pendingStore = createPendingSignupStore(browserSessionStorage());
-
-  function rememberPending() {
-    pendingStore.save(pendingEmail, pendingSentAt);
-  }
-
-  function restorePending() {
-    if (pendingEmail) return;
-    const saved = pendingStore.load();
-    if (saved) {
-      pendingEmail = saved.email;
-      pendingSentAt = saved.sentAtMs;
-    }
-  }
-
-  function clearResendTimer() {
-    if (resendTimer) clearInterval(resendTimer);
-    resendTimer = null;
-  }
+  // ---------- sign in, registration, recovery codes (auth.js) ----------
+  // An owner signs in with a username and password. A new owner picks a username and password and
+  // accepts the Terms and Privacy Policy. Ten recovery codes are shown once; a forgotten password is
+  // reset with one of them. Email is not used anywhere in this flow. Customers never reach these screens.
 
   // The side screens of sign in have their own addresses, so Back (on Android and in the browser)
-  // returns to the screen before them instead of leaving the app.
-  const SIGN_IN_SCREENS = ['register', 'forgot', 'verify'];
+  // returns to sign in instead of leaving the app.
+  const SIGN_IN_SCREENS = ['register', 'forgot'];
+  // Set just before a jump to the Security page, so that page can say what happened. Shown once.
+  let securityNotice = '';
 
   function signInScreen(page) {
     return SIGN_IN_SCREENS.includes(page) ? page : 'signin';
@@ -514,13 +485,60 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   function renderSignIn(mode = 'signin', notice = '') {
     setTabs(null);
-    clearResendTimer();
-    pendingPassword = '';
     if (mode === 'register') return renderRegister(notice);
-    if (mode === 'verify') restorePending();
-    if (mode === 'verify' && pendingEmail) return renderVerify(notice);
-    if (mode === 'forgot') return renderForgotPassword(notice);
+    if (mode === 'forgot') return renderForgot(notice);
     return renderSignInForm(notice);
+  }
+
+  // A password box with a Show / Hide button. The button only changes the box type. The value stays on this page.
+  function passwordField(name, label, autocomplete) {
+    const id = `auth-${name}`;
+    return `<div class="field">
+        <label for="${id}">${escapeHtml(label)}</label>
+        <span class="password-field">
+          <input id="${id}" name="${name}" type="password" autocomplete="${autocomplete}" autocapitalize="none" spellcheck="false" />
+          <button type="button" class="link" data-toggle-password="${id}" aria-pressed="false">Show</button>
+        </span>
+      </div>`;
+  }
+
+  function bindAuthChrome() {
+    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
+    onAll('[data-toggle-password]', 'click', togglePassword);
+  }
+
+  function togglePassword(event) {
+    const button = event.currentTarget;
+    const input = app.querySelector(`#${button.dataset.togglePassword}`);
+    if (!input) return;
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    button.textContent = reveal ? 'Hide' : 'Show';
+    button.setAttribute('aria-pressed', String(reveal));
+  }
+
+  // Redraws the live password checklist and the "passwords match" line from what is typed.
+  function paintChecks(form) {
+    const password = form.elements.password?.value ?? '';
+    const username = normalizeUsername(form.elements.username?.value ?? '');
+    const list = form.querySelector('[data-rules]');
+    if (list) {
+      list.innerHTML = passwordChecklist(password, username)
+        .map(({ label, met }) => `<li class="${met ? 'met' : ''}"><span class="rule-mark" aria-hidden="true">${met ? '✓' : '○'}</span> ${escapeHtml(label)}</li>`)
+        .join('');
+    }
+    const match = form.querySelector('[data-match]');
+    if (match) {
+      const confirm = form.elements.confirm?.value ?? '';
+      if (confirm === '') match.textContent = '';
+      else match.textContent = confirm === password ? 'The passwords match.' : 'The passwords do not match yet.';
+    }
+  }
+
+  function clearPasswords(form) {
+    for (const name of ['password', 'confirm', 'current']) {
+      if (form.elements[name]) form.elements[name].value = '';
+    }
   }
 
   function renderSignInForm(notice = '') {
@@ -528,78 +546,78 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       `<section class="card">
         <h1>Shop owner sign in</h1>
         <p class="muted small">Only shop owners sign in here. Customers do not need an account.</p>
-        <form id="auth-form" class="grid">
-          <label>Email
-            <input name="email" type="email" autocomplete="email" required />
+        <form id="auth-form" class="grid" novalidate>
+          <label>Username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" />
           </label>
-          <label>Password
-            <input name="password" type="password" autocomplete="current-password" required />
-          </label>
+          ${passwordField('password', 'Password', 'current-password')}
           <button type="submit" data-label="Sign in">Sign in</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
         </form>
-        <p><button type="button" class="link" data-switch="forgot">Forgot password?</button></p>
+        <p><button type="button" class="link" data-switch="forgot">Forgot password? Use a recovery code</button></p>
         <p><button type="button" class="link" data-switch="register">New owner? Create an account</button></p>
       </section>`
     );
     on('#auth-form', 'submit', onSignInSubmit);
-    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
+    bindAuthChrome();
   }
 
   async function onSignInSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = new FormData(form);
-    const email = String(data.get('email') ?? '').trim();
-    const password = String(data.get('password') ?? '');
+    const username = String(form.elements.username.value ?? '').trim();
+    const password = form.elements.password.value;
     setError(form, '');
+    if (username === '') return setError(form, 'Enter your username.');
+    if (password === '') return setError(form, 'Enter your password.');
     setBusy(form, true);
     try {
-      await auth.signIn(email, password);
-      // Signed in, so any registration still waiting for its code is finished.
-      pendingEmail = '';
-      pendingStore.clear();
+      await auth.signIn(username, password);
+      clearPasswords(form);
       go([]);
     } catch (err) {
-      if (err.code === 'email_not_confirmed') {
-        return startVerification(email, 'Your email is not verified yet. We have sent you a new code.');
-      }
-      setError(form, accountErrorMessage(err));
+      clearPasswords(form);
+      setError(form, signInErrorMessage(err));
       setBusy(form, false);
     }
   }
 
-  // An owner who has not verified yet gets a new code, then the code screen.
-  async function startVerification(email, notice) {
-    pendingEmail = email;
-    pendingPassword = ''; // this owner did not register here, so there is no password to save
+  // Loads the current Terms and Privacy versions first. Sign-up cannot be sent without them.
+  async function renderRegister(notice = '') {
+    setTabs(null);
+    show('<p class="muted">Loading…</p>');
+    let policies;
     try {
-      await auth.resendSignupCode(email);
-      pendingSentAt = Date.now();
-      rememberPending();
-      renderVerify(notice);
+      policies = await auth.policies();
     } catch (err) {
-      // A plain 429 with no error code means a code went out a moment ago. The coded
-      // limits (email limit, request limit) get their own message from otpErrorMessage.
-      const recentlySent = err.status === 429 && !err.code;
-      if (recentlySent) pendingSentAt = Date.now();
-      rememberPending();
-      renderVerify(recentlySent ? 'A code was sent a moment ago. Enter it, or wait a minute to resend.' : otpErrorMessage(err, 'resend'));
+      show(
+        `<section class="card">
+          <h1>Create an owner account</h1>
+          <p class="error" role="alert">${escapeHtml(signUpErrorMessage(err))}</p>
+          <p><button type="button" data-action="retry-policies">Try again</button></p>
+          <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+        </section>`
+      );
+      on('[data-action="retry-policies"]', 'click', () => renderRegister(notice));
+      bindAuthChrome();
+      return;
     }
-  }
-
-  function renderRegister(notice = '') {
     show(
       `<section class="card">
         <h1>Create an owner account</h1>
-        <p class="muted small">Only shop owners register here. Customers do not need an account.
-           We will email a one-time code to confirm your address.</p>
-        <form id="auth-form" class="grid">
-          <label>Email
-            <input name="email" type="email" autocomplete="email" required />
+        <p class="muted small">Only shop owners register here. Customers do not need an account. No email address is needed.</p>
+        <form id="auth-form" class="grid" novalidate>
+          <label>Username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" aria-describedby="username-hint" />
           </label>
-          <label>Password (at least 8 characters)
-            <input name="password" type="password" minlength="8" autocomplete="new-password" required />
+          <p id="username-hint" class="muted small">3 to 24 characters: letters a to z, numbers and single underscores. Start with a letter. Usernames are not case sensitive.</p>
+          ${passwordField('password', 'Password', 'new-password')}
+          <ul class="checklist" data-rules aria-label="Password rules"></ul>
+          ${passwordField('confirm', 'Confirm password', 'new-password')}
+          <p class="small" data-match aria-live="polite"></p>
+          <label class="check">
+            <input type="checkbox" name="accept" />
+            <span>I have read and accept the <a href="#/terms" target="_blank" rel="noopener">${escapeHtml(policies.terms.title)}</a> (version ${escapeHtml(policies.terms.version)}) and the <a href="#/privacy" target="_blank" rel="noopener">${escapeHtml(policies.privacy.title)}</a> (version ${escapeHtml(policies.privacy.version)}).</span>
           </label>
           <button type="submit" data-label="Create account">Create account</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
@@ -607,258 +625,237 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         <p><button type="button" class="link" data-switch="signin">Already have an account? Sign in</button></p>
       </section>`
     );
-    on('#auth-form', 'submit', onRegisterSubmit);
-    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
+    const form = app.querySelector('#auth-form');
+    form.addEventListener('submit', (event) => onRegisterSubmit(event, policies));
+    form.addEventListener('input', () => paintChecks(form));
+    paintChecks(form);
+    bindAuthChrome();
   }
 
-  async function onRegisterSubmit(event) {
+  async function onRegisterSubmit(event, policies) {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = new FormData(form);
-    const email = String(data.get('email') ?? '').trim();
-    const password = String(data.get('password') ?? '');
-    if (!isEmailAddress(email)) return setError(form, 'Enter a valid email address.');
-    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
+    const name = checkUsername(form.elements.username.value);
+    const password = form.elements.password.value;
     setError(form, '');
+    if (!name.ok) return setError(form, name.message);
+    if (!checkPassword(password, name.username).ok) {
+      return setError(form, 'Your password does not meet all the rules yet. The list above shows what is missing.');
+    }
+    if (password !== form.elements.confirm.value) {
+      return setError(form, 'The passwords do not match. Type the same password in both boxes.');
+    }
+    if (!form.elements.accept.checked) {
+      return setError(form, 'Accept the Terms and the Privacy Policy to create an account.');
+    }
     setBusy(form, true);
     try {
-      await auth.signUp(email, password);
-      pendingEmail = email;
-      pendingSentAt = Date.now(); // signing up has just emailed the first code
-      pendingPassword = password;
-      rememberPending();
-      renderVerify('');
+      await auth.signUp({
+        username: name.username,
+        password,
+        accept: { terms: policies.terms.version, privacy: policies.privacy.version },
+      });
+      clearPasswords(form);
+      // The recovery codes screen opens first (see render).
+      go([]);
     } catch (err) {
-      setError(form, accountErrorMessage(err));
+      // The passwords stay in the boxes, so the owner only changes what the message asks for.
+      setError(form, signUpErrorMessage(err));
       setBusy(form, false);
     }
   }
 
-  function renderVerify(notice = '') {
-    // The code screen follows on from registration or sign in without a new history entry,
-    // so its address is set to match what is shown: a reload then opens sign in, as before.
-    if (window.location.hash !== '#/owner/verify') window.history.replaceState(null, '', '#/owner/verify');
-    show(
-      `<section class="card">
-        <h1>Check your email</h1>
-        <p>Enter the one-time code we emailed to <strong>${escapeHtml(pendingEmail)}</strong>.
-           It can take a minute to arrive, and it may be in your spam folder. Next you will
-           choose the password you use to sign in.</p>
-        <form id="auth-form" class="grid">
-          <label>Verification code
-            <input name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required />
-          </label>
-          <button type="submit" data-label="Verify email">Verify email</button>
-          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
-        </form>
-        <p><button type="button" class="link" data-action="resend">Resend code</button></p>
-        <p class="muted small">No email after a few minutes? Check your spam folder, then press Resend code. If the email has a button or link instead of a code, open it on this device.</p>
-        <p class="muted small">Already verified? <button type="button" class="link" data-switch="signin">Sign in with your password</button></p>
-      </section>`
-    );
-    on('#auth-form', 'submit', onVerifySubmit);
-    on('[data-action="resend"]', 'click', onResendCode);
-    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
-    startResendCountdown();
-  }
-
-  // The resend button stays disabled, with a countdown, until the cooldown ends.
-  function startResendCountdown() {
-    const button = app.querySelector('[data-action="resend"]');
-    if (!button) return;
-    const update = () => {
-      if (!button.isConnected) return clearResendTimer();
-      const wait = resendWaitSeconds(pendingSentAt, Date.now());
-      button.disabled = wait > 0;
-      button.textContent = wait > 0 ? `Resend code in ${wait} s` : 'Resend code';
-      if (wait <= 0) clearResendTimer();
-    };
-    clearResendTimer();
-    update();
-    if (button.disabled) resendTimer = setInterval(update, 1000);
-  }
-
-  async function onResendCode(event) {
-    const button = event.currentTarget;
-    button.disabled = true;
-    button.textContent = 'Sending…';
-    try {
-      await auth.resendSignupCode(pendingEmail);
-      pendingSentAt = Date.now();
-      rememberPending();
-      renderVerify('A new code is on its way.');
-    } catch (err) {
-      if (err.status === 429 && !err.code) pendingSentAt = Date.now();
-      rememberPending();
-      renderVerify(otpErrorMessage(err, 'resend'));
-    }
-  }
-
-  async function onVerifySubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const token = String(new FormData(form).get('token') ?? '').replace(/\s+/g, '');
-    if (!isOtpCode(token)) return setError(form, 'Enter the code from the email. It has 6 to 10 digits.');
-    setError(form, '');
-    setBusy(form, true);
-    try {
-      await auth.verifySignupCode(pendingEmail, token);
-    } catch (err) {
-      setError(form, otpErrorMessage(err, 'verify'));
-      setBusy(form, false);
-      return;
-    }
-    clearResendTimer();
-    pendingEmail = '';
-    pendingStore.clear();
-    // The password typed at registration is saved now, so the owner's own password is the
-    // one that works. An owner who came here from sign-in chooses one on the next screen.
-    const password = pendingPassword;
-    pendingPassword = '';
-    if (!password) return renderSetPassword();
-    return finishSignup(password);
-  }
-
-  // Saves the password and opens the account. A failure is shown on the password screen.
-  async function finishSignup(password) {
-    try {
-      await auth.completeSignup(password);
-    } catch (err) {
-      return signupFailed(err);
-    }
-    return go([]);
-  }
-
-  // A confirmation that has ended sends the owner to Forgot password. Any other failure
-  // keeps the owner on the password screen to try again.
-  function signupFailed(err) {
-    if (err.code === 'signup_expired') return renderSignIn('forgot', err.message);
-    return renderSetPassword(accountErrorMessage(err));
-  }
-
-  // The password step: after the code or the confirmation link, before the account opens.
-  // Nothing stays signed in until a password is saved.
-  function renderSetPassword(notice = '') {
-    clearResendTimer();
-    show(`<section class="card">
-      <h1>Choose your password</h1>
-      <p class="muted small">Your email is confirmed. Choose the password you will use to sign in from now on.
-         It replaces any password set before the confirmation. Use at least 8 characters.</p>
-      <form id="set-password-form" class="grid">
-        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <button type="submit" data-label="Save password">Save password</button>
-        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
-      </form>
-      <p class="muted small">Cannot save a password? <button type="button" class="link" data-switch="forgot">Use Forgot password</button></p>
-    </section>`);
-    on('#set-password-form', 'submit', onSetPasswordSubmit);
-    onAll('[data-switch]', 'click', (event) => {
-      auth.abandonSignup();
-      goAuth(event.currentTarget.dataset.switch);
-    });
-  }
-
-  async function onSetPasswordSubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const password = String(data.get('password') ?? '');
-    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
-    if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
-    setError(form, '');
-    setBusy(form, true);
-    return finishSignup(password);
-  }
-
-  // ---------- password reset (a separate flow, unchanged) ----------
-
-  function renderForgotPassword(notice = '') {
+  function renderForgot(notice = '') {
+    setTabs(null);
     show(
       `<section class="card">
         <h1>Reset your password</h1>
-        <p class="muted small">We email a reset link to owners who have a password.</p>
-        <form id="auth-form" class="grid">
-          <label>Email
-            <input name="email" type="email" autocomplete="email" required />
+        <p class="muted small">Use one of the recovery codes you saved when you created the account or last made new codes. Each code works once. Other devices stay signed in for up to an hour after the reset.</p>
+        <form id="auth-form" class="grid" novalidate>
+          <label>Username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" />
           </label>
-          <button type="submit" data-label="Send reset link">Send reset link</button>
+          <label>Recovery code
+            <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="30" placeholder="XXXX-XXXX-XXXX-XXXX" />
+          </label>
+          <p class="muted small">Type the code with or without the dashes. Capital and small letters are the same.</p>
+          ${passwordField('password', 'New password', 'new-password')}
+          <ul class="checklist" data-rules aria-label="Password rules"></ul>
+          ${passwordField('confirm', 'Confirm new password', 'new-password')}
+          <p class="small" data-match aria-live="polite"></p>
+          <button type="submit" data-label="Reset password">Reset password</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
         </form>
+        <p class="muted small">No recovery code left, or none of them work? The password cannot be reset here. Ask QRquick for help.</p>
         <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
       </section>`
     );
-    on('#auth-form', 'submit', onForgotSubmit);
-    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
+    const form = app.querySelector('#auth-form');
+    form.addEventListener('submit', onForgotSubmit);
+    form.addEventListener('input', () => paintChecks(form));
+    paintChecks(form);
+    bindAuthChrome();
   }
 
   async function onForgotSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const email = String(new FormData(form).get('email') ?? '').trim();
+    const username = normalizeUsername(form.elements.username.value);
+    const code = normalizeRecoveryCode(form.elements.code.value);
+    const password = form.elements.password.value;
     setError(form, '');
+    if (username === '') return setError(form, 'Enter your username.');
+    if (code === null) return setError(form, 'Enter a recovery code. It has 16 letters and numbers, in four groups of four.');
+    if (!checkPassword(password, username).ok) {
+      return setError(form, 'Your new password does not meet all the rules yet. The list above shows what is missing.');
+    }
+    if (password !== form.elements.confirm.value) return setError(form, 'The new passwords do not match.');
     setBusy(form, true);
     try {
-      await auth.recoverPassword(email);
-      showResetSent(email);
+      await auth.resetPassword({ username, recoveryCode: code, newPassword: password });
+      clearPasswords(form);
+      go([]);
     } catch (err) {
-      setError(form, accountErrorMessage(err));
+      // The passwords stay in the boxes. A password the server refused is still the owner's to change.
+      setError(form, resetErrorMessage(err));
       setBusy(form, false);
     }
   }
 
-  // The same message whether or not the address has an account, so the form cannot be
-  // used to find which emails are registered.
-  function showResetSent(email) {
+  // Shows recovery codes once. They are kept nowhere in the browser. onDone runs after the owner
+  // confirms that they are saved.
+  function renderRecoveryCodes({ purpose, username, recoveryCodes, onDone }) {
+    setTabs(null);
+    const intro =
+      purpose === 'reset'
+        ? 'Your password has been changed. Save these new recovery codes before you continue. The old codes no longer work.'
+        : purpose === 'regenerate'
+          ? 'These are your new recovery codes. The codes you had before no longer work. Save these before you leave this page.'
+          : 'Your account is ready. Save these recovery codes before you continue. Each one can reset your password once if you forget it.';
+    const warning =
+      purpose === 'regenerate'
+        ? 'Leaving this page hides these codes for good. You would then need to make a new set.'
+        : 'Do not reload or leave this page before you save them. They are kept nowhere, so after a reload you would sign in and make a new set.';
+    const text = recoveryCodesText(username, recoveryCodes);
     show(
       `<section class="card">
-        <h1>Check your email</h1>
-        <p>If <strong>${escapeHtml(email)}</strong> has an owner account with a password, we have emailed a reset link. Open it on this device to choose a new password.</p>
-        <p><button type="button" class="link" data-switch="signin">Go to sign in</button></p>
+        <h1>Save your recovery codes</h1>
+        <p>${escapeHtml(intro)}</p>
+        <p class="banner" role="note">${escapeHtml(warning)}</p>
+        <p class="muted small">Account: <strong>${escapeHtml(username)}</strong></p>
+        <ol class="recovery-codes">
+          ${recoveryCodes.map((code) => `<li><code>${escapeHtml(code)}</code></li>`).join('')}
+        </ol>
+        <p class="muted small">Keep them private. Anyone with one of these codes can reset this account's password. Only a scrambled form of each code is stored, so they cannot be shown again.</p>
+        <p class="button-row">
+          <button type="button" class="secondary" data-action="copy-codes">Copy codes</button>
+          <button type="button" class="secondary" data-action="download-codes">Download as text</button>
+        </p>
+        <p class="error" data-error role="alert"></p>
+        <label class="check">
+          <input type="checkbox" data-saved />
+          <span>I have saved these codes somewhere safe.</span>
+        </label>
+        <p><button type="button" data-action="codes-done" disabled data-label="Continue">Continue</button></p>
       </section>`
     );
-    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
-  }
-
-  function renderResetPassword(notice = '') {
-    show(`<section class="card">
-      <h1>Choose a new password</h1>
-      <p class="muted small">Use at least 8 characters. This recovery link is short-lived.</p>
-      <form id="reset-form" class="grid">
-        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <button type="submit">Save new password</button>
-        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
-      </form>
-    </section>`);
-    on('#reset-form', 'submit', async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const data = new FormData(form);
-      const password = String(data.get('password') ?? '');
-      if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
-      setBusy(form, true);
+    const done = app.querySelector('[data-action="codes-done"]');
+    app.querySelector('[data-saved]').addEventListener('change', (event) => {
+      done.disabled = !event.currentTarget.checked;
+    });
+    on('[data-action="copy-codes"]', 'click', async () => {
       try {
-        await auth.updatePassword(password);
-        await auth.signOut();
-        renderSignIn('signin', 'Password changed. Sign in with your new password.');
-      } catch (err) {
-        setError(form, friendlyAuthError(err));
-        setBusy(form, false);
+        await navigator.clipboard.writeText(text);
+        setError(app, 'The codes are copied. Paste them somewhere safe.');
+      } catch {
+        setError(app, 'Could not copy from this screen. Select the codes and copy them by hand, or use Download as text.');
       }
+    });
+    on('[data-action="download-codes"]', 'click', () => {
+      try {
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `qrquick-recovery-codes-${username}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch {
+        setError(app, 'Could not download the file. Select the codes and copy them by hand.');
+      }
+    });
+    done.addEventListener('click', () => {
+      done.disabled = true;
+      onDone();
     });
   }
 
-  function friendlyAuthError(err) {
-    if (err instanceof TypeError) return CONNECTION_MESSAGE;
-    if (/invalid login/i.test(err.message)) return 'That email and password do not match an account.';
-    if (/already (registered|exists)/i.test(err.message)) {
-      return 'An account with this email already exists. Sign in instead.';
-    }
-    return err.message;
+  // The owner has saved the codes of a new account or a reset. The server gave a session with
+  // both, so the owner goes straight in. Without one, the owner signs in with the new password.
+  async function finishPendingCodes() {
+    const session = await auth.acknowledgeCodes();
+    if (session) return go([]);
+    return renderSignIn('signin', 'Sign in with your username and new password.');
   }
 
-  // ---------- your shops ----------
+  function leaveRegeneratedCodes() {
+    securityNotice = 'New recovery codes are saved. The old codes no longer work.';
+    go(['security']);
+  }
+
+  // Signed in: make a new set of codes. The current password is needed, so a stolen open session alone is not enough.
+  function renderSecurity(user) {
+    setTabs('more');
+    const notice = securityNotice;
+    securityNotice = '';
+    show(
+      `<section class="card page-head">
+        <p class="eyebrow">MORE</p>
+        <h1>Recovery codes</h1>
+        <p class="small"><span class="muted">Signed in as</span> <strong>${escapeHtml(user?.username ?? '')}</strong></p>
+      </section>
+      <section class="card">
+        <h2>Make new recovery codes</h2>
+        <p class="muted small">Recovery codes reset your password if you forget it. Making a new set stops every code you had before from working. Enter your current password to continue.</p>
+        <form id="codes-form" class="grid" novalidate>
+          ${passwordField('current', 'Current password', 'current-password')}
+          <button type="submit" data-label="Make new codes">Make new codes</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>
+      <p class="notice" data-notice>${escapeHtml(notice)}</p>`
+    );
+    on('#codes-form', 'submit', onCodesSubmit);
+    bindAuthChrome();
+  }
+
+  async function onCodesSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const password = form.elements.current.value;
+    setError(form, '');
+    if (password === '') return setError(form, 'Enter your current password.');
+    setBusy(form, true);
+    try {
+      const made = await auth.regenerateCodes(password);
+      clearPasswords(form);
+      renderRecoveryCodes({
+        purpose: 'regenerate',
+        username: made.username,
+        recoveryCodes: made.recoveryCodes,
+        onDone: leaveRegeneratedCodes,
+      });
+    } catch (err) {
+      clearPasswords(form);
+      if (err.code === 'session_required') {
+        await auth.signOut();
+        return renderSignIn('signin', regenerateErrorMessage(err));
+      }
+      setError(form, regenerateErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
 
   async function renderShopList(user) {
     const shops = await ownerApi.listMyShops(user.id);

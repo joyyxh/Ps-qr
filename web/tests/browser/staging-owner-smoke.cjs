@@ -3,9 +3,9 @@
 //
 // Safety rules for this script:
 //   - Only the publishable key is accepted (sb_publishable_...). Service-role and legacy keys are refused.
-//   - It never confirms an email address, never edits a database row, and never prints a password.
-//   - It creates an account only when STAGING_SIGNUP_EMAIL and STAGING_SIGNUP_PASSWORD are both set,
-//     and it signs in to a dashboard only when STAGING_OWNER_EMAIL and STAGING_OWNER_PASSWORD are both set.
+//   - It never edits a database row, never prints a password, and never creates an account. Accounts are
+//     made only by the live API check (web/tests/live/owner-auth-live.mjs), and no email is used anywhere.
+//   - It signs in to a dashboard only when STAGING_OWNER_USERNAME and STAGING_OWNER_PASSWORD are both set.
 //
 // Environment:
 //   STAGING_SUPABASE_URL      https://<staging-ref>.supabase.co
@@ -23,9 +23,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const BASE = process.env.STAGING_APP_URL || 'http://127.0.0.1:5175/';
 const SUPABASE_URL = process.env.STAGING_SUPABASE_URL || '';
 const PUBLISHABLE_KEY = process.env.STAGING_PUBLISHABLE_KEY || '';
-const SIGNUP_EMAIL = process.env.STAGING_SIGNUP_EMAIL || '';
-const SIGNUP_PASSWORD = process.env.STAGING_SIGNUP_PASSWORD || '';
-const OWNER_EMAIL = process.env.STAGING_OWNER_EMAIL || '';
+const OWNER_USERNAME = process.env.STAGING_OWNER_USERNAME || '';
 const OWNER_PASSWORD = process.env.STAGING_OWNER_PASSWORD || '';
 
 const results = [];
@@ -90,7 +88,7 @@ async function main() {
     );
 
     // 2. An unknown account is refused with a readable message, not a database error.
-    await page.fill('#auth-form input[name=email]', 'no-such-owner.qrquick@example.com');
+    await page.fill('#auth-form input[name=username]', 'no_such_owner_qa');
     await page.fill('#auth-form input[name=password]', 'WrongPassword-2026');
     await page.click('#auth-form button[type=submit]');
     await page.waitForFunction(() => {
@@ -109,41 +107,26 @@ async function main() {
     const afterBack = ((await page.textContent('h1')) || '').trim();
     record('Back from create-account returns to owner sign in (qrquickBack)', handled === true && /Shop owner sign in/i.test(afterBack), `handled ${handled}, now "${afterBack}"`);
 
-    // 3. Registration: the code screen appears, or the restricted-recipient message shows.
-    if (SIGNUP_EMAIL && SIGNUP_PASSWORD) {
-      // A query string makes each load a full navigation, so the sign-in state from step 2 is not reused.
-      await page.goto(BASE + '?run=register#/owner', { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('[data-switch=register]', { timeout: 30000 });
-      await page.click('[data-switch=register]');
-      await page.waitForSelector('#auth-form input[name=password][minlength]', { timeout: 30000 });
-      await page.fill('#auth-form input[name=email]', SIGNUP_EMAIL);
-      await page.fill('#auth-form input[name=password]', SIGNUP_PASSWORD);
-      await page.click('#auth-form button[type=submit]');
-      await page.waitForFunction(() => {
-        if (document.querySelector('[data-action="resend"]')) return true;
-        const el = document.querySelector('[data-error]');
-        return el && el.textContent.trim().length > 0;
-      }, null, { timeout: 60000 });
-      const codeScreen = (await page.$('[data-action="resend"]')) !== null;
-      const message = codeScreen ? 'verification code screen shown' : ((await page.textContent('[data-error]')) || '').trim();
-      if (codeScreen) {
-        record('registration shows the code screen', true, message);
-      } else {
-        // The built-in Supabase email service sends to the project's team addresses only. This message
-        // is the real outcome for any other address, and it is reported, not hidden.
-        info('registration outcome for the test address', message);
-        record('registration gives a clear outcome (no database error)', message.length > 0 && !COLUMN_ERROR.test(message), message);
-      }
-      await page.screenshot({ path: path.join(OUT, '03-register.png'), fullPage: true });
-    } else {
-      info('registration', 'skipped: STAGING_SIGNUP_EMAIL and STAGING_SIGNUP_PASSWORD are not set');
-    }
+    // 3. Registration form: a username and a password, no email, the Terms and Privacy links, and the password rules.
+    // A query string makes each load a full navigation, so the sign-in state from step 2 is not reused.
+    await page.goto(BASE + '?run=register#/owner', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-switch=register]', { timeout: 30000 });
+    await page.click('[data-switch=register]');
+    await page.waitForSelector('#auth-form input[name=username]', { timeout: 30000 });
+    const emailFields = await page.locator('#auth-form input[name=email]').count();
+    record('sign-up asks for no email address', emailFields === 0, `email fields ${emailFields}`);
+    const termsLinks = await page.locator('a[href="#/terms"]').count();
+    const privacyLinks = await page.locator('a[href="#/privacy"]').count();
+    record('sign-up links to the Terms and the Privacy Policy', termsLinks === 1 && privacyLinks === 1, `terms ${termsLinks}, privacy ${privacyLinks}`);
+    const ruleItems = await page.locator('[data-rules] li').count();
+    record('sign-up shows the six password rules', ruleItems === 6, `${ruleItems} rules`);
+    await page.screenshot({ path: path.join(OUT, '03-register.png'), fullPage: true });
 
     // 4. A verified owner signs in and every dashboard tab renders.
-    if (OWNER_EMAIL && OWNER_PASSWORD) {
+    if (OWNER_USERNAME && OWNER_PASSWORD) {
       await page.goto(BASE + '?run=owner#/owner', { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('#auth-form', { timeout: 30000 });
-      await page.fill('#auth-form input[name=email]', OWNER_EMAIL);
+      await page.fill('#auth-form input[name=username]', OWNER_USERNAME);
       await page.fill('#auth-form input[name=password]', OWNER_PASSWORD);
       await page.click('#auth-form button[type=submit]');
       await page.waitForSelector('[data-tab]', { timeout: 60000 });
@@ -159,7 +142,7 @@ async function main() {
         await page.screenshot({ path: path.join(OUT, `05-tab-${tab}.png`), fullPage: true });
       }
     } else {
-      info('owner dashboard', 'skipped: STAGING_OWNER_EMAIL and STAGING_OWNER_PASSWORD are not set');
+      info('owner dashboard', 'skipped: STAGING_OWNER_USERNAME and STAGING_OWNER_PASSWORD are not set');
     }
 
     record('no uncaught page errors during the run', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));

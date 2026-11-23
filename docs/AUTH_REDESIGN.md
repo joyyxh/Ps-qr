@@ -35,8 +35,10 @@ Supabase Auth (GoTrue) stays the session authority, so RLS, refresh, and logout 
   `raw_app_meta_data.owner_flow = 'username-v1'` and its email ends in `@accounts.qrquick.invalid`.
   `app_metadata` can be set only by the admin API, so a public `/auth/v1/signup` call with an email
   address is refused by the database, even if the dashboard still allows email sign-up.
-- **Recovery codes**: 10 per account, 16 characters from a 32-character alphabet with no `0 O 1 I L`
-  (80 bits each), shown once. Stored as bcrypt hashes (`crypt(code, gen_salt('bf', 8))`), single use. The
+- **Recovery codes**: 10 per account, 16 characters from a 31-symbol alphabet
+  (`ABCDEFGHJKMNPQRSTUVWXYZ23456789`: no `0 O 1 I L`), shown as four groups of four and once only. Each code
+  carries about 79 bits (16 × log2 31). Bytes at or above 248 are discarded before `% 31`, so every symbol is
+  equally likely. Stored as bcrypt hashes (`crypt(code, gen_salt('bf', 8))`), single use. The
   whole set is replaced on a successful reset and on an explicit regenerate.
 - **Terms and Privacy acceptance** is checked by the function against `legal_documents` (current versions
   only). Acceptance rows (`owner_policy_acceptances`) are written server-side with a timestamp. A signup
@@ -92,12 +94,12 @@ Supabase Auth (GoTrue) stays the session authority, so RLS, refresh, and logout 
 | Migration `0021_owner_username_auth` on staging (two migrations: `owner_username_auth`, `owner_guard_revoke_execute`), verified in a rolled-back transaction, advisors re-run | Done (staging) |
 | `owner-auth` function: 30 unit tests against a mocked GoTrue/PostgREST pass (`web/tests/owner-auth-function.test.js`) | Done |
 | `owner-auth` deployed to staging, `verify_jwt = false`, status ACTIVE | Done (staging) |
-| Live staging checks (signup, duplicate, sign-in, reset, terms refusal, rate limit, direct email signup refused) | Pending CI (B9) |
-| Client: `auth.js`, `session.js`, `logic.js`, `owner.js` screens, `app.js` routes, Terms/Privacy pages | Pending |
-| Email code removed (`pending-signup.js`, OTP paths, recovery by email) | Pending |
-| Local tests (`npm test`, browser smokes against mocks) | Pending |
-| Live staging CI workflow | Pending |
-| Commit and push to `stage7-implementation-2026-11-13` | Pending |
+| Live staging checks, `web/tests/live/owner-auth-live.mjs` run by `owner-auth-staging.yml`: policies, terms refusal, weak password, reserved name, sign-up with the `.invalid` address, duplicate, sign-in, reset with a code, a stale code refused, new codes, rate limit | Written. Not run yet: this sandbox cannot reach staging, so the first CI run is the proof for B2 and B9. Refusing direct email sign-up is not in the script; it depends on the dashboard setting (B3). |
+| Client: `auth.js`, `session.js`, `logic.js`, `owner.js` screens, `app.js` routes, `legal.js` Terms and Privacy pages | Done locally. The Terms and Privacy text is a DRAFT with [bracketed] placeholders that the operator must complete and approve. |
+| Email code removed: `pending-signup.js` and its test deleted; OTP, email recovery and email sign-up removed from the client | Done locally |
+| Local tests: `npm test` 258 of 258; browser smokes against mocks: owner-smoke 43/43, owner-shell-smoke 51/51, registration-smoke 44/44, qr-smoke 12/12, licence-smoke 33/33, features-smoke 24/24, stats-smoke exit 0 | Pass |
+| Staging browser smoke (`staging-owner-smoke.cjs`) moved to usernames; its owner secrets are now `STAGING_OWNER_USERNAME` and `STAGING_OWNER_PASSWORD` | Done; not run against staging (needs the owner secret) |
+| Commit and push to `stage7-implementation-2026-11-13` | Pending until pushed; see the branch log |
 
 ## 6. Fallbacks if a step fails
 

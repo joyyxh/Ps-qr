@@ -1,3 +1,5 @@
+import { checkPassword, PASSWORD_RULE_TEXT } from './owner-rules.js';
+
 // Pure helpers: no DOM and no network access, so they can be unit tested
 // with Node's built-in test runner (see tests/).
 
@@ -832,89 +834,119 @@ export function publicAssetUrl(supabaseUrl, path) {
   return `${String(supabaseUrl).replace(/\/$/, '')}/storage/v1/object/public/shop-assets/${encoded}`;
 }
 
-// ---------- owner accounts: registration, verification and sign-in (owner.js, auth.js) ----------
-// The server decides how long a code lasts and how often codes can be sent. These
-// helpers only shape what the owner sees. Supabase codes are 6 digits by default, and
-// the project can change that, so the page accepts 6 to 10.
-export const OTP_RESEND_SECONDS = 60;
-export const PASSWORD_MIN_LENGTH = 8;
+// ---------- owner accounts: username, password and recovery codes (owner.js, auth.js) ----------
+// The server decides every rule that matters (supabase/functions/owner-auth). These helpers only
+// shape what the owner sees. The same password and username rules run in the browser
+// (owner-rules.js), so a mistake shows before a request is sent. Nothing here stores anything.
+
 const CONNECTION_TEXT = 'Could not reach the server. Check your internet connection and try again.';
+const SERVER_TEXT = 'Something went wrong. Try again.';
+const NOT_CONFIGURED_TEXT = 'Sign-in is not set up on this server yet. Ask QRquick for help.';
 
-// Seconds left before a new code may be requested. 0 means the owner may resend now.
-export function resendWaitSeconds(sentAtMs, nowMs, cooldownSeconds = OTP_RESEND_SECONDS) {
-  if (!sentAtMs) return 0;
-  return Math.max(0, Math.ceil((sentAtMs + cooldownSeconds * 1000 - nowMs) / 1000));
+// A TypeError means the request never reached the server (no network, blocked, aborted).
+function serverUnreachable(err) {
+  return err instanceof TypeError;
 }
 
-export function isOtpCode(value) {
-  return /^\d{6,10}$/.test(String(value ?? '').trim());
+// Turns a failed sign-up into one sentence. Server messages are already written for the owner.
+export function signUpErrorMessage(err) {
+  if (serverUnreachable(err)) return CONNECTION_TEXT;
+  switch (err?.code) {
+    case 'username_taken':
+      return 'That username is already taken. Choose another.';
+    case 'username_required':
+    case 'username_length':
+    case 'username_chars':
+    case 'username_reserved':
+    case 'weak_password':
+    case 'password_rejected':
+      return err.message || 'Check the username and password, then try again.';
+    case 'terms_required':
+      return 'Accept the current Terms and Privacy Policy to create an account. If they have just changed, read them again and accept.';
+    case 'rate_limited':
+      return 'Too many sign-up attempts from this device. Wait an hour, then try again.';
+    case 'not_configured':
+      return NOT_CONFIGURED_TEXT;
+    default:
+      return err?.message || SERVER_TEXT;
+  }
 }
 
-export function isEmailAddress(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? '').trim());
+// Turns a failed sign-in into one sentence. The wrong-username and wrong-password cases read the same
+// on purpose, so the screen does not reveal which usernames exist.
+export function signInErrorMessage(err) {
+  if (serverUnreachable(err)) return CONNECTION_TEXT;
+  switch (err?.code) {
+    case 'invalid_credentials':
+      return 'That username or password is not right.';
+    case 'password_required':
+      return 'Enter your password.';
+    case 'rate_limited':
+      return 'Too many sign-in attempts. Wait 15 minutes, then try again.';
+    case 'not_configured':
+      return NOT_CONFIGURED_TEXT;
+    default:
+      return err?.message || SERVER_TEXT;
+  }
 }
 
-export function isNewPassword(value) {
-  return String(value ?? '').length >= PASSWORD_MIN_LENGTH;
+// Turns a failed reset with a recovery code into one sentence.
+export function resetErrorMessage(err) {
+  if (serverUnreachable(err)) return CONNECTION_TEXT;
+  switch (err?.code) {
+    case 'reset_failed':
+      return 'That username or recovery code is not right.';
+    case 'weak_password':
+      return 'Your new password does not meet all the rules. The list above shows what is missing.';
+    case 'password_rejected':
+      return err.message || 'That password is not accepted. Choose a different one. Your recovery code was used, so use another code.';
+    case 'rate_limited':
+      return 'Too many reset attempts. Wait an hour, then try again.';
+    case 'not_configured':
+      return NOT_CONFIGURED_TEXT;
+    default:
+      return err?.message || SERVER_TEXT;
+  }
 }
 
-// Supabase's built-in email sender delivers only to addresses on the project's team and
-// refuses every other address. Until custom email (SMTP) is set up, no code can reach
-// such an owner, so the message says so instead of asking them to wait for a code.
-export const EMAIL_NOT_AUTHORIZED_TEXT =
-  'QRquick cannot send the code to this address yet. Ask QRquick to finish the email setup, then try again.';
-// Supabase allows only a few emails to one address each hour (2 with the built-in sender).
-export const EMAIL_LIMIT_TEXT =
-  'Emails have already been sent to this address. Wait about an hour before asking for another code, then check your inbox and spam folder.';
-
-function isEmailNotAuthorized(err) {
-  return err?.code === 'email_address_not_authorized' || /email address .*not authorized/i.test(String(err?.message ?? ''));
+// Turns a failed request for new recovery codes into one sentence.
+export function regenerateErrorMessage(err) {
+  if (serverUnreachable(err)) return CONNECTION_TEXT;
+  switch (err?.code) {
+    case 'password_incorrect':
+      return 'The current password is not right.';
+    case 'password_required':
+      return 'Enter your current password.';
+    case 'session_required':
+      return 'Your sign-in has ended. Sign in again to make new codes.';
+    case 'rate_limited':
+      return 'Too many attempts. Wait an hour, then try again.';
+    case 'not_configured':
+      return NOT_CONFIGURED_TEXT;
+    default:
+      return err?.message || SERVER_TEXT;
+  }
 }
 
-// Turns a failed verify or resend into a sentence for the owner. Supabase reports an
-// expired code and a wrong code with the same message, so both get the same advice.
-export function otpErrorMessage(err, stage = 'verify') {
-  if (err instanceof TypeError) return CONNECTION_TEXT;
-  const text = String(err?.message ?? '');
-  const status = err?.status;
-  if (isEmailNotAuthorized(err)) return EMAIL_NOT_AUTHORIZED_TEXT;
-  if (err?.code === 'over_email_send_rate_limit') return EMAIL_LIMIT_TEXT;
-  if (status === 429) {
-    if (err?.code === 'over_request_rate_limit') {
-      return 'Too many requests from this device. Wait a few minutes, then try again.';
-    }
-    return stage === 'resend'
-      ? 'Too many codes have been requested. Wait a minute, then try again.'
-      : 'Too many attempts. Wait a few minutes, then request a new code.';
-  }
-  if (stage === 'resend') return text || 'The code could not be sent. Try again.';
-  if ([400, 401, 403, 422].includes(status)) {
-    return 'That code is not right or has expired. Check the newest email, or request a new code.';
-  }
-  return text || 'The code could not be checked. Try again.';
+// One line per password rule, in a fixed order, for the live checklist beside the password box.
+export function passwordChecklist(password, username = '') {
+  const { failures } = checkPassword(password, username);
+  return Object.keys(PASSWORD_RULE_TEXT).map((key) => ({
+    key,
+    label: PASSWORD_RULE_TEXT[key],
+    met: !failures.includes(key),
+  }));
 }
 
-// Turns a failed password sign-in, registration or reset request into a sentence.
-// The unverified-owner case (code email_not_confirmed) is handled by the screen itself.
-export function accountErrorMessage(err) {
-  if (err instanceof TypeError) return CONNECTION_TEXT;
-  const code = err?.code;
-  const text = String(err?.message ?? '');
-  if (isEmailNotAuthorized(err)) return EMAIL_NOT_AUTHORIZED_TEXT;
-  if (code === 'over_email_send_rate_limit') return EMAIL_LIMIT_TEXT;
-  if (err?.status === 429) return 'Too many attempts. Wait a few minutes, then try again.';
-  if (code === 'invalid_credentials' || /invalid login/i.test(text)) {
-    return 'That email and password do not match an account.';
-  }
-  if (code === 'user_already_exists' || code === 'email_exists' || /already (registered|exists)/i.test(text)) {
-    return 'An account with this email already exists. Sign in with your password instead.';
-  }
-  if (code === 'email_provider_disabled') {
-    return 'Sign-up with email and password is switched off for this project. Ask QRquick for help.';
-  }
-  if (code === 'signup_disabled' || /signups? not allowed/i.test(text)) {
-    return 'New owner accounts cannot be created right now. Ask QRquick for help.';
-  }
-  if (code === 'weak_password') return 'Choose a password that is harder to guess, with at least 8 characters.';
-  return text || 'Something went wrong. Try again.';
+// The plain text the owner can copy or download. Codes are shown once, so this is the only copy.
+export function recoveryCodesText(username, codes) {
+  return [
+    'QRquick recovery codes',
+    `Account: ${username}`,
+    '',
+    'Each code resets the password once. Keep them private.',
+    '',
+    ...codes.map((code, index) => `${index + 1}. ${code}`),
+    '',
+  ].join('\n');
 }

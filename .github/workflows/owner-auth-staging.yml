@@ -1,0 +1,40 @@
+name: Owner sign-in and recovery (live staging backend)
+
+# Runs web/tests/live/owner-auth-live.mjs against the REAL qrquick-staging project (nbzojqlqkrydcjtogwrb).
+# It uses the staging publishable key only. There is no service-role key and no repository secret here.
+# The script creates throwaway accounts named qa_live_* on staging. It cannot reach production: it refuses
+# any other Supabase project and any key that is not a publishable key.
+#
+# This is the proof for the parts the sandbox cannot reach (the sandbox proxy blocks the staging API host):
+# GoTrue accepting the internal .invalid address, and the server-side rules and rate limits.
+
+on:
+  push:
+    branches:
+      - stage7-implementation-2026-11-13
+    paths:
+      - 'web/tests/live/**'
+      - 'supabase/functions/owner-auth/**'
+      - 'supabase/migrations/0021_owner_username_auth.sql'
+      - '.github/workflows/owner-auth-staging.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-owner-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run the owner sign-in and recovery checks against staging
+        run: node web/tests/live/owner-auth-live.mjs

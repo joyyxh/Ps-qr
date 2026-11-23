@@ -94,7 +94,7 @@ function newSession() {
     access_token: `owner-token-${tokenCounter}`,
     refresh_token: 'refresh-1',
     expires_in: 3600,
-    user: { id: 'owner-1', email: 'owner@example.com' },
+    user: { id: 'owner-1', username: 'owner_demo' },
   };
 }
 
@@ -136,15 +136,15 @@ async function handleSupabase(route) {
   const shopFields = (shop) => ({ ...shop });
 
   // ----- Auth -----
-  if (url.pathname === '/auth/v1/token') {
-    const grant = url.searchParams.get('grant_type');
-    if (grant === 'password') {
-      if (body.password !== 'correct-horse') {
-        return json(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
-      }
-      return json(200, newSession());
+  // Owner sign-in is username and password, through the owner-auth function (no email).
+  if (url.pathname === '/functions/v1/owner-auth/signin') {
+    if (body.username !== 'owner_demo' || body.password !== 'correct-horse') {
+      return json(401, { code: 'invalid_credentials', message: 'That username or password is not right.' });
     }
-    if (grant === 'refresh_token') return json(200, newSession());
+    return json(200, { username: 'owner_demo', session: newSession() });
+  }
+  if (url.pathname === '/auth/v1/token') {
+    if (url.searchParams.get('grant_type') === 'refresh_token') return json(200, newSession());
   }
   if (url.pathname === '/auth/v1/logout') return json(204, null);
 
@@ -304,7 +304,7 @@ function wire(page, problems) {
 async function signIn(page) {
   await page.goto(`${BASE}#/owner`);
   await page.locator('#auth-form').waitFor();
-  await page.fill('#auth-form input[name=email]', 'owner@example.com');
+  await page.fill('#auth-form input[name=username]', 'owner_demo');
   await page.fill('#auth-form input[name=password]', 'correct-horse');
   await page.click('#auth-form button[type=submit]');
   await waitText(page, 'Demo Xerox Centre');

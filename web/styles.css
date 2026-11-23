@@ -428,3 +428,19 @@ input[type='file']::file-selector-button { font: inherit; font-weight: 700; colo
   main#app:has(.stats-periods) > section.card:has(.table-wrap),
   main#app:has(.stats-periods) > section.card:has(.week-nav) { grid-column: 1 / -1; }
 }
+
+/* Owner sign in, registration and recovery codes */
+.password-field { display: flex; gap: 8px; align-items: center; }
+.password-field input { flex: 1 1 auto; min-width: 0; }
+.password-field button.link { flex: 0 0 auto; padding: 9px 6px; }
+.checklist { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: .9rem; color: var(--muted); }
+.checklist li.met { color: var(--ok); }
+.rule-mark { display: inline-block; width: 1.2em; font-weight: 750; }
+label.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; }
+label.check input[type='checkbox'] { width: auto; margin-top: 4px; flex: 0 0 auto; }
+.recovery-codes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin: 14px 0; padding-left: 1.6em; }
+.recovery-codes code { font-size: 1.05rem; letter-spacing: .04em; }
+.button-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.legal h2 { margin-top: 22px; font-size: 1.05rem; }
+.legal ul { padding-left: 1.3em; }
+.legal li { margin: 4px 0; }

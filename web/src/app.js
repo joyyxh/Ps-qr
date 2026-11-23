@@ -2,6 +2,7 @@ import { createApi } from './api.js';
 import { createAuth } from './auth.js';
 import { createOwnerApi } from './owner-api.js';
 import { createOwnerPages } from './owner.js';
+import { renderLegalPage } from './legal.js';
 import { isPhotoFile } from './photo-edit.js';
 import { openPhotoEditor } from './photo-editor.js';
 import { browserSessionStorage, createSessionStore } from './session.js';
@@ -28,7 +29,7 @@ if (config?.ownerApp) document.body.classList.add('owner-app');
 
 // Android Back (MainActivity asks the page first). On a sign-in side screen, Back returns to the owner sign-in
 // screen instead of closing the app. The WebView history cannot be relied on for this on every device.
-const OWNER_SIDE_SCREEN = /^#\/owner\/(register|forgot|verify|reset)$/;
+const OWNER_SIDE_SCREEN = /^#\/owner\/(register|forgot)$/;
 window.qrquickBack = () => {
   if (!config?.ownerApp || !OWNER_SIDE_SCREEN.test(window.location.hash)) return false;
   window.location.hash = '#/owner';
@@ -36,8 +37,7 @@ window.qrquickBack = () => {
 };
 
 // Called by MainActivity when the app comes back to the front. A create-account or forgot-password form that was
-// left open is closed, so the app reopens on the protected sign-in screen. The code screen stays open, because the
-// code arrives by email and people leave the app to read it.
+// left open is closed, so the app reopens on the protected sign-in screen.
 window.qrquickResume = () => {
   if (config?.ownerApp && /^#\/owner\/(register|forgot)$/.test(window.location.hash)) window.location.hash = '#/owner';
 };
@@ -58,26 +58,12 @@ if (!config?.supabaseUrl || !config?.publishableKey) {
   api = createApi(config);
   const auth = createAuth({ config, store: createSessionStore(browserSessionStorage()) });
   owner = createOwnerPages({ app, auth, ownerApi: createOwnerApi({ config, auth }), config });
-  startApp(auth);
+  startApp();
 }
 
-async function startApp(auth) {
+function startApp() {
   applyTheme(loadTheme());
   bindThemePicker();
-  const callback = await auth.consumeCallback(window.location.hash);
-  if (callback.handled) {
-    // Access and refresh tokens arrive in the fragment. Remove them before
-    // rendering anything so they are not retained in browser history.
-    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
-    if (callback.error) {
-      app.innerHTML = `<section class="card"><h1>Email confirmation failed</h1>
-        <p class="error">${escapeHtml(callback.error.message)}</p>
-        <p><a class="button" href="#/owner">Return to owner sign in</a></p></section>`;
-      window.addEventListener('hashchange', route);
-      return;
-    }
-    window.location.hash = callback.type === 'recovery' ? '#/owner/reset' : '#/owner';
-  }
   window.addEventListener('hashchange', route);
   route();
 }
@@ -88,13 +74,23 @@ function route() {
   const parts = window.location.hash.replace(/^#\/?/, '').split('/').map(safeDecode);
   const [kind = '', value = ''] = parts;
 
+  // The terms and privacy pages are public: they open without signing in, in the owner app too.
+  if (kind === 'terms' || kind === 'privacy') return renderLegalPage(app, kind, { ownerApp: Boolean(config?.ownerApp) });
+
   if (config?.ownerApp && kind !== 'owner') return owner.render([]);
 
   if (!kind || kind === 'home') return renderHome();
   if (kind === 'scan') return renderScan();
   if (kind === 's' && value) return renderShop(value);
   if (kind === 'track') return renderTrack(value);
-  if (kind === 'owner') return owner.render(parts.slice(1));
+  if (kind === 'owner') {
+    // The email verification and password reset screens were removed. Their addresses go to sign in.
+    if (value === 'verify' || value === 'reset') {
+      window.location.hash = '#/owner';
+      return;
+    }
+    return owner.render(parts.slice(1));
+  }
   return renderNotFound();
 }
 

@@ -24,8 +24,16 @@ const shot = (name) => path.join(OUT_DIR, `${MODE}-${name}`);
 
 const SHOP_ID = 'bbbbbbbb-0000-0000-0000-000000000001';
 const SLUG = 'demo-xerox';
-const EMAIL = 'owner@example.com';
-const PASSWORD = 'correct-horse';
+const USERNAME = 'owner_demo';
+const TAKEN_USERNAME = 'taken_name';
+const PASSWORD = 'Correct-Horse-9';
+const POLICY_VERSION = '2026-11-22.1';
+const POLICIES = {
+  terms: { version: POLICY_VERSION, title: 'Terms and Conditions', effective_at: '2026-11-22T00:00:00Z' },
+  privacy: { version: POLICY_VERSION, title: 'Privacy Policy', effective_at: '2026-11-22T00:00:00Z' },
+};
+const VALID_RECOVERY = 'ABCDEFGHJKMNPQRS';
+const RECOVERY_CODES = Array.from({ length: 10 }, (_, i) => `ABCD-EFGH-JKMN-P${String(i).padStart(3, '0')}`);
 const TAB_NAMES = ['Home', 'Orders', 'Prices', 'Stats', 'More'];
 
 const state = {
@@ -63,7 +71,7 @@ function session() {
     refresh_token: 'owner-refresh-1',
     expires_in: 3600,
     token_type: 'bearer',
-    user: { id: 'owner-1', email: EMAIL },
+    user: { id: 'owner-1', username: USERNAME },
   };
 }
 
@@ -85,22 +93,55 @@ async function handleSupabase(route) {
   }
 
   if (url.pathname === '/auth/v1/token') {
-    if (body.password !== PASSWORD) {
-      return json(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
-    }
-    state.signedIn = true;
-    return json(200, session());
+    // The owner app only refreshes through Auth now. Sign-in goes through owner-auth below.
+    if (url.searchParams.get('grant_type') === 'refresh_token' && state.signedIn) return json(200, session());
+    return json(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' });
   }
   if (url.pathname === '/auth/v1/logout') {
     state.signedIn = false;
     state.logouts += 1;
     return json(204, null);
   }
-  if (url.pathname === '/auth/v1/signup') {
-    state.signups += 1;
-    return json(200, { id: 'owner-2', email: body.email });
+  if (url.pathname.startsWith('/functions/v1/owner-auth/')) {
+    // The owner-auth function: sign-in, sign-up, recovery and the public Terms versions.
+    const action = url.pathname.slice('/functions/v1/owner-auth/'.length);
+    if (action === 'policies') return json(200, POLICIES);
+    if (action === 'signin') {
+      if (body.username !== USERNAME || body.password !== PASSWORD) {
+        return json(401, { code: 'invalid_credentials', message: 'That username or password is not right.' });
+      }
+      state.signedIn = true;
+      return json(200, { username: USERNAME, session: session() });
+    }
+    if (action === 'signup') {
+      if (body.accept?.terms !== POLICY_VERSION || body.accept?.privacy !== POLICY_VERSION) {
+        return json(400, { code: 'terms_required', message: 'Accept the current Terms and Privacy Policy.' });
+      }
+      if (body.username === TAKEN_USERNAME) {
+        return json(409, { code: 'username_taken', message: 'That username is already taken. Choose another.' });
+      }
+      if (typeof body.password !== 'string' || body.password.length < 10) {
+        return json(400, { code: 'weak_password', message: 'Your password does not meet all the rules.' });
+      }
+      state.signups += 1;
+      state.signedIn = true;
+      return json(201, { username: body.username, recovery_codes: RECOVERY_CODES, session: session() });
+    }
+    if (action === 'reset') {
+      if (body.recovery_code !== VALID_RECOVERY) {
+        return json(401, { code: 'reset_failed', message: 'That username or recovery code is not right.' });
+      }
+      state.signedIn = true;
+      return json(200, { username: USERNAME, recovery_codes: RECOVERY_CODES, session: session() });
+    }
+    if (action === 'codes/regenerate') {
+      if (body.current_password !== PASSWORD) {
+        return json(401, { code: 'password_incorrect', message: 'The current password is not right.' });
+      }
+      return json(200, { username: USERNAME, recovery_codes: RECOVERY_CODES });
+    }
+    return json(404, { code: 'not_found', message: 'Not found.' });
   }
-  if (url.pathname === '/auth/v1/resend') return json(200, {});
   if (url.pathname === '/rest/v1/shop_memberships') {
     return json(200, state.signedIn ? state.shops.map((shop) => ({ role: 'owner', shop: { ...shop } })) : []);
   }
@@ -169,32 +210,55 @@ async function main() {
     await page.locator('#auth-form').waitFor();
     await page.click('[data-switch="register"]');
     await page.locator('h1', { hasText: 'Create an owner account' }).waitFor();
-    check('registration screen opens', (await page.locator('#auth-form input[name=email]').count()) === 1);
-    check('registration asks for a password of at least 8 characters', (await page.locator('#auth-form input[name=password][minlength="8"]').count()) === 1);
+    check('registration asks for a username, a password and a confirmation', (await page.locator('#auth-form input[name=username]').count()) === 1 && (await page.locator('#auth-form input[name=password]').count()) === 1 && (await page.locator('#auth-form input[name=confirm]').count()) === 1);
+    check('registration has no email field', (await page.locator('#auth-form input[name=email]').count()) === 0);
+    check('registration shows the six password rules', (await page.locator('[data-rules] li').count()) === 6);
+    check('registration links to the Terms and the Privacy Policy', (await page.locator('a[href="#/terms"]').count()) === 1 && (await page.locator('a[href="#/privacy"]').count()) === 1);
     // Back (the browser Back button, which Android Back also uses) returns to sign in, not out of the app.
     await page.goBack();
     await page.locator('h1', { hasText: 'Shop owner sign in' }).waitFor();
-    check('Back from registration returns to sign in', (await page.locator('#auth-form input[name=email]').count()) === 1);
+    check('Back from registration returns to sign in', (await page.locator('#auth-form input[name=username]').count()) === 1);
     await page.click('[data-switch="register"]');
     await page.locator('h1', { hasText: 'Create an owner account' }).waitFor();
     await page.screenshot({ path: shot('register-390.png'), fullPage: true });
-    await page.fill('#auth-form input[name=email]', EMAIL);
-    await page.fill('#auth-form input[name=password]', PASSWORD);
+
+    // Each refusal shows its own message and sends no account request.
+    const errorText = async () => (await page.locator('#auth-form [data-error]').innerText()).trim();
+    await page.fill('#auth-form input[name=username]', USERNAME);
+    await page.fill('#auth-form input[name=password]', 'short');
+    await page.fill('#auth-form input[name=confirm]', 'short');
     await page.click('#auth-form button[type=submit]');
-    await page.locator('h1', { hasText: 'Check your email' }).waitFor();
-    check('sign-up sends the owner to the verification code screen', state.signups === 1);
-    check('verification asks for the one-time code', (await page.locator('#auth-form input[name=token]').count()) === 1);
-    await page.screenshot({ path: shot('verify-390.png'), fullPage: true });
+    check('a weak password is refused on the page', /does not meet all the rules/.test(await errorText()));
+    await page.fill('#auth-form input[name=password]', PASSWORD);
+    await page.fill('#auth-form input[name=confirm]', 'Different-Horse-9');
+    await page.click('#auth-form button[type=submit]');
+    check('a mismatched confirmation is refused', /do not match/.test(await errorText()));
+    await page.fill('#auth-form input[name=confirm]', PASSWORD);
+    await page.click('#auth-form button[type=submit]');
+    check('the terms must be accepted before the account is made', /Accept the Terms/.test(await errorText()));
+    check('no account request is sent before the terms are accepted', state.signups === 0);
+    await page.check('#auth-form input[name=accept]');
+    await page.fill('#auth-form input[name=username]', TAKEN_USERNAME);
+    await page.click('#auth-form button[type=submit]');
+    await page.locator('#auth-form [data-error]', { hasText: 'already taken' }).waitFor();
+    check('a taken username is reported on the page', true);
+    check('a taken username makes no account', state.signups === 0);
+
+    await page.fill('#auth-form input[name=username]', USERNAME);
+    await page.click('#auth-form button[type=submit]');
+    await page.locator('h1', { hasText: 'Save your recovery codes' }).waitFor();
+    check('the new account shows ten recovery codes', (await page.locator('.recovery-codes li').count()) === 10);
+    check('Continue waits until the codes are confirmed as saved', await page.locator('[data-action="codes-done"]').isDisabled());
+    check('no session is kept before the codes are confirmed', (await page.evaluate(() => sessionStorage.getItem('qrquick.owner.session'))) === null);
+    await page.screenshot({ path: shot('codes-390.png'), fullPage: true });
+
+    // A reload loses the codes (they are kept nowhere in the browser), so the owner signs in again.
+    await page.reload();
+    await page.locator('#auth-form').waitFor();
+    check('a reload does not show the codes again', (await page.locator('.recovery-codes').count()) === 0);
 
     // ----- 2. Sign in and land on Home with five tabs -----
-    // Reload on the code screen: the address is remembered for this tab, so the code screen comes back.
-    await page.reload();
-    await page.locator('h1', { hasText: 'Check your email' }).waitFor();
-    check('a reload keeps the code screen and the address', (await page.locator('#auth-form input[name=token]').count()) === 1 && (await page.getByText(EMAIL).count()) >= 1);
-    // Already verified? goes to sign in with the password.
-    await page.click('[data-switch="signin"]');
-    await page.locator('#auth-form').waitFor();
-    await page.fill('#auth-form input[name=email]', EMAIL);
+    await page.fill('#auth-form input[name=username]', USERNAME);
     await page.fill('#auth-form input[name=password]', PASSWORD);
     await page.click('#auth-form button[type=submit]');
     await tab('home').waitFor();
@@ -239,7 +303,8 @@ async function main() {
     await page.locator('#owner-tabbar a[data-tab="more"][aria-current="page"]').waitFor();
     check('More shows the shop QR code', (await page.getByRole('heading', { name: 'Shop QR code' }).count()) === 1);
     check('More shows the shop details form', (await page.locator('#details-form').count()) === 1);
-    check('More shows the account email', (await page.getByText(EMAIL).count()) >= 1);
+    check('More shows the username', (await page.getByText(USERNAME, { exact: false }).count()) >= 1);
+    check('More links to the recovery codes', (await page.locator('a[href="#/owner/security"]').count()) === 1);
     check('More is the current tab', (await tab('more').getAttribute('aria-current')) === 'page');
     await page.screenshot({ path: shot('more-390.png'), fullPage: true });
 
