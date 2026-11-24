@@ -9,10 +9,17 @@ values
   ('aaaaaaaa-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'owner_other@accounts.qrquick.invalid', now(), now(), '{"provider":"email","providers":["email"],"owner_flow":"username-v1"}', '{}')
 on conflict (id) do nothing;
 
-insert into public.owner_usernames (username, user_id) values
-  ('owner_demo',  'aaaaaaaa-0000-0000-0000-000000000001'),
-  ('owner_other', 'aaaaaaaa-0000-0000-0000-000000000002')
-on conflict do nothing;
+-- The username table comes from migration 0021. The owner catch-up rehearsal loads this seed before that migration,
+-- so the insert runs only when the table exists.
+do $$
+begin
+  if to_regclass('public.owner_usernames') is not null then
+    insert into public.owner_usernames (username, user_id) values
+      ('owner_demo',  'aaaaaaaa-0000-0000-0000-000000000001'),
+      ('owner_other', 'aaaaaaaa-0000-0000-0000-000000000002')
+    on conflict do nothing;
+  end if;
+end $$;
 
 insert into public.shops (id, slug, name, phone, address) values
   ('bbbbbbbb-0000-0000-0000-000000000001', 'demo-xerox',   'Demo Xerox Centre', '+91 98765 00001', 'Main Road, Ranchi'),
