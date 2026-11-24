@@ -4,9 +4,10 @@
 // Environment:
 //   PLAYWRIGHT_MODULE     path to the playwright package (CI installs playwright@1.63.0 outside the repository)
 //   QRQUICK_EXECUTABLE    the built executable: the unpacked Linux binary, or the installed QRquick.exe
-//   QRQUICK_MODE          production (default): the shipped build. Checks the sign-in screen and its configuration.
-//                         staging-probe: the TEST-ONLY staging copy (QRQUICK_TEST_WEB_DIR). Submits one wrong
-//                         password for a made-up address, to check the readable refusal.
+//   QRQUICK_MODE          production (default): the shipped build for the production project. Used only once approved.
+//                         staging-package: the packaged TEST build (staging project). Checks its configuration and
+//                         that a wrong password for a made-up address gets a readable refusal.
+//                         staging-probe: the TEST-ONLY staging copy (QRQUICK_TEST_WEB_DIR), same checks.
 //   QRQUICK_TEST_WEB_DIR  folder of the test-only copy (staging-probe mode only)
 //   QRQUICK_SMOKE_OUT     folder for screenshots and results.json
 'use strict';
@@ -36,8 +37,8 @@ async function main() {
     console.error(`QRQUICK_EXECUTABLE is not set or does not exist: "${EXECUTABLE}"`);
     process.exit(2);
   }
-  if (!['production', 'staging-probe'].includes(MODE)) {
-    console.error(`QRQUICK_MODE must be production or staging-probe (got "${MODE}")`);
+  if (!['production', 'staging-package', 'staging-probe'].includes(MODE)) {
+    console.error(`QRQUICK_MODE must be production, staging-package or staging-probe (got "${MODE}")`);
     process.exit(2);
   }
 
@@ -89,11 +90,11 @@ async function main() {
       await page.screenshot({ path: path.join(OUT, '01-signin-production.png'), fullPage: true });
     } else {
       record(
-        'the test copy uses the staging project (test only, not in the release)',
+        'the app uses the staging project (TEST build only, not for distribution)',
         !!served && served.supabaseUrl === `https://${STAGING_REF}.supabase.co` && served.ownerApp === true,
         served ? served.supabaseUrl : 'no config loaded'
       );
-      await page.fill('#auth-form input[name=email]', 'no-such-owner.qrquick@example.com');
+      await page.fill('#auth-form input[name=username]', 'no_such_owner');
       await page.fill('#auth-form input[name=password]', 'WrongPassword-2026');
       await page.click('#auth-form button[type=submit]');
       await page.waitForFunction(

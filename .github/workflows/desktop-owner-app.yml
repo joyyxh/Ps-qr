@@ -1,18 +1,19 @@
 name: Desktop owner app (Windows and Linux)
 
 # Builds the QRquick owner desktop app for Windows x64 (an NSIS installer) and Linux x64 (an AppImage) from the
-# same web/ source as the website and the Android app, with the production configuration. Every run builds both,
-# checks the packages, and runs the smoke test on each. The packages are uploaded as run artifacts; this workflow
-# creates no GitHub release.
+# same web/ source as the website and the Android app. Every run builds both, checks the packages, and runs the
+# smoke test on each. The packages are uploaded as run artifacts; this workflow creates no GitHub release.
 #
-# Two kinds of run, which are never mixed:
+# Every package from this workflow is a TEST build for the qrquick-staging project (publishable key only). The
+# production project has no username sign-in yet (migrations 0021 and 0022 and the owner-auth function are on
+# staging only), so the production web app is not packed: desktop/scripts/copy-web.mjs refuses it.
+#
+# Kinds of run:
 #   TEST (every push, and a manual run with no inputs). Named TEST. Not for distribution. The Windows installer
 #        is unsigned.
-#   RELEASE (manual only, release=true). The Windows installer and the app inside it are signed with the QRquick
-#        code-signing certificate from the repository secrets. The Windows build stops when those secrets are
-#        missing, and the signature must be valid. See docs/RELEASE.md.
 #   test_signing=true (manual only). Signs the Windows build with a throwaway self-signed certificate, to test the
 #        signing step. Named TEST. Windows does not trust that certificate.
+#   RELEASE (release=true) is refused. It needs owner approval and a production build. See docs/RELEASE.md.
 
 on:
   workflow_dispatch:
@@ -52,7 +53,7 @@ jobs:
     env:
       # Electron-builder signs only with the certificate this workflow passes in (CSC_LINK), never one it finds.
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      # The staging project is used only by the test-only copy that the smoke test drives. It is never packed.
+      # The packages are the staging TEST build, so they point at the staging project. Test builds only, never released.
       STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
       STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
     defaults:
@@ -76,12 +77,11 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           SHORT_SHA="${GITHUB_SHA::7}"
           if [ "$WANT_RELEASE" = "true" ]; then
-            DIST=RELEASE
-            SIGNING=release-cert
-          else
-            DIST=TEST
-            if [ "$WANT_TEST_SIGNING" = "true" ]; then SIGNING=test-cert; else SIGNING=none; fi
+            echo 'A RELEASE build is refused. The production project does not have username sign-in yet (migrations 0021 and 0022 and the owner-auth function are on staging only). Owner approval is needed first.' >&2
+            exit 1
           fi
+          DIST=TEST
+          if [ "$WANT_TEST_SIGNING" = "true" ]; then SIGNING=test-cert; else SIGNING=none; fi
           {
             echo "APP_VERSION=$VERSION"
             echo "BUILD_SHA=$SHORT_SHA"
@@ -94,8 +94,8 @@ jobs:
       - name: Install the Electron shell and the packager (pinned in desktop/package.json)
         run: npm install --no-audit --no-fund
 
-      - name: Copy the shared web app with the production configuration
-        run: npm run copy-web
+      - name: Copy the shared web app as the TEST build for the staging project
+        run: npm run copy-web:staging-package
 
       - name: Install Playwright 1.63.0 for the smoke test (outside the repository)
         env:
@@ -148,7 +148,7 @@ jobs:
         if: matrix.platform == 'linux-x64'
         run: npx electron-builder --linux --x64 --publish never
 
-      - name: Check the packages contain the production app only, and no secrets
+      - name: Check the packages are the staging TEST build only, with no production reference and no secrets
         run: |
           set -euo pipefail
           if [ "${{ matrix.platform }}" = 'windows-x64' ]; then
@@ -161,16 +161,17 @@ jobs:
           RES="$UNPACKED/resources/app-web"
           test -f "$RES/index.html"
           test -f "$RES/src/app.js"
+          grep -q 'TEST BUILD ONLY' "$RES/config.js"
           # config.js is JavaScript (supabaseUrl: '...'), so accept either quote style or a JSON-style key.
-          grep -Eq "supabaseUrl[\"']?[[:space:]]*:[[:space:]]*[\"']https://qvnwqrevgyootaaunrto[.]supabase[.]co[\"']" "$RES/config.js"
+          grep -Eq "supabaseUrl[\"']?[[:space:]]*:[[:space:]]*[\"']https://nbzojqlqkrydcjtogwrb[.]supabase[.]co[\"']" "$RES/config.js"
           grep -Eq "ownerApp[\"']?[[:space:]]*:[[:space:]]*true" "$RES/config.js"
           grep -Eq "publicBaseUrl[\"']?[[:space:]]*:[[:space:]]*[\"']https://joyyxh[.]github[.]io/Ps-qr/[\"']" "$RES/config.js"
-          # Not in the web copy, and not in the packed application archive.
-          if grep -rIl "nbzojqlqkrydcjtogwrb" "$RES" > /dev/null; then echo 'the staging project is in the packaged web copy' >&2; exit 1; fi
+          # The production project is not in the package, and no secret key is.
+          if grep -rIl "qvnwqrevgyootaaunrto" "$RES" > /dev/null; then echo 'the production project is in the packaged web copy' >&2; exit 1; fi
           if grep -rIEl 'sb_secret_|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.' "$RES" > /dev/null; then echo 'a secret-looking key is in the packaged web copy' >&2; exit 1; fi
-          if grep -aq "nbzojqlqkrydcjtogwrb\|sb_secret_" "$UNPACKED/resources/app.asar"; then echo 'the staging project or a secret key is in app.asar' >&2; exit 1; fi
+          if grep -aq "qvnwqrevgyootaaunrto\|sb_secret_" "$UNPACKED/resources/app.asar"; then echo 'the production project or a secret key is in app.asar' >&2; exit 1; fi
           test -f "$UNPACKED/resources/app.asar"
-          echo "Packaged web copy: $(find "$RES" -type f | wc -l) files, production project, ownerApp true."
+          echo "Packaged web copy: $(find "$RES" -type f | wc -l) files, staging TEST build, ownerApp true."
 
       - name: Check the Windows signature (Windows)
         if: matrix.platform == 'windows-x64'
@@ -213,18 +214,14 @@ jobs:
           pkill -f 'qrquick-linux-x64.AppImage' || true
           echo 'The AppImage started and was still running after 25 seconds.'
 
-      - name: Smoke test the Linux app (shipped build, then the test-only staging copy)
+      - name: Smoke test the Linux app (the packaged staging TEST build)
         if: matrix.platform == 'linux-x64'
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
         run: |
           set -euo pipefail
-          xvfb-run -a env QRQUICK_EXECUTABLE="$PWD/dist/linux-unpacked/qrquick" QRQUICK_MODE=production \
-            QRQUICK_SMOKE_OUT="$RUNNER_TEMP/desktop-smoke-linux-production" node tests/smoke.cjs
-          npm run copy-web:staging-test
-          xvfb-run -a env QRQUICK_EXECUTABLE="$PWD/dist/linux-unpacked/qrquick" QRQUICK_MODE=staging-probe \
-            QRQUICK_TEST_WEB_DIR="$PWD/test-web" QRQUICK_SMOKE_OUT="$RUNNER_TEMP/desktop-smoke-linux-probe" \
-            node tests/smoke.cjs
+          xvfb-run -a env QRQUICK_EXECUTABLE="$PWD/dist/linux-unpacked/qrquick" QRQUICK_MODE=staging-package \
+            QRQUICK_SMOKE_OUT="$RUNNER_TEMP/desktop-smoke-linux-package" node tests/smoke.cjs
 
       - name: Install the Windows installer silently (Windows)
         if: matrix.platform == 'windows-x64'
@@ -252,7 +249,7 @@ jobs:
           "QRQUICK_INSTALL=$target" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Installed to $target"
 
-      - name: Smoke test the installed Windows app (shipped build, then the test-only staging copy)
+      - name: Smoke test the installed Windows app (the packaged staging TEST build)
         if: matrix.platform == 'windows-x64'
         shell: pwsh
         env:
@@ -261,17 +258,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $exe = Join-Path $env:QRQUICK_INSTALL 'QRquick.exe'
           $env:QRQUICK_EXECUTABLE = $exe
-          $env:QRQUICK_MODE = 'production'
-          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-production'
+          $env:QRQUICK_MODE = 'staging-package'
+          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-package'
           node tests/smoke.cjs
-          if ($LASTEXITCODE -ne 0) { throw 'The shipped-build smoke test failed.' }
-          npm run copy-web:staging-test
-          if ($LASTEXITCODE -ne 0) { throw 'The test-only copy could not be built.' }
-          $env:QRQUICK_MODE = 'staging-probe'
-          $env:QRQUICK_TEST_WEB_DIR = (Resolve-Path 'test-web').Path
-          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-probe'
-          node tests/smoke.cjs
-          if ($LASTEXITCODE -ne 0) { throw 'The staging-probe smoke test failed.' }
+          if ($LASTEXITCODE -ne 0) { throw 'The installed-build smoke test failed.' }
 
       - name: Uninstall the Windows app silently and confirm it is removed (Windows)
         if: matrix.platform == 'windows-x64'
@@ -311,7 +301,7 @@ jobs:
           Commit: $GITHUB_SHA
           Platform: $PLATFORM
           $SIGN_LINE
-          Supabase project: qvnwqrevgyootaaunrto (production)
+          Supabase project: nbzojqlqkrydcjtogwrb (staging TEST build, not for distribution)
           QR address: https://joyyxh.github.io/Ps-qr/
           Built (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF

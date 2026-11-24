@@ -2,10 +2,11 @@ name: Android APK
 
 # Builds the QRquick Android APK in the cloud, so no Android tools are needed on the developer's computer.
 #
+# Every APK from this workflow is a TEST build for the qrquick-staging project (publishable key only). The
+# production project has no username sign-in yet, so the production web app is not packed (mobile/scripts/copy-web.mjs).
 # Modes. A push always builds the debug APK. A manual run chooses one of these:
-#   debug         default. Signed with the debug key. For testing only, not for distribution.
-#   release       release=true. Signed with the QRquick release key from the repository secrets.
-#                 The run stops when the secrets are missing; it never falls back to the debug key.
+#   debug         default. Signed with the debug key. Staging TEST build, not for distribution.
+#   release       release=true. Refused until the owner approves: the production project lacks username sign-in.
 #   test-release  test_signing=true. Pipeline test only: a throwaway key is made for this run and discarded.
 #                 The artifact is named TEST-ONLY and must not be distributed.
 # See docs/RELEASE.md for the secrets and the steps to create the release key.
@@ -50,6 +51,10 @@ jobs:
     env:
       QRQUICK_VERSION_NAME: '1.0.0'
       QRQUICK_VERSION_CODE: ${{ github.run_number }}
+      # Every APK from this workflow is a TEST build for the qrquick-staging project (publishable key only).
+      # The production project has no username sign-in yet, so a production APK is not built here.
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
     defaults:
       run:
         working-directory: mobile
@@ -82,11 +87,15 @@ jobs:
           else
             MODE=debug
           fi
+          if [ "$MODE" = "release" ]; then
+            echo 'A production release is blocked. The production project does not have username sign-in yet: migrations 0021 and 0022 and the owner-auth function are on staging only. Owner approval is needed first.' >&2
+            exit 1
+          fi
           SHORT="${GITHUB_SHA::7}"
           case "$MODE" in
             debug)
               APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
-              ARTIFACT=qrquick-debug-apk
+              ARTIFACT=TEST-ONLY-qrquick-debug-apk
               ;;
             release)
               APK=mobile/android/app/build/outputs/apk/release/app-release.apk
@@ -168,7 +177,7 @@ jobs:
           } >> "$GITHUB_ENV"
           echo 'The signing key is ready for this run (its values are not printed).'
 
-      - name: Copy the web app into the Android project source
+      - name: Copy the TEST web app (qrquick-staging project) into the Android project source
         env:
           PRINTNEST_PUBLIC_URL: ${{ inputs.public_url || vars.PRINTNEST_PUBLIC_URL || 'https://joyyxh.github.io/Ps-qr/' }}
         run: |
@@ -176,7 +185,11 @@ jobs:
             echo 'PRINTNEST_PUBLIC_URL is required. Set it as a repository Actions variable to the deployed HTTPS web-app URL.' >&2
             exit 1
           }
-          npm run copy-web
+          node scripts/copy-web.mjs --staging-test
+          grep -q 'TEST BUILD ONLY' www/config.js || {
+            echo 'The Android bundle must be the staging test build (TEST BUILD ONLY).' >&2
+            exit 1
+          }
           grep -q 'ownerApp: true' www/config.js || {
             echo 'The Android bundle must be the owner-only app (ownerApp: true).' >&2
             exit 1
@@ -266,15 +279,16 @@ jobs:
           unzip -t "$APK" >/dev/null
           grep -qxF 'assets/public/index.html' "$RUNNER_TEMP/apk-entries.txt"
           grep -qxF 'assets/public/src/licence-status.js' "$RUNNER_TEMP/apk-entries.txt"
-          # The bundled web app is the owner app on the production project, with no staging reference or secret text.
+          # The bundled web app is a TEST build for the staging project, with no production reference or secret text.
           unzip -p "$APK" assets/public/config.js > "$RUNNER_TEMP/bundled-config.js"
-          grep -q "supabaseUrl: 'https://qvnwqrevgyootaaunrto.supabase.co'" "$RUNNER_TEMP/bundled-config.js"
+          grep -q "supabaseUrl: 'https://nbzojqlqkrydcjtogwrb.supabase.co'" "$RUNNER_TEMP/bundled-config.js"
+          grep -q 'TEST BUILD ONLY' "$RUNNER_TEMP/bundled-config.js"
           grep -q 'ownerApp: true' "$RUNNER_TEMP/bundled-config.js"
           BAD=0
           while IFS= read -r f; do
             unzip -p "$APK" "$f" > "$RUNNER_TEMP/entry.bin"
-            if grep -aq 'nbzojqlqkrydcjtogwrb\|sb_secret_\|service_role' "$RUNNER_TEMP/entry.bin"; then
-              echo "A staging reference or secret text is in $f" >&2
+            if grep -aq 'qvnwqrevgyootaaunrto\|sb_secret_\|service_role' "$RUNNER_TEMP/entry.bin"; then
+              echo "A production reference or secret text is in $f" >&2
               BAD=$((BAD + 1))
             fi
           done < <(unzip -Z1 "$APK" | grep '^assets/public/')
@@ -291,7 +305,7 @@ jobs:
             echo "- Launcher icons: adaptive QRquick icon present"
             echo "- Signature verification: passed"
             echo "- Zip alignment: passed"
-            echo "- Bundled config: production project, owner app, no staging reference or secret text"
+            echo "- Bundled config: TEST BUILD for the qrquick-staging project, owner app, no production reference or secret text. Not for distribution."
             echo "- Bundled web entry point and owner licence-status module: present"
             if [ "$MODE" = "test-release" ]; then echo "- **TEST ONLY: signed with a throwaway key. Not for distribution.**"; fi
             echo "- Native .so files: reported by APK contents only; absence is not treated as a failure for this Capacitor app"

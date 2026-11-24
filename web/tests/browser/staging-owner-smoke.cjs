@@ -112,6 +112,11 @@ async function main() {
     await page.goto(BASE + '?run=register#/owner', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-switch=register]', { timeout: 30000 });
     await page.click('[data-switch=register]');
+    // The sign-in form also has a username field, so wait for the create-account heading, its policy
+    // links and the password rules. The form is drawn only after the staging policy versions load.
+    await page.waitForFunction(() => /Create an owner account/.test(document.querySelector('h1')?.textContent || ''), null, { timeout: 30000 });
+    await page.waitForSelector('a[href="#/terms"]', { timeout: 30000 });
+    await page.waitForSelector('[data-rules] li', { timeout: 30000 });
     await page.waitForSelector('#auth-form input[name=username]', { timeout: 30000 });
     const emailFields = await page.locator('#auth-form input[name=email]').count();
     record('sign-up asks for no email address', emailFields === 0, `email fields ${emailFields}`);

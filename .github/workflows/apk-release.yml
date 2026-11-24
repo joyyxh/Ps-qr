@@ -1,7 +1,8 @@
 name: Publish APK release
 
-# Copies the qrquick-debug-apk artifact of one Android APK run into a GitHub prerelease, so
-# the APK has a direct download link. Artifact links need a GitHub sign-in; release assets do not.
+# DISABLED until the owner approves a production release. It would copy the APK artifact of one Android APK run
+# into a GitHub prerelease, so the APK has a direct download link. Every APK from the Android APK workflow is a
+# staging TEST build, so the first step refuses to publish. Artifact links need a GitHub sign-in; release assets do not.
 # Runs when .github/apk-release-request.txt changes. Its first line is the Android APK run id.
 
 on:
@@ -21,6 +22,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Refuse the publish (staging TEST builds are not for distribution)
+        run: |
+          echo 'Publishing is blocked. Every APK from the Android APK workflow is a TEST build for the staging project and must not be distributed. A release needs owner approval and a production build.' >&2
+          exit 1
+
       - uses: actions/checkout@v4
 
       - name: Read the run id

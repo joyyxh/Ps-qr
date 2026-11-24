@@ -7,6 +7,7 @@
   "scripts": {
     "copy-web": "node scripts/copy-web.mjs",
     "copy-web:staging-test": "node scripts/copy-web.mjs --staging-test",
+    "copy-web:staging-package": "node scripts/copy-web.mjs --staging-test --package",
     "start": "npm run copy-web && electron .",
     "dist:win": "npm run copy-web && electron-builder --win --x64 --publish never",
     "dist:linux": "npm run copy-web && electron-builder --linux --x64 --publish never"
