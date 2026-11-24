@@ -7,7 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createOwnerAuth } from "../../supabase/functions/owner-auth/owner-auth.js";
+import { createOwnerAuth, passwordIsBreached } from "../../supabase/functions/owner-auth/owner-auth.js";
 import {
   checkPassword,
   checkUsername,
@@ -198,6 +198,8 @@ function makeHandler(backend, extra = {}) {
     serviceKey: SERVICE,
     fetchImpl: backend.fetchImpl,
     now: () => Date.parse("2026-11-22T12:00:00Z"),
+    // The unit tests never reach the breach service. The live workflow checks it for real.
+    breachCheck: async () => false,
     ...extra,
   });
 }
@@ -432,6 +434,65 @@ test("legacy email-only accounts cannot sign in with a username", async () => {
   backend.users.set("legacy-1", { id: "legacy-1", email: "owner@example.com", password: GOOD_PASSWORD });
   const res = await post(handle, "signin", { username: "owner", password: GOOD_PASSWORD });
   assert.equal(res.status, 401);
+});
+
+// ---- leaked passwords ------------------------------------------------------
+
+const BREACHED_PASSWORD = "Summer2026Pass";
+
+test("a breached password is refused at sign-up and no account is made", async () => {
+  const backend = makeBackend();
+  const handle = makeHandler(backend, { breachCheck: async (password) => password === BREACHED_PASSWORD });
+  const res = await post(handle, "signup", { username: "breach_shop", password: BREACHED_PASSWORD, accept: ACCEPT });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).code, "password_breached");
+  assert.equal(backend.users.size, 0);
+  assert.equal(backend.reservations.size, 0);
+});
+
+test("a breach check that cannot run refuses sign-up with a retry message and makes no account", async () => {
+  const backend = makeBackend();
+  const handle = makeHandler(backend, {
+    breachCheck: async () => {
+      throw new Error("network down");
+    },
+  });
+  const res = await post(handle, "signup", { username: "unchecked_shop", password: GOOD_PASSWORD, accept: ACCEPT });
+  assert.equal(res.status, 503);
+  assert.equal((await res.json()).code, "password_check_unavailable");
+  assert.equal(backend.users.size, 0);
+});
+
+test("a breached new password is refused on reset before a recovery code is used", async () => {
+  const backend = makeBackend();
+  let breached = false;
+  const handle = makeHandler(backend, { breachCheck: async () => breached });
+  const { body: signed } = await signUp(handle, "breach_reset");
+  breached = true;
+  const res = await post(handle, "reset", {
+    username: "breach_reset",
+    recovery_code: signed.recovery_codes[0],
+    new_password: BREACHED_PASSWORD,
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).code, "password_breached");
+  assert.equal(backend.codes.filter((c) => c.user_id === signed.session.user.id && c.used).length, 0);
+});
+
+test("the breach check sends only five hash characters and reads the suffix on the device", async () => {
+  const requests = [];
+  const range = (text) => async (url, init) => {
+    requests.push({ url, headers: init.headers });
+    return new Response(text, { status: 200 });
+  };
+  // SHA-1 of "password" is 5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8: prefix 5BAA6, suffix below.
+  const hit = range("0018A45C4D1DEF81644B54AB7F969B88D65:1\r\n1E4C9B93F3F0682250B6CF8331B7EE68FD8:3861493\r\n");
+  assert.equal(await passwordIsBreached("password", hit), true);
+  assert.equal(requests[0].url, "https://api.pwnedpasswords.com/range/5BAA6");
+  assert.equal(requests[0].headers["Add-Padding"], "true");
+  assert.equal(await passwordIsBreached("password", range("1E4C9B93F3F0682250B6CF8331B7EE68FD8:0\r\n")), false);
+  assert.equal(await passwordIsBreached("password", range("FFFFFFFF0000000000000000000000000000:9\r\n")), false);
+  await assert.rejects(passwordIsBreached("password", async () => new Response("", { status: 503 })));
 });
 
 // ---- recovery --------------------------------------------------------------

@@ -119,6 +119,27 @@ function toHex(buffer) {
   return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// The HaveIBeenPwned range API. It is given only the first five hex characters of the password's SHA-1
+// (k-anonymity), so neither the password nor its full hash leaves the function.
+export const PWNED_RANGE_URL = "https://api.pwnedpasswords.com/range/";
+
+export async function passwordIsBreached(password, doFetch = (url, init) => fetch(url, init)) {
+  const digest = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(String(password)));
+  const hex = toHex(digest).toUpperCase();
+  const prefix = hex.slice(0, 5);
+  const suffix = hex.slice(5);
+  const res = await doFetch(`${PWNED_RANGE_URL}${prefix}`, {
+    method: "GET",
+    headers: { "Add-Padding": "true", Accept: "text/plain" },
+  });
+  if (!res.ok) throw new Error(`breach range ${res.status}`);
+  // Padding lines have a count of 0 and are not a match.
+  return (await res.text()).split(/\r?\n/).some((line) => {
+    const [found, count] = line.trim().split(":");
+    return found === suffix && Number(count) > 0;
+  });
+}
+
 export function createOwnerAuth(config = {}) {
   const supabaseUrl = (config.supabaseUrl ?? "").replace(/\/+$/, "");
   const anonKey = config.anonKey ?? "";
@@ -127,6 +148,7 @@ export function createOwnerAuth(config = {}) {
   const clock = config.now ?? (() => Date.now());
   const randomBytes = config.randomBytes ?? ((n) => crypto.getRandomValues(new Uint8Array(n)));
   const configured = Boolean(supabaseUrl && anonKey && serviceKey);
+  const breachCheck = config.breachCheck ?? ((password) => passwordIsBreached(password));
 
   // ---- transport ---------------------------------------------------------
 
@@ -324,6 +346,29 @@ export function createOwnerAuth(config = {}) {
     if (!res.ok) throw new Error(`acceptance ${res.status}`);
   }
 
+  // Fails closed: when the breach list cannot be checked, the password is refused until it can be.
+  async function refuseBreached(password) {
+    let breached;
+    try {
+      breached = await breachCheck(password);
+    } catch (err) {
+      console.error("owner-auth: breach check unavailable", err?.name ?? "error");
+      throw new OwnerAuthError(
+        503,
+        "password_check_unavailable",
+        "Could not check this password right now. Try again in a few minutes.",
+      );
+    }
+    if (breached) {
+      throw new OwnerAuthError(
+        400,
+        "password_breached",
+        "That password has appeared in a data breach. Choose a different one.",
+        { failures: ["breached"] },
+      );
+    }
+  }
+
   // ---- handlers ----------------------------------------------------------
 
   async function handlePolicies() {
@@ -364,6 +409,8 @@ export function createOwnerAuth(config = {}) {
     if (await userIdFor(name.username)) {
       throw new OwnerAuthError(409, "username_taken", TAKEN_TEXT);
     }
+
+    await refuseBreached(password);
 
     const userId = await createAccount(name.username, password);
     if (!userId) throw new OwnerAuthError(409, "username_taken", TAKEN_TEXT);
@@ -442,13 +489,14 @@ export function createOwnerAuth(config = {}) {
       throw new OwnerAuthError(401, "reset_failed", RESET_TEXT);
     }
 
-    // The new password is checked before a code is used, so a weak password costs no code.
+    // The new password is checked before a code is used, so a weak or breached password costs no code.
     const rules = checkPassword(newPassword, name.username);
     if (!rules.ok) {
       throw new OwnerAuthError(400, "weak_password", "Your new password does not meet all the rules.", {
         failures: rules.failures,
       });
     }
+    await refuseBreached(newPassword);
 
     const userId = await userIdFor(name.username);
     if (!userId) {

@@ -85,6 +85,11 @@ async function main() {
   check('a weak password is refused on the server (weak_password)', weak.status === 400 && weak.data?.code === 'weak_password', codeOf(weak));
   const reserved = await call('signup', { body: { username: 'admin', password, accept } });
   check('a reserved username is refused (username_reserved)', reserved.status === 400 && reserved.data?.code === 'username_reserved', codeOf(reserved));
+  // "Password123" is on the public breach list. It is refused before any account is made. It uses its own name,
+  // so if the check were missing and an account were made, the main account below would not collide with it.
+  const breachName = `qa_breach_${hex(5)}`;
+  const breached = await call('signup', { body: { username: breachName, password: 'Password123', accept } });
+  check('a breached password is refused at sign-up (password_breached)', breached.status === 400 && breached.data?.code === 'password_breached', codeOf(breached));
 
   // 3. The account itself: this is where GoTrue must accept the internal .invalid address (blocker B2)
   const made = await call('signup', { body: { username, password, accept } });
@@ -123,7 +128,10 @@ async function main() {
   const right = await call('signin', { body: { username, password } });
   check('the right password signs in and returns the username and a session', right.status === 200 && right.data?.username === username && typeof right.data?.session?.access_token === 'string', codeOf(right));
 
-  // 5. Recovery with a code, then the codes from before the reset are gone
+  // 5. Recovery with a code, then the codes from before the reset are gone.
+  // A breached new password is refused before a code is spent: codes[0] must still work on the real reset below.
+  const breachedReset = await call('reset', { body: { username, recovery_code: codes[0], new_password: 'Password123' } });
+  check('a breached new password is refused on reset (password_breached)', breachedReset.status === 400 && breachedReset.data?.code === 'password_breached', codeOf(breachedReset));
   const reset = await call('reset', { body: { username, recovery_code: codes[0], new_password: newPassword } });
   check(
     'a recovery code and a new password reset the account and return ten new codes',
