@@ -16,6 +16,7 @@ on:
       - 'web/tests/live/**'
       - 'supabase/functions/owner-auth/**'
       - 'supabase/migrations/0021_owner_username_auth.sql'
+      - 'supabase/migrations/0022_owner_guard_at_commit.sql'
       - '.github/workflows/owner-auth-staging.yml'
   workflow_dispatch:
 

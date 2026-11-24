@@ -117,9 +117,18 @@ def new_uuid():
     return str(uuid.uuid4())
 
 
+def auth_user_sql(u):
+    """An auth.users row in the shape owner accounts have at commit: an owner username address and
+    owner_flow set. Migration 0022 refuses every other auth.users row, so the fixtures use this shape."""
+    email = f"acct_{u.replace('-', '')}@accounts.qrquick.invalid"
+    meta = '{"provider":"email","providers":["email"],"owner_flow":"username-v1"}'
+    return (f"insert into auth.users (id, email, raw_app_meta_data, raw_user_meta_data) "
+            f"values ({lit(u)}, {lit(email)}, {lit(meta)}::jsonb, '{{}}'::jsonb)")
+
+
 def new_admin():
     u = new_uuid()
-    q(f"insert into auth.users (id) values ({lit(u)}); "
+    q(f"{auth_user_sql(u)}; "
       f"insert into public.platform_admins (user_id) values ({lit(u)}); select 1;")
     return u
 
@@ -588,7 +597,7 @@ def test_authorisation():
            payload(shop2, 0, extension_unit="month"), admin, aal="aal1")
 
     non_admin = new_uuid()
-    q(f"insert into auth.users (id) values ({lit(non_admin)}); select 1;")
+    q(f"{auth_user_sql(non_admin)}; select 1;")
     denied("A-05 a signed-in user who is not a platform admin is forbidden", shop2, "licence_admin_grant",
            payload(shop2, 0, grant_kind="one_month"), non_admin, aal="aal2")
 
@@ -1277,7 +1286,7 @@ def call_status(shop, user, role="authenticated", claims="auto"):
 
 
 def add_member(shop, user, role):
-    q(f"insert into auth.users (id) values ({lit(user)}) on conflict do nothing; "
+    q(f"{auth_user_sql(user)} on conflict do nothing; "
       f"insert into public.shop_memberships (shop_id, user_id, role) "
       f"values ({lit(shop)}, {lit(user)}, {lit(role)}); select 1;")
 
@@ -1285,7 +1294,7 @@ def add_member(shop, user, role):
 def test_shop_licence_status():
     admin = new_admin()
     owner, staff, outsider = new_uuid(), new_uuid(), new_uuid()
-    q(f"insert into auth.users (id) values ({lit(owner)}), ({lit(staff)}), ({lit(outsider)}); select 1;")
+    q(f"{auth_user_sql(owner)}; {auth_user_sql(staff)}; {auth_user_sql(outsider)}; select 1;")
     s = new_shop()
     add_member(s, owner, "owner")
     add_member(s, staff, "staff")

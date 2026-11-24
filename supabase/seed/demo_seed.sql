@@ -2,11 +2,17 @@
 -- Real owners sign up through Supabase Auth and create shops with create_shop().
 -- Do not run this against a production project.
 
+-- Owner accounts take the username shape that owner-auth creates (migration 0022 refuses any other row).
 insert into auth.users (id, aud, role, email, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
 values
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'owner.demo@printnest.test',  now(), now(), '{"provider":"email"}', '{}'),
-  ('aaaaaaaa-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'owner.other@printnest.test', now(), now(), '{"provider":"email"}', '{}')
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'owner_demo@accounts.qrquick.invalid',  now(), now(), '{"provider":"email","providers":["email"],"owner_flow":"username-v1"}', '{}'),
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'owner_other@accounts.qrquick.invalid', now(), now(), '{"provider":"email","providers":["email"],"owner_flow":"username-v1"}', '{}')
 on conflict (id) do nothing;
+
+insert into public.owner_usernames (username, user_id) values
+  ('owner_demo',  'aaaaaaaa-0000-0000-0000-000000000001'),
+  ('owner_other', 'aaaaaaaa-0000-0000-0000-000000000002')
+on conflict do nothing;
 
 insert into public.shops (id, slug, name, phone, address) values
   ('bbbbbbbb-0000-0000-0000-000000000001', 'demo-xerox',   'Demo Xerox Centre', '+91 98765 00001', 'Main Road, Ranchi'),

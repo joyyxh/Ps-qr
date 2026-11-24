@@ -103,6 +103,20 @@ async function main() {
   const dup = await call('signup', { body: { username, password, accept } });
   check('the same username cannot be taken twice (username_taken)', dup.status === 409 && dup.data?.code === 'username_taken', codeOf(dup));
 
+  // A public email sign-up must fail (migration 0022 refuses any auth.users row that is not an owner username
+  // with owner_flow). Both probes are refused as a whole, so no account is left behind if the guard holds.
+  // A success status (below 400) would mean an account was created, and fails the check.
+  for (const address of [`qa_probe_${hex(4)}@example.com`, `qa_probe_${hex(4)}@accounts.qrquick.invalid`]) {
+    const publicRes = await fetch(`${parsed.origin}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: address, password }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const label = address.endsWith('.invalid') ? 'an owner-style address' : 'a real address';
+    check(`a public email sign-up with ${label} is refused`, publicRes.status >= 400, `HTTP ${publicRes.status}`);
+  }
+
   // 4. Sign-in
   const wrong = await call('signin', { body: { username, password: 'Wrong-Horse-99' } });
   check('a wrong password gets the generic message (invalid_credentials)', wrong.status === 401 && wrong.data?.code === 'invalid_credentials', codeOf(wrong));
