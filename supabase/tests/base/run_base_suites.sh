@@ -6,7 +6,7 @@
 #
 # What it does:
 #   1. builds one template database: the test-only platform stand-ins (00_base_platform_shims.sql),
-#      migrations 0001 to 0010, 0015 to 0022 in order, then the development seed. Chain A
+#      migrations 0001 to 0010, 0015 to 0023 in order, then the development seed. Chain A
 #      migrations 0011 to 0014 are not on this branch, and the script refuses to run if they appear.
 #   2. runs each suite in its own fresh database copied from the template. Each suite is one
 #      transaction that ends with rollback, and it prints name, ok, detail.
@@ -52,13 +52,13 @@ cleanup
 for migration in "$ROOT"/supabase/migrations/*.sql; do
   case "$(basename "$migration")" in
     0011_*|0012_*|0013_*|0014_*) echo "refusing: unexpected Chain A file $(basename "$migration")" >&2; exit 2 ;;
-    0015_*|0016_*|0017_*|0018_*|0019_*|0020_*|0021_*|0022_*|0001_*|0002_*|0003_*|0004_*|0005_*|0006_*|0007_*|0008_*|0009_*|0010_*) ;;
+    0015_*|0016_*|0017_*|0018_*|0019_*|0020_*|0021_*|0022_*|0023_*|0001_*|0002_*|0003_*|0004_*|0005_*|0006_*|0007_*|0008_*|0009_*|0010_*) ;;
     *) echo "refusing: unexpected migration file $(basename "$migration")" >&2; exit 2 ;;
   esac
   "${PSQL[@]}" -d "$TEMPLATE" -f "$migration" >/dev/null
 done
 "${PSQL[@]}" -d "$TEMPLATE" -f "$ROOT/supabase/seed/demo_seed.sql"
-echo "== template ready: shims, migrations 0001-0010 and 0015-0022, dev seed"
+echo "== template ready: shims, migrations 0001-0010 and 0015-0023, dev seed"
 
 # The owner guard (migration 0022) on the template. The probe rolls back, so the template stays as it is.
 "${PSQL[@]}" -d "$TEMPLATE" -f "$HERE/../owner_guard_probe.sql"
