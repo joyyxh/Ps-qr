@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 60
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      BUILD_SHA: diag
       STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
       STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
     defaults:
