@@ -7,6 +7,10 @@
 --
 -- Load order: this file first, then supabase/migrations in order, then the seed.
 
+-- ---------- extensions (Supabase keeps pgcrypto in this schema; migrations 0021 and 0024 call extensions.crypt) ----------
+create schema if not exists extensions;
+create extension if not exists pgcrypto schema extensions;
+
 -- ---------- auth ----------
 create schema if not exists auth;
 create table if not exists auth.users (
@@ -18,6 +22,16 @@ create table if not exists auth.users (
   updated_at timestamptz,
   raw_app_meta_data jsonb,
   raw_user_meta_data jsonb
+);
+-- Stand-in for the identity rows GoTrue keeps beside each user (used by migration 0024's identity sync).
+create table if not exists auth.identities (
+  id uuid primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  provider text not null,
+  provider_id text,
+  identity_data jsonb not null default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 create or replace function auth.jwt() returns jsonb language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;

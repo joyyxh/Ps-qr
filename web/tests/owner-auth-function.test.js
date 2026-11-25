@@ -29,6 +29,8 @@ function makeBackend(options = {}) {
   const reservations = new Map(); // username -> user_id
   const codes = []; // { user_id, code, used }
   const acceptances = [];
+  const claims = []; // { user_id, code, used, expired }
+  const identitySyncs = [];
   const sessions = new Map(); // access token -> { user_id, refresh }
   const limits = new Map(); // key -> hits
   const calls = [];
@@ -109,7 +111,14 @@ function makeBackend(options = {}) {
       if (body.password === "Breached2026Pass") {
         return json(422, { code: 422, error_code: "weak_password", msg: "pwned" });
       }
-      users.get(id).password = body.password;
+      if (options.failConvert && body.email) return json(500, { msg: "boom" });
+      if (body.password === "Breached2026Pass") {
+        return json(422, { code: 422, error_code: "weak_password", msg: "pwned" });
+      }
+      const target = users.get(id);
+      target.password = body.password;
+      if (body.email) target.email = body.email;
+      if (body.app_metadata?.owner_flow) target.owner_flow = body.app_metadata.owner_flow;
       return json(200, { id });
     }
     if (path === "/auth/v1/token" && u.searchParams.get("grant_type") === "password" && method === "POST") {
@@ -154,6 +163,48 @@ function makeBackend(options = {}) {
       for (const c of body.p_codes) codes.push({ user_id: body.p_user_id, code: c.replace(/-/g, ""), used: false });
       return json(200, "set-id");
     }
+    const isLegacy = (id) => {
+      const x = users.get(id);
+      return Boolean(x && x.owner && x.owner_flow !== "username-v1" && ![...reservations.values()].includes(id));
+    };
+    if (path === "/rest/v1/rpc/owner_legacy_user_for") {
+      const found = [...users.values()].find((x) => x.email === String(body.p_email).toLowerCase());
+      return json(200, found && isLegacy(found.id) ? found.id : null);
+    }
+    if (path === "/rest/v1/rpc/owner_consume_claim_code") {
+      const row = claims.find((c) => c.user_id === body.p_user_id && !c.used && !c.expired && c.code === body.p_code);
+      if (!row) return json(200, false);
+      row.used = true;
+      return json(200, true);
+    }
+    if (path === "/rest/v1/rpc/owner_unconsume_claim_code") {
+      const row = claims.find((c) => c.user_id === body.p_user_id && c.used && !c.expired && c.code === body.p_code);
+      if (!row || !isLegacy(body.p_user_id)) return json(200, false);
+      row.used = false;
+      return json(200, true);
+    }
+    if (path === "/rest/v1/rpc/owner_claim_apply") {
+      if (!isLegacy(body.p_user_id)) return json(400, { code: "22023" });
+      if (options.failApply) return json(500, { code: "x" });
+      if (reservations.has(body.p_username)) return json(409, { code: "23505" });
+      reservations.set(body.p_username, body.p_user_id);
+      acceptances.push({ user_id: body.p_user_id, kind: "terms", version: body.p_terms_version });
+      acceptances.push({ user_id: body.p_user_id, kind: "privacy", version: body.p_privacy_version });
+      for (let i = codes.length - 1; i >= 0; i -= 1) if (codes[i].user_id === body.p_user_id) codes.splice(i, 1);
+      for (const c of body.p_codes) codes.push({ user_id: body.p_user_id, code: c.replace(/-/g, ""), used: false });
+      return json(200, "set-id");
+    }
+    if (path === "/rest/v1/rpc/owner_claim_undo") {
+      if (String(users.get(body.p_user_id)?.email).endsWith("@accounts.qrquick.invalid")) return json(400, { code: "22023" });
+      for (const [name, id] of reservations) if (id === body.p_user_id) reservations.delete(name);
+      for (let i = codes.length - 1; i >= 0; i -= 1) if (codes[i].user_id === body.p_user_id) codes.splice(i, 1);
+      for (let i = acceptances.length - 1; i >= 0; i -= 1) if (acceptances[i].user_id === body.p_user_id) acceptances.splice(i, 1);
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/rest/v1/rpc/owner_claim_sync_identity") {
+      identitySyncs.push(body);
+      return json(200, 1);
+    }
     if (path === "/rest/v1/owner_usernames" && method === "GET") {
       const name = u.searchParams.get("username");
       const owner = u.searchParams.get("user_id");
@@ -188,7 +239,7 @@ function makeBackend(options = {}) {
     return json(404, { message: `no route ${method} ${path}` });
   }
 
-  return { fetchImpl, users, reservations, codes, acceptances, sessions, limits, calls, legal };
+  return { fetchImpl, users, reservations, codes, acceptances, claims, identitySyncs, sessions, limits, calls, legal };
 }
 
 function makeHandler(backend, extra = {}) {
@@ -493,6 +544,188 @@ test("the breach check sends only five hash characters and reads the suffix on t
   assert.equal(await passwordIsBreached("password", range("1E4C9B93F3F0682250B6CF8331B7EE68FD8:0\r\n")), false);
   assert.equal(await passwordIsBreached("password", range("FFFFFFFF0000000000000000000000000000:9\r\n")), false);
   await assert.rejects(passwordIsBreached("password", async () => new Response("", { status: 503 })));
+});
+
+// ---- legacy owner claim ----------------------------------------------------
+
+const CLAIM_CODE = "KMNPQRSTUVWXYZ23";
+const LEGACY_EMAIL = "ravi@example.com";
+const OLD_PASSWORD = "OldPassword2025x";
+
+function addLegacy(backend, { id = "legacy-1", email = LEGACY_EMAIL, password = OLD_PASSWORD } = {}) {
+  backend.users.set(id, { id, email, password, owner: true });
+  backend.claims.push({ user_id: id, code: CLAIM_CODE, used: false, expired: false });
+  return id;
+}
+
+function claimBody(over = {}) {
+  return {
+    email: LEGACY_EMAIL,
+    claim_code: "KMNP-QRST-UVWX-YZ23",
+    username: "ravi_prints",
+    password: GOOD_PASSWORD,
+    accept: ACCEPT,
+    ...over,
+  };
+}
+
+test("a claim converts the legacy account in place and keeps its user id", async () => {
+  const backend = makeBackend();
+  const id = addLegacy(backend);
+  const handle = makeHandler(backend);
+  const res = await post(handle, "claim", claimBody());
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.username, "ravi_prints");
+  assert.equal(body.recovery_codes.length, 10);
+  assert.equal(body.session.user.id, id);
+  const user = backend.users.get(id);
+  assert.equal(user.email, "ravi_prints@accounts.qrquick.invalid");
+  assert.equal(user.owner_flow, "username-v1");
+  assert.equal(user.password, GOOD_PASSWORD);
+  assert.equal(backend.reservations.get("ravi_prints"), id);
+  assert.equal(backend.acceptances.filter((a) => a.user_id === id).length, 2);
+  assert.equal(backend.codes.filter((c) => c.user_id === id).length, 10);
+  assert.equal(backend.claims[0].used, true);
+  assert.equal(backend.identitySyncs.length, 1);
+  // Username sign-in now works; the old email and password do not.
+  assert.equal((await post(handle, "signin", { username: "ravi_prints", password: GOOD_PASSWORD })).status, 200);
+  assert.equal((await post(handle, "signin", { username: "ravi_prints", password: OLD_PASSWORD })).status, 401);
+});
+
+test("a claim code works only once", async () => {
+  const backend = makeBackend();
+  addLegacy(backend);
+  const handle = makeHandler(backend);
+  assert.equal((await post(handle, "claim", claimBody())).status, 200);
+  const again = await post(handle, "claim", claimBody({ username: "ravi_two" }));
+  assert.equal(again.status, 401);
+  assert.equal((await again.json()).code, "claim_failed");
+});
+
+test("a wrong code, an unknown email and an already converted account all get the same refusal", async () => {
+  const backend = makeBackend();
+  addLegacy(backend);
+  const handle = makeHandler(backend);
+  await signUp(handle, "already_user");
+  const attempts = [
+    claimBody({ claim_code: "AAAA-AAAA-AAAA-AAAA" }),
+    claimBody({ email: "nobody@example.com" }),
+    claimBody({ email: "already_user@accounts.qrquick.invalid" }),
+    claimBody({ claim_code: "not a code" }),
+  ];
+  const seen = [];
+  for (const attempt of attempts) {
+    const res = await post(handle, "claim", attempt);
+    seen.push([res.status, (await res.json()).message]);
+  }
+  for (const [status, message] of seen) {
+    assert.equal(status, 401);
+    assert.equal(message, seen[0][1]);
+  }
+  assert.equal(backend.users.get("legacy-1").email, LEGACY_EMAIL);
+  assert.equal(backend.claims[0].used, false);
+});
+
+test("an expired claim code is refused", async () => {
+  const backend = makeBackend();
+  addLegacy(backend);
+  backend.claims[0].expired = true;
+  const res = await post(makeHandler(backend), "claim", claimBody());
+  assert.equal(res.status, 401);
+  assert.equal(backend.users.get("legacy-1").email, LEGACY_EMAIL);
+});
+
+test("a claim with a weak, breached or unaccepted setup is refused before the account is looked up", async () => {
+  const backend = makeBackend();
+  addLegacy(backend);
+  const handle = makeHandler(backend, { breachCheck: async (p) => p === "Summer2026Pass" });
+  const cases = [
+    [claimBody({ password: "short" }), "weak_password"],
+    [claimBody({ password: "Summer2026Pass" }), "password_breached"],
+    [claimBody({ accept: {} }), "terms_required"],
+    [claimBody({ username: "admin" }), "username_reserved"],
+  ];
+  for (const [body, code] of cases) {
+    const res = await post(handle, "claim", body);
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).code, code);
+  }
+  assert.equal(backend.calls.some((c) => c.path.includes("owner_legacy_user_for")), false);
+  assert.equal(backend.claims[0].used, false);
+});
+
+test("a taken username is refused and the claim code is not spent", async () => {
+  const backend = makeBackend();
+  addLegacy(backend);
+  const handle = makeHandler(backend);
+  await signUp(handle, "ravi_prints");
+  const res = await post(handle, "claim", claimBody());
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).code, "username_taken");
+  assert.equal(backend.claims[0].used, false);
+});
+
+test("if converting the account fails, the legacy account is unchanged and the code is re-opened", async () => {
+  const backend = makeBackend({ failConvert: true });
+  const id = addLegacy(backend);
+  const handle = makeHandler(backend);
+  const res = await post(handle, "claim", claimBody());
+  assert.equal(res.status, 500);
+  const user = backend.users.get(id);
+  assert.equal(user.email, LEGACY_EMAIL);
+  assert.equal(user.password, OLD_PASSWORD);
+  assert.equal(backend.reservations.size, 0);
+  assert.equal(backend.acceptances.length, 0);
+  assert.equal(backend.codes.length, 0);
+  assert.equal(backend.claims[0].used, false);
+});
+
+test("a password the auth server rejects undoes the claim and says so", async () => {
+  const backend = makeBackend();
+  const id = addLegacy(backend);
+  const handle = makeHandler(backend);
+  const res = await post(handle, "claim", claimBody({ password: "Breached2026Pass" }));
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).code, "password_rejected");
+  assert.equal(backend.users.get(id).email, LEGACY_EMAIL);
+  assert.equal(backend.reservations.size, 0);
+  assert.equal(backend.claims[0].used, false);
+});
+
+test("a failure in the database step undoes the claim and re-opens the code", async () => {
+  const backend = makeBackend({ failApply: true });
+  addLegacy(backend);
+  const res = await post(makeHandler(backend), "claim", claimBody());
+  assert.equal(res.status, 500);
+  assert.equal(backend.claims[0].used, false);
+  assert.equal(backend.users.get("legacy-1").email, LEGACY_EMAIL);
+});
+
+test("claim attempts are rate limited per email", async () => {
+  const backend = makeBackend();
+  addLegacy(backend);
+  const handle = makeHandler(backend);
+  let last;
+  for (let i = 0; i < 6; i += 1) last = await post(handle, "claim", claimBody({ claim_code: "AAAA-AAAA-AAAA-AAAA" }));
+  assert.equal(last.status, 429);
+});
+
+test("the claim route accepts POST only and logs no secrets", async () => {
+  const backend = makeBackend();
+  addLegacy(backend);
+  const logged = [];
+  const original = console.error;
+  console.error = (...args) => logged.push(args.join(" "));
+  try {
+    const handle = makeHandler(backend, { breachCheck: async () => { throw new Error("down"); } });
+    await post(handle, "claim", claimBody());
+    assert.equal((await get(handle, "claim")).status, 405);
+  } finally {
+    console.error = original;
+  }
+  const text = logged.join("\n");
+  for (const secret of [GOOD_PASSWORD, CLAIM_CODE, LEGACY_EMAIL, "ravi_prints"]) assert.equal(text.includes(secret), false);
 });
 
 // ---- recovery --------------------------------------------------------------

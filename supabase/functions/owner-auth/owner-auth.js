@@ -9,6 +9,10 @@
 //   POST /owner-auth/reset             { username, recovery_code, new_password }
 //   POST /owner-auth/codes/regenerate  header Authorization: Bearer <access token>
 //                                      body { current_password }
+//   POST /owner-auth/claim             { email, claim_code, username, password, accept: { terms, privacy } }
+//                                      moves an existing email-style owner to a username account, keeping
+//                                      the same user id (so the shop and orders stay). The operator issues the
+//                                      one-time claim code (migration 0024).
 //
 // Successful signup, sign-in, reset and regenerate return recovery codes or a session.
 // Errors return { code, message } and never say which of two things was wrong when that
@@ -38,6 +42,7 @@ const MAX_BODY_CHARS = 4096;
 const TAKEN_TEXT = "That username is already taken. Choose another.";
 const INVALID_TEXT = "That username or password is not right.";
 const RESET_TEXT = "That username or recovery code is not right.";
+const CLAIM_TEXT = "That email or claim code is not right, or the code has expired. Ask the operator for a new code.";
 const RATE_TEXT = "Too many attempts from this connection. Wait a few minutes and try again.";
 
 export class OwnerAuthError extends Error {
@@ -369,6 +374,21 @@ export function createOwnerAuth(config = {}) {
     }
   }
 
+  // The client must show the current versions and send them back. An old page cannot skip this.
+  async function requireAcceptance(acceptBody) {
+    const policies = await currentPolicies();
+    const accept = acceptBody && typeof acceptBody === "object" ? acceptBody : {};
+    if (accept.terms !== policies.terms.version || accept.privacy !== policies.privacy.version) {
+      throw new OwnerAuthError(
+        400,
+        "terms_required",
+        "Read and accept the Terms and Conditions and the Privacy Policy to continue.",
+        { current: { terms: policies.terms.version, privacy: policies.privacy.version } },
+      );
+    }
+    return policies;
+  }
+
   // ---- handlers ----------------------------------------------------------
 
   async function handlePolicies() {
@@ -394,17 +414,7 @@ export function createOwnerAuth(config = {}) {
       });
     }
 
-    // The client must show the current versions and send them back. An old page cannot skip this.
-    const policies = await currentPolicies();
-    const accept = body.accept && typeof body.accept === "object" ? body.accept : {};
-    if (accept.terms !== policies.terms.version || accept.privacy !== policies.privacy.version) {
-      throw new OwnerAuthError(
-        400,
-        "terms_required",
-        "Read and accept the Terms and Conditions and the Privacy Policy to continue.",
-        { current: { terms: policies.terms.version, privacy: policies.privacy.version } },
-      );
-    }
+    const policies = await requireAcceptance(body.accept);
 
     if (await userIdFor(name.username)) {
       throw new OwnerAuthError(409, "username_taken", TAKEN_TEXT);
@@ -520,6 +530,109 @@ export function createOwnerAuth(config = {}) {
     });
   }
 
+  // Undoes the database side of a claim and re-opens the code. Best effort: each step reports its own failure.
+  async function abortClaim(userId, compactCode) {
+    try {
+      await rpc("owner_claim_undo", { p_user_id: userId });
+    } catch {
+      console.error("owner-auth: could not undo a failed claim");
+    }
+    try {
+      await rpc("owner_unconsume_claim_code", { p_user_id: userId, p_code: compactCode });
+    } catch {
+      console.error("owner-auth: could not re-open a claim code");
+    }
+  }
+
+  async function handleClaim(req) {
+    const body = await readJson(req);
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    await limitOrThrow([
+      ["claim-ip", clientAddress(req), 10, 3600],
+      ["claim-email", email || "(empty)", 5, 3600],
+    ]);
+
+    // Checks that reveal nothing about any account come first.
+    const name = checkUsername(body.username);
+    if (!name.ok) throw new OwnerAuthError(400, name.code, name.message);
+    const password = typeof body.password === "string" ? body.password : "";
+    const rules = checkPassword(password, name.username);
+    if (!rules.ok) {
+      throw new OwnerAuthError(400, "weak_password", "Your password does not meet all the rules.", { failures: rules.failures });
+    }
+    const policies = await requireAcceptance(body.accept);
+    await refuseBreached(password);
+
+    const compact = normalizeRecoveryCode(body.claim_code);
+    if (!email || email.length > 254 || !email.includes("@") || compact === null) {
+      await burnTime(password);
+      throw new OwnerAuthError(401, "claim_failed", CLAIM_TEXT);
+    }
+    const userId = await rpc("owner_legacy_user_for", { p_email: email });
+    if (!userId) {
+      await burnTime(password);
+      throw new OwnerAuthError(401, "claim_failed", CLAIM_TEXT);
+    }
+    if (await userIdFor(name.username)) throw new OwnerAuthError(409, "username_taken", TAKEN_TEXT);
+
+    if (!(await rpc("owner_consume_claim_code", { p_user_id: userId, p_code: compact }))) {
+      throw new OwnerAuthError(401, "claim_failed", CLAIM_TEXT);
+    }
+
+    const codes = generateRecoveryCodes(randomBytes);
+    try {
+      await rpc("owner_claim_apply", {
+        p_user_id: userId,
+        p_username: name.username,
+        p_terms_version: policies.terms.version,
+        p_privacy_version: policies.privacy.version,
+        p_codes: codes,
+      });
+    } catch (err) {
+      await abortClaim(userId, compact);
+      if (String(err?.message).endsWith(" 409")) throw new OwnerAuthError(409, "username_taken", TAKEN_TEXT);
+      throw err;
+    }
+
+    try {
+      await revokeSessions(userId);
+      const res = await auth(`/admin/users/${encodeURIComponent(userId)}`, {
+        method: "PUT",
+        key: serviceKey,
+        token: serviceKey,
+        body: {
+          email: internalEmailFor(name.username),
+          password,
+          email_confirm: true,
+          app_metadata: { owner_flow: "username-v1" },
+        },
+      });
+      if (!res.ok) {
+        const failed = await readError(res);
+        if (failed?.error_code === "weak_password") {
+          throw new OwnerAuthError(400, "password_rejected", "That password is not accepted. Choose a different one.");
+        }
+        throw new Error(`convert user ${res.status}`);
+      }
+    } catch (err) {
+      // The legacy account is unchanged when the conversion failed, so the database side is undone.
+      await abortClaim(userId, compact);
+      throw err;
+    }
+
+    try {
+      await rpc("owner_claim_sync_identity", { p_user_id: userId, p_email: internalEmailFor(name.username) });
+    } catch {
+      console.error("owner-auth: identity sync failed after a claim");
+    }
+    const token = await signInWithPassword(name.username, password);
+    return json(200, {
+      username: name.username,
+      recovery_codes: codes,
+      session: token ? publicSession(token, name.username) : null,
+    });
+  }
+
   async function handleRegenerate(req) {
     const access = bearerToken(req);
     if (!access) throw new OwnerAuthError(401, "session_required", "Sign in again to continue.");
@@ -568,6 +681,7 @@ export function createOwnerAuth(config = {}) {
         signup: handleSignup,
         signin: handleSignin,
         reset: handleReset,
+        claim: handleClaim,
         "codes/regenerate": handleRegenerate,
       };
       if (!(action in routes)) throw new OwnerAuthError(404, "not_found", "Not found.");
