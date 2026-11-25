@@ -4,6 +4,15 @@ This file says which builds are for distribution, which are test-only, what secr
 needs, and the order to run things in. It contains no key values. Never paste a keystore, a
 certificate, a password or a base64 key into chat, an issue, a commit, a log or a screenshot.
 
+> **Current state (2026-11-25): no distributable build exists yet.** Production has no username
+> sign-in (see `docs/AUTH_REDESIGN.md`, section 7), so every Android and desktop build is a
+> staging TEST build, and the workflows **refuse** `release=true` and the APK prerelease. The
+> `Distribute it? Yes` rows below describe the intended end state only. Do not set
+> `QRQUICK_ALLOW_PRODUCTION_BUILD=1` until production has the migrations and the `owner-auth`
+> function and the owner has approved the production plan (`docs/PRODUCTION_APPROVAL.md`).
+> Signing credentials are supplied by the owner (the six secrets below). Acceptance on real
+> phones and printers is `docs/PHYSICAL_ACCEPTANCE.md`.
+
 ## Which builds are for distribution
 
 | Build | How to start it | Signed with | Name in the run | Distribute it? |

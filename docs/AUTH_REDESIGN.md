@@ -74,17 +74,17 @@ Supabase Auth (GoTrue) stays the session authority, so RLS, refresh, and logout 
 
 | # | Item | What the owner does | Status |
 |---|---|---|---|
-| B1 | Leaked-password protection is **off** (advisor). | Authentication → Attack protection / Password security: turn on the HaveIBeenPwned check. Confirm it applies to admin-created users; if not, record that. | Owner |
+| B1 | Leaked-password protection is **off** in the dashboard (advisor WARN). | **Fixed in code:** `owner-auth` checks every new password against the breach list (k-anonymity, five hash characters sent) at sign-up and reset, before an account is made or a code is used. Fails closed (503 `password_check_unavailable`). Live staging test 21/21 refuses `Password123`. **Owner:** also turn on the dashboard check so the advisor clears. | Code done; owner toggle remains |
 | B2 | GoTrue acceptance of `@accounts.qrquick.invalid` is **unverified**. | The CI staging test creates one account and must pass. If GoTrue refuses the domain, stop and choose another internal domain (see section 6). | Proved by CI |
-| B3 | Email sign-up in the dashboard. | Turn email sign-up **off** when the new client is live. The trigger already refuses email rows, so this is defence in depth. | Owner |
-| B4 | Legacy email-only owners. | Staging has 2 such accounts, with no password. Production is unknown. Decide: an admin-assisted claim (identity checked by the owner, then a reservation row added by hand), or recreate. **Not implemented.** | Owner decision |
+| B3 | Email sign-up in the dashboard. | Not changeable with the tools available. The database guard (0022, deferred at commit) already refuses any email row, so public sign-up cannot create an account. **Owner:** turn email sign-up off as defence in depth, then re-run `owner-auth-staging.yml` to confirm username sign-up still works. | Guarded; owner toggle remains |
+| B4 | Legacy email-only owners. | Counted read-only on 2026-11-25: **production has 3 owner accounts, all legacy email-style; 2 have no password.** Staging has 2, no password. Options: (a) admin-assisted claim: the operator verifies the person, then adds a username row and sets a password through the admin API, and the owner receives recovery codes; (b) recreate the shop under a new username account. Option (a) keeps shops and orders. **Not implemented: needs the decision and identity checks.** | Owner decision |
 | B5 | Recovery-code loss. | Without codes, a forgotten password cannot be reset by the app. Mitigation: the signed-in "new recovery codes" action (needs the current password). Fallback is a manual admin reset, which needs a process. | Accepted risk, to be shown in the UI |
 | B6 | Access tokens outlive a reset. | Refresh sessions are revoked at once. Existing access tokens last until their expiry (default 1 hour). | Documented |
 | B7 | Username-taken message on signup. | Signup must say "taken" to be usable. This reveals that a name is registered. Login does not reveal it. | Accepted trade-off |
-| B8 | Public email endpoints (`/auth/v1/recover`, `/auth/v1/otp`) still exist for legacy accounts. | The app does not call them. Full removal means turning the email provider off, which also removes legacy access. Owner decision. | Owner decision |
-| B9 | Live tests cannot run from this sandbox (proxy 403 to staging). | Run `owner-auth-staging.yml` in CI. Its result is the only proof of the live path. | Open until CI is green |
-| B10 | Migration drift (remote 13 vs repo 16). | Compare before any production catch-up. Not changed here. | Open |
-| B11 | Pre-existing advisor warnings (anon-callable `place_order`, `quote_order`, `track_order`; authenticated SECURITY DEFINER RPCs). | Not part of this change. Review separately. | Open |
+| B8 | Public email endpoints (`/auth/v1/recover`, `/auth/v1/otp`). | These are GoTrue built-ins, not repo code; the repo and the `owner-auth` router have no such routes and the client never calls them. Username sign-in uses the GoTrue password grant, which needs the email provider enabled, so switching the provider off would **break username sign-in**. Recover and OTP cannot reach an internal `.invalid` address. Recommendation: keep the provider on. | Owner decision (recommend keep) |
+| B9 | Live tests cannot run from this sandbox (proxy 403 to staging). | Run in CI. `owner-auth-staging.yml` passed 21/21 on `dd97dc7`. | Closed by CI |
+| B10 | Migration drift. | Mapped 2026-11-25 (section 7). Staging lacks licence migrations 0015 to 0017 and has one remote-only history entry. **Production is at roughly 0009 and lacks 0010 to 0023**, so the production plan must be the whole chain, not 0021 to 0023. | Mapped; repair needs approval |
+| B11 | Advisor warnings. | Migration 0023 (written, tested locally, **not applied**) splits the FOR ALL owner write policies and adds four foreign-key indexes. The SECURITY DEFINER warnings are intentional: `place_order`, `quote_order` and `track_order` are the anonymous customer flow, and `is_shop_member`, `is_shop_owner` and `shop_folder_is_mine` must stay executable because RLS policies call them. Unused-index INFO items are left until there is real traffic. | Fixed in 0023 pending approval; remainder accepted, owner to confirm |
 
 ## 5. Status
 
@@ -97,9 +97,26 @@ Supabase Auth (GoTrue) stays the session authority, so RLS, refresh, and logout 
 | Live staging checks, `web/tests/live/owner-auth-live.mjs` run by `owner-auth-staging.yml`: policies, terms refusal, weak password, reserved name, sign-up with the `.invalid` address, duplicate, sign-in, reset with a code, a stale code refused, new codes, rate limit | Written. Not run yet: this sandbox cannot reach staging, so the first CI run is the proof for B2 and B9. Refusing direct email sign-up is not in the script; it depends on the dashboard setting (B3). |
 | Client: `auth.js`, `session.js`, `logic.js`, `owner.js` screens, `app.js` routes, `legal.js` Terms and Privacy pages | Done locally. The Terms and Privacy text is a DRAFT with [bracketed] placeholders that the operator must complete and approve. |
 | Email code removed: `pending-signup.js` and its test deleted; OTP, email recovery and email sign-up removed from the client | Done locally |
-| Local tests: `npm test` 258 of 258; browser smokes against mocks: owner-smoke 43/43, owner-shell-smoke 51/51, registration-smoke 44/44, qr-smoke 12/12, licence-smoke 33/33, features-smoke 24/24, stats-smoke exit 0 | Pass |
+| Local tests: `npm test` 262 of 262 (after B1); browser smokes against mocks: owner-smoke 43/43, owner-shell-smoke 51/51, registration-smoke 44/44, qr-smoke 12/12, licence-smoke 33/33, features-smoke 24/24, stats-smoke exit 0 | Pass |
 | Staging browser smoke (`staging-owner-smoke.cjs`) moved to usernames; its owner secrets are now `STAGING_OWNER_USERNAME` and `STAGING_OWNER_PASSWORD` | Done; not run against staging (needs the owner secret) |
-| Commit and push to `stage7-implementation-2026-11-13` | Pending until pushed; see the branch log |
+| B1 breach check, unit tests, live checks | Done; `owner-auth` v2 on staging; live 21/21 on `dd97dc7` |
+| Migration 0023 | Written, base suites 8/8 locally and in CI; not applied |
+| Commit and push to `stage7-implementation-2026-11-13` | Done through `c8d6519` |
+
+## 7. Migration drift map (read-only inspection, 2026-11-25)
+
+| Repo file | Staging | Production |
+|---|---|---|
+| 0001 to 0009 | applied (named as in the repo) | applied under older names (`stage1_foundation`, `services_public_policy_fix`, `stage4_customer_files`, `stage6_*`, `stage7_payments_and_statistics`, `qrquick_security_hardening`, `qrquick_payment_intents`, `cash_policy_and_payment_hardening`) plus two with no repo file: `fix_tracking_code_alphabet` and `shared_pricing_and_quote_order`. The repo defines those functions in 0001, 0003, 0004 and 0020. |
+| 0010 print_agents | applied | **missing** (no print tables in production) |
+| 0015 to 0017 licence | **missing** | missing |
+| 0018 to 0020 | applied | missing |
+| 0021 owner_username_auth | applied | missing |
+| 0022 owner_guard_at_commit | applied, plus remote-only `owner_guard_revoke_execute` (revokes a function 0022 drops; harmless, superseded) | missing |
+| 0023 | not applied (prepared) | missing |
+
+Production public tables: 8 (`shops`, `shop_memberships`, `services`, `orders`, `order_items`, `customer_files`, `feature_catalog`, `order_events`). Staging: 16.
+Nothing was written to either project during this inspection. Production received SELECT statements only.
 
 ## 6. Fallbacks if a step fails
 
