@@ -1,0 +1,114 @@
+name: Windows installer crash diagnosis
+
+# Diagnostic only. Builds the TEST installer exactly as desktop-owner-app.yml does, then runs it repeatedly under
+# several conditions and records exit codes, Windows crash events (faulting module and offset) and Defender
+# state, to find why the silent install sometimes exits with -1073741819 (0xC0000005). Publishes nothing.
+# Runs only when this file changes, or manually.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - '.github/workflows/windows-installer-diagnose.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the installer as the real workflow does
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run copy-web:staging-package
+          npx electron-builder --win --x64 --publish never
+          ls -l dist/*.exe
+
+      - name: Turn on crash dumps and record the machine
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+          New-Item -Path $key -Force | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\dumps" | Out-Null
+          Set-ItemProperty -Path $key -Name DumpFolder -Value "$env:RUNNER_TEMP\dumps"
+          Set-ItemProperty -Path $key -Name DumpType -Value 2 -Type DWord
+          Get-ComputerInfo | Select-Object OsName, OsBuildNumber, OsVersion, CsTotalPhysicalMemory | Format-List
+          try { Get-MpComputerStatus | Select-Object AMServiceEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion | Format-List } catch { Write-Host "Defender status unavailable: $($_.Exception.Message)" }
+
+      - name: Run the installer in five conditions, eight times each
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $installer = (Get-ChildItem dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1).FullName
+          Write-Host "Installer: $installer  $((Get-Item $installer).Length) bytes  SHA256 $((Get-FileHash $installer).Hash)"
+          $results = @()
+          function Invoke-Case($name, $count, [scriptblock]$prepare, [scriptblock]$run) {
+            for ($i = 1; $i -le $count; $i++) {
+              $target = Join-Path $env:RUNNER_TEMP "inst-$name-$i"
+              if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+              $exe = & $prepare
+              $sw = [Diagnostics.Stopwatch]::StartNew()
+              $code = & $run $exe $target
+              $sw.Stop()
+              $installed = Test-Path (Join-Path $target 'QRquick.exe')
+              if ($name -eq 'defaultdir') { $installed = Test-Path "$env:LOCALAPPDATA\Programs" }
+              $script:results += [pscustomobject]@{ Case = $name; Run = $i; ExitCode = $code; Installed = $installed; Seconds = [math]::Round($sw.Elapsed.TotalSeconds,1) }
+              Write-Host ("{0,-12} run {1}: exit {2} installed={3} {4}s" -f $name, $i, $code, $installed, [math]::Round($sw.Elapsed.TotalSeconds,1))
+              Start-Sleep -Seconds 2
+            }
+          }
+          $asBuilt  = { $installer }
+          $copied   = { $c = Join-Path $env:RUNNER_TEMP 'setup.exe'; Copy-Item $installer $c -Force; $c }
+          $startProc = { param($exe,$target) (Start-Process -FilePath $exe -ArgumentList @('/S', "/D=$target") -Wait -PassThru).ExitCode }
+          $callOp    = { param($exe,$target) & $exe /S "/D=$target" | Out-Null; $LASTEXITCODE }
+          $noDir     = { param($exe,$target) (Start-Process -FilePath $exe -ArgumentList @('/S') -Wait -PassThru).ExitCode }
+
+          Invoke-Case 'asbuilt'    8 $asBuilt $startProc
+          Invoke-Case 'copied'     8 $copied  $startProc
+          Invoke-Case 'calloperator' 8 $copied $callOp
+          Add-MpPreference -ExclusionPath $env:RUNNER_TEMP, (Join-Path (Get-Location) 'dist') -ErrorAction SilentlyContinue
+          Invoke-Case 'defexcluded' 8 $copied $startProc
+          Invoke-Case 'defaultdir'  4 $copied $noDir
+          $results | Format-Table -AutoSize | Out-String | Write-Host
+          $results | Group-Object Case | ForEach-Object {
+            $bad = @($_.Group | Where-Object { $_.ExitCode -ne 0 -or -not $_.Installed }).Count
+            "{0}: {1} of {2} runs failed" -f $_.Name, $bad, $_.Count
+          } | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY" -Append
+
+      - name: Crash events, Defender detections and dumps
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host '--- Application Error / WER events (faulting module and offset) ---'
+          Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error','Windows Error Reporting' } -MaxEvents 40 -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'setup|QRquick|nsis|Uninstall' } |
+            ForEach-Object { "{0} {1}" -f $_.TimeCreated.ToString('s'), ($_.Message -replace '\s+', ' ').Substring(0, [math]::Min(420, $_.Message.Length)) }
+          Write-Host '--- Defender detections ---'
+          try { Get-MpThreatDetection | Select-Object InitialDetectionTime, ThreatID, Resources | Format-List } catch { Write-Host 'none or unavailable' }
+          Write-Host '--- dumps ---'
+          Get-ChildItem "$env:RUNNER_TEMP\dumps" -ErrorAction SilentlyContinue | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-crash-dumps
+          path: ${{ runner.temp }}/dumps
+          if-no-files-found: ignore
+          retention-days: 7
