@@ -52,7 +52,7 @@ jobs:
           Get-ComputerInfo | Select-Object OsName, OsBuildNumber, OsVersion, CsTotalPhysicalMemory | Format-List
           try { Get-MpComputerStatus | Select-Object AMServiceEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion | Format-List } catch { Write-Host "Defender status unavailable: $($_.Exception.Message)" }
 
-      - name: Run the installer in five conditions, eight times each
+      - name: Run the installer young and late, built path and copy
         shell: pwsh
         working-directory: desktop
         run: |
@@ -75,18 +75,21 @@ jobs:
               Start-Sleep -Seconds 2
             }
           }
+          $age = { [math]::Round(((Get-Date) - (Get-Item $installer).LastWriteTime).TotalSeconds) }
           $asBuilt  = { $installer }
-          $copied   = { $c = Join-Path $env:RUNNER_TEMP 'setup.exe'; Copy-Item $installer $c -Force; $c }
+          $copied   = { $c = Join-Path $env:RUNNER_TEMP "setup-$([guid]::NewGuid().ToString('N')).exe"; Copy-Item $installer $c -Force; $c }
           $startProc = { param($exe,$target) (Start-Process -FilePath $exe -ArgumentList @('/S', "/D=$target") -Wait -PassThru).ExitCode }
-          $callOp    = { param($exe,$target) & $exe /S "/D=$target" | Out-Null; $LASTEXITCODE }
-          $noDir     = { param($exe,$target) (Start-Process -FilePath $exe -ArgumentList @('/S') -Wait -PassThru).ExitCode }
-
-          Invoke-Case 'asbuilt'    8 $asBuilt $startProc
-          Invoke-Case 'copied'     8 $copied  $startProc
-          Invoke-Case 'calloperator' 8 $copied $callOp
-          Add-MpPreference -ExclusionPath $env:RUNNER_TEMP, (Join-Path (Get-Location) 'dist') -ErrorAction SilentlyContinue
-          Invoke-Case 'defexcluded' 8 $copied $startProc
-          Invoke-Case 'defaultdir'  4 $copied $noDir
+          Write-Host "Seconds since the installer was written: $(& $age)"
+          Write-Host '--- busy processes right after the build ---'
+          Get-Process | Sort-Object CPU -Descending | Select-Object -First 8 Name, CPU, Id | Format-Table | Out-String | Write-Host
+          # Order matters: a fresh copy first, while the built file is still young, then the built file itself,
+          # then a wait, then the built file again. If only young files crash, the copy crashes too.
+          Invoke-Case 'copy-young'  6 $copied  $startProc
+          Invoke-Case 'asbuilt'     6 $asBuilt $startProc
+          Write-Host "Seconds since the installer was written: $(& $age). Waiting 90 s."
+          Start-Sleep -Seconds 90
+          Invoke-Case 'asbuilt-late' 4 $asBuilt $startProc
+          Invoke-Case 'copy-late'    4 $copied  $startProc
           $results | Format-Table -AutoSize | Out-String | Write-Host
           $results | Group-Object Case | ForEach-Object {
             $bad = @($_.Group | Where-Object { $_.ExitCode -ne 0 -or -not $_.Installed }).Count
