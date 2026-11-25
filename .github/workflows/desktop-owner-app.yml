@@ -231,8 +231,35 @@ jobs:
           $installer = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1
           if (-not $installer) { throw 'The Windows installer was not built.' }
           $target = Join-Path $env:RUNNER_TEMP 'QRquick-install'
-          $process = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$target") -Wait -PassThru
-          Write-Host "Installer exit code: $($process.ExitCode). Installer size: $((Get-Item $installer.FullName).Length) bytes."
+          # Known fault, found by .github/workflows/windows-installer-diagnose.yml: on a freshly started runner the
+          # NSIS installer (NSIS 3.0.4.1, shipped inside electron-builder 25 and 26 alike) sometimes dies with an access
+          # violation, exit -1073741819 (0xC0000005), in its own System.dll plug-in at offset 0x1581, before it writes
+          # anything. The same file installs fine on the next try. This step retries ONLY that exact signature, at
+          # most three attempts, and says so in the job summary. Any other exit code, or a different fault, fails
+          # at once, and three crashes in a row fail the job.
+          $crashCode = -1073741819
+          $attempt = 0
+          $crashes = 0
+          while ($true) {
+            $attempt++
+            $started = Get-Date
+            if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+            $process = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$target") -Wait -PassThru
+            Write-Host "Attempt ${attempt}: installer exit code $($process.ExitCode). Installer size: $((Get-Item $installer.FullName).Length) bytes."
+            if ($process.ExitCode -ne $crashCode) { break }
+            $events = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; StartTime = $started.AddSeconds(-2) } -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'setup\.exe' })
+            $text = ($events | ForEach-Object { $_.Message -replace '\s+', ' ' }) -join ' || '
+            Write-Host "Crash events: $text"
+            $known = $text -match 'Faulting module name: System\.dll' -and $text -match 'Fault offset: 0x0*1581\b'
+            if (-not $known) { throw "The installer crashed with an unrecognised fault. It is not retried. Events: $text" }
+            $crashes++
+            if ($attempt -ge 3) { throw "The installer crashed with the known System.dll fault on all $attempt attempts." }
+            Write-Host "::warning title=Installer crash (known NSIS System.dll fault)::Attempt $attempt crashed. Trying again."
+            Start-Sleep -Seconds 5
+          }
+          "Windows installer: $crashes known crash(es) before the install that was tested (attempts: $attempt)." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Write-Host "Installer attempts: $attempt, known crashes: $crashes."
           # The installer can return before its files are written (it may hand off to a child process), so wait for
           # the app and its uninstaller to appear, up to three minutes.
           $deadline = (Get-Date).AddSeconds(180)
