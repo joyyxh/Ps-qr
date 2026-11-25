@@ -19,6 +19,12 @@ jobs:
   diagnose:
     runs-on: windows-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        builder: ['25.1.8', '26']
+        replica: [1, 2, 3]
+    name: diagnose (electron-builder ${{ matrix.builder }}, replica ${{ matrix.replica }})
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       BUILD_SHA: diag
@@ -37,6 +43,8 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-audit --no-fund
+          if [ "${{ matrix.builder }}" != "25.1.8" ]; then npm install --no-save --no-audit --no-fund "electron-builder@${{ matrix.builder }}"; fi
+          npx electron-builder --version
           npm run copy-web:staging-package
           npx electron-builder --win --x64 --publish never
           ls -l dist/*.exe
@@ -84,8 +92,8 @@ jobs:
           Get-Process | Sort-Object CPU -Descending | Select-Object -First 8 Name, CPU, Id | Format-Table | Out-String | Write-Host
           # Order matters: a fresh copy first, while the built file is still young, then the built file itself,
           # then a wait, then the built file again. If only young files crash, the copy crashes too.
+          Invoke-Case 'asbuilt'     10 $asBuilt $startProc
           Invoke-Case 'copy-young'  6 $copied  $startProc
-          Invoke-Case 'asbuilt'     6 $asBuilt $startProc
           Write-Host "Seconds since the installer was written: $(& $age). Waiting 90 s."
           Start-Sleep -Seconds 90
           Invoke-Case 'asbuilt-late' 4 $asBuilt $startProc
@@ -112,7 +120,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installer-crash-dumps
+          name: installer-crash-dumps-${{ matrix.builder }}-${{ matrix.replica }}
           path: ${{ runner.temp }}/dumps
           if-no-files-found: ignore
           retention-days: 7
