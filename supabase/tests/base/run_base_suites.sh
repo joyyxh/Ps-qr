@@ -6,7 +6,7 @@
 #
 # What it does:
 #   1. builds one template database: the test-only platform stand-ins (00_base_platform_shims.sql),
-#      migrations 0001 to 0010, 0015 to 0024 in order, then the development seed. Chain A
+#      migrations 0001 to 0010, 0015 to 0025 in order, then the development seed. Chain A
 #      migrations 0011 to 0014 are not on this branch, and the script refuses to run if they appear.
 #   2. runs each suite in its own fresh database copied from the template. Each suite is one
 #      transaction that ends with rollback, and it prints name, ok, detail.
@@ -52,21 +52,21 @@ cleanup
 for migration in "$ROOT"/supabase/migrations/*.sql; do
   case "$(basename "$migration")" in
     0011_*|0012_*|0013_*|0014_*) echo "refusing: unexpected Chain A file $(basename "$migration")" >&2; exit 2 ;;
-    0015_*|0016_*|0017_*|0018_*|0019_*|0020_*|0021_*|0022_*|0023_*|0024_*|0001_*|0002_*|0003_*|0004_*|0005_*|0006_*|0007_*|0008_*|0009_*|0010_*) ;;
+    0015_*|0016_*|0017_*|0018_*|0019_*|0020_*|0021_*|0022_*|0023_*|0024_*|0025_*|0001_*|0002_*|0003_*|0004_*|0005_*|0006_*|0007_*|0008_*|0009_*|0010_*) ;;
     *) echo "refusing: unexpected migration file $(basename "$migration")" >&2; exit 2 ;;
   esac
   "${PSQL[@]}" -d "$TEMPLATE" -f "$migration" >/dev/null
 done
 "${PSQL[@]}" -d "$TEMPLATE" -f "$ROOT/supabase/seed/demo_seed.sql"
-echo "== template ready: shims, migrations 0001-0010 and 0015-0024, dev seed"
+echo "== template ready: shims, migrations 0001-0010 and 0015-0025, dev seed"
 
 # The owner guard (migration 0022) on the template. The probe rolls back, so the template stays as it is.
 "${PSQL[@]}" -d "$TEMPLATE" -f "$HERE/../owner_guard_probe.sql"
 echo "== owner guard probe passed"
 
 # Suite name and the minimum number of checks it had when this harness was written.
-SUITES=(stage1_isolation stage3_owner stage4_files stage5_orders stage6_features stage7_stats stage8_print stage9_upi stage10_claim)
-MINIMUM=(30 30 23 23 42 54 48 12 70)
+SUITES=(stage1_isolation stage3_owner stage4_files stage5_orders stage6_features stage7_stats stage8_print stage9_upi stage10_claim stage11_hardening)
+MINIMUM=(30 30 23 23 42 54 48 12 70 12)
 
 overall=0
 for index in "${!SUITES[@]}"; do
@@ -90,7 +90,7 @@ for index in "${!SUITES[@]}"; do
 done
 
 if [ "$overall" -eq 0 ]; then
-  echo "== base SQL suites: all nine passed"
+  echo "== base SQL suites: all ten passed"
 else
   echo "== base SQL suites: at least one suite failed" >&2
 fi
