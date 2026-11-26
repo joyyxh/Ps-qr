@@ -22,8 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        builder: ['25.1.8', '26']
-        replica: [1, 2, 3]
+        builder: ['25.1.8']
+        replica: [1, 2, 3, 4, 5, 6]
     name: diagnose (electron-builder ${{ matrix.builder }}, replica ${{ matrix.replica }})
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -60,49 +60,46 @@ jobs:
           Get-ComputerInfo | Select-Object OsName, OsBuildNumber, OsVersion, CsTotalPhysicalMemory | Format-List
           try { Get-MpComputerStatus | Select-Object AMServiceEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion | Format-List } catch { Write-Host "Defender status unavailable: $($_.Exception.Message)" }
 
-      - name: Run the installer young and late, built path and copy
+      - name: Find a crash window, then test mitigations inside it
         shell: pwsh
         working-directory: desktop
         run: |
           $ErrorActionPreference = 'Continue'
           $installer = (Get-ChildItem dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1).FullName
-          Write-Host "Installer: $installer  $((Get-Item $installer).Length) bytes  SHA256 $((Get-FileHash $installer).Hash)"
-          $results = @()
-          function Invoke-Case($name, $count, [scriptblock]$prepare, [scriptblock]$run) {
-            for ($i = 1; $i -le $count; $i++) {
-              $target = Join-Path $env:RUNNER_TEMP "inst-$name-$i"
-              if (Test-Path $target) { Remove-Item -Recurse -Force $target }
-              $exe = & $prepare
-              $sw = [Diagnostics.Stopwatch]::StartNew()
-              $code = & $run $exe $target
-              $sw.Stop()
-              $installed = Test-Path (Join-Path $target 'QRquick.exe')
-              if ($name -eq 'defaultdir') { $installed = Test-Path "$env:LOCALAPPDATA\Programs" }
-              $script:results += [pscustomobject]@{ Case = $name; Run = $i; ExitCode = $code; Installed = $installed; Seconds = [math]::Round($sw.Elapsed.TotalSeconds,1) }
-              Write-Host ("{0,-12} run {1}: exit {2} installed={3} {4}s" -f $name, $i, $code, $installed, [math]::Round($sw.Elapsed.TotalSeconds,1))
-              Start-Sleep -Seconds 2
-            }
+          Write-Host "VM uptime (s): $([int]((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds)"
+          Write-Host '--- system-wide process mitigations ---'
+          try { Get-ProcessMitigation -System | Format-List | Out-String | Write-Host } catch { Write-Host "unavailable: $($_.Exception.Message)" }
+          $log = @()
+          function Try-Install($label, $exePath) {
+            $target = Join-Path $env:RUNNER_TEMP ("inst-" + [guid]::NewGuid().ToString('N'))
+            $code = (Start-Process -FilePath $exePath -ArgumentList @('/S', "/D=$target") -Wait -PassThru).ExitCode
+            $ok = ($code -eq 0) -and (Test-Path (Join-Path $target 'QRquick.exe'))
+            $script:log += [pscustomobject]@{ T = (Get-Date).ToString('HH:mm:ss'); Case = $label; Exit = $code; Installed = $ok }
+            Write-Host ("{0} {1,-22} exit {2} installed={3}" -f (Get-Date).ToString('HH:mm:ss'), $label, $code, $ok)
+            return $code
           }
-          $age = { [math]::Round(((Get-Date) - (Get-Item $installer).LastWriteTime).TotalSeconds) }
-          $asBuilt  = { $installer }
-          $copied   = { $c = Join-Path $env:RUNNER_TEMP "setup-$([guid]::NewGuid().ToString('N')).exe"; Copy-Item $installer $c -Force; $c }
-          $startProc = { param($exe,$target) (Start-Process -FilePath $exe -ArgumentList @('/S', "/D=$target") -Wait -PassThru).ExitCode }
-          Write-Host "Seconds since the installer was written: $(& $age)"
-          Write-Host '--- busy processes right after the build ---'
-          Get-Process | Sort-Object CPU -Descending | Select-Object -First 8 Name, CPU, Id | Format-Table | Out-String | Write-Host
-          # Order matters: a fresh copy first, while the built file is still young, then the built file itself,
-          # then a wait, then the built file again. If only young files crash, the copy crashes too.
-          Invoke-Case 'asbuilt'     10 $asBuilt $startProc
-          Invoke-Case 'copy-young'  6 $copied  $startProc
-          Write-Host "Seconds since the installer was written: $(& $age). Waiting 90 s."
-          Start-Sleep -Seconds 90
-          Invoke-Case 'asbuilt-late' 4 $asBuilt $startProc
-          Invoke-Case 'copy-late'    4 $copied  $startProc
-          $results | Format-Table -AutoSize | Out-String | Write-Host
-          $results | Group-Object Case | ForEach-Object {
-            $bad = @($_.Group | Where-Object { $_.ExitCode -ne 0 -or -not $_.Installed }).Count
-            "{0}: {1} of {2} runs failed" -f $_.Name, $bad, $_.Count
-          } | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY" -Append
+          # Phase 1: run the built installer every 3 s for up to 4 minutes until it crashes once.
+          $crashed = $false
+          $deadline = (Get-Date).AddMinutes(4)
+          while ((Get-Date) -lt $deadline -and -not $crashed) {
+            $c = Try-Install 'plain' $installer
+            if ($c -eq -1073741819) { $crashed = $true } else { Start-Sleep -Seconds 3 }
+          }
+          Write-Host "crash window found: $crashed"
+          if ($crashed) {
+            # Phase 2: still inside the window, try variants three times each, then plain again.
+            $copy = Join-Path $env:RUNNER_TEMP 'variant-setup.exe'; Copy-Item $installer $copy -Force
+            1..3 | ForEach-Object { Try-Install 'plain-again' $installer | Out-Null }
+            Set-ProcessMitigation -Name 'QRquick-1.0.0-diag-win-x64-setup.exe' -Disable UserShadowStack, StrictUserShadowStack -ErrorAction SilentlyContinue
+            1..3 | ForEach-Object { Try-Install 'cet-off' $installer | Out-Null }
+            Set-ProcessMitigation -Name 'QRquick-1.0.0-diag-win-x64-setup.exe' -Disable DEP, EmulateAtlThunks, CFG, ForceRelocateImages -ErrorAction SilentlyContinue
+            1..3 | ForEach-Object { Try-Install 'dep-cfg-aslr-off' $installer | Out-Null }
+            Set-ProcessMitigation -Name 'variant-setup.exe' -Disable UserShadowStack, DEP, CFG -ErrorAction SilentlyContinue
+            1..3 | ForEach-Object { Try-Install 'copy-all-off' $copy | Out-Null }
+            1..3 | ForEach-Object { Try-Install 'plain-late' $installer | Out-Null }
+          }
+          $log | Format-Table -AutoSize | Out-String | Write-Host
+          $log | Group-Object Case | ForEach-Object { "{0}: {1} of {2} crashed" -f $_.Name, @($_.Group | Where-Object { $_.Exit -eq -1073741819 }).Count, $_.Count } | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY" -Append
 
       - name: Crash events, Defender detections and dumps
         if: always()
