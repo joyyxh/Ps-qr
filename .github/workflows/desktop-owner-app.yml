@@ -247,8 +247,13 @@ jobs:
             $process = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$target") -Wait -PassThru
             Write-Host "Attempt ${attempt}: installer exit code $($process.ExitCode). Installer size: $((Get-Item $installer.FullName).Length) bytes."
             if ($process.ExitCode -ne $crashCode) { break }
-            $events = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; StartTime = $started.AddSeconds(-2) } -ErrorAction SilentlyContinue |
-              Where-Object { $_.Message -match 'setup\.exe' })
+            # Windows writes the Application Error event a few seconds after the crash. Wait for it, up to 45 seconds.
+            $events = @()
+            for ($waited = 0; $waited -lt 45 -and $events.Count -eq 0; $waited += 3) {
+              $events = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; StartTime = $started.AddSeconds(-2) } -ErrorAction SilentlyContinue |
+                Where-Object { $_.Message -match 'setup\.exe' })
+              if ($events.Count -eq 0) { Start-Sleep -Seconds 3 }
+            }
             $text = ($events | ForEach-Object { $_.Message -replace '\s+', ' ' }) -join ' || '
             Write-Host "Crash events: $text"
             $known = $text -match 'Faulting module name: System\.dll' -and $text -match 'Fault offset: 0x0*1581\b'
