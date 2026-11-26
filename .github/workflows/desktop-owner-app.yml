@@ -235,8 +235,8 @@ jobs:
           # NSIS installer (NSIS 3.0.4.1, shipped inside electron-builder 25 and 26 alike) sometimes dies with an access
           # violation, exit -1073741819 (0xC0000005), in its own System.dll plug-in at offset 0x1581, before it writes
           # anything. The same file installs fine on the next try. This step retries ONLY that exact signature, at
-          # most three attempts, and says so in the job summary. Any other exit code, or a different fault, fails
-          # at once, and three crashes in a row fail the job.
+          # most five attempts 15 seconds apart, and says so in the job summary. Any other exit code, or a different fault, fails
+          # at once, and five crashes in a row fail the job.
           $crashCode = -1073741819
           $attempt = 0
           $crashes = 0
@@ -259,9 +259,9 @@ jobs:
             $known = $text -match 'Faulting module name: System\.dll' -and $text -match 'Fault offset: 0x0*1581\b'
             if (-not $known) { throw "The installer crashed with an unrecognised fault. It is not retried. Events: $text" }
             $crashes++
-            if ($attempt -ge 3) { throw "The installer crashed with the known System.dll fault on all $attempt attempts." }
+            if ($attempt -ge 5) { throw "The installer crashed with the known System.dll fault on all $attempt attempts." }
             Write-Host "::warning title=Installer crash (known NSIS System.dll fault)::Attempt $attempt crashed. Trying again."
-            Start-Sleep -Seconds 5
+            Start-Sleep -Seconds 15
           }
           "Windows installer: $crashes known crash(es) before the install that was tested (attempts: $attempt)." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           Write-Host "Installer attempts: $attempt, known crashes: $crashes."
