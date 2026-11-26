@@ -872,6 +872,34 @@ export function signUpErrorMessage(err) {
   }
 }
 
+// Turns a failed move from an email account to a username account into one sentence. A wrong email, a wrong
+// code, an expired code and an account that was already moved all read the same on purpose.
+export function claimErrorMessage(err) {
+  if (serverUnreachable(err)) return CONNECTION_TEXT;
+  switch (err?.code) {
+    case 'claim_failed':
+      return 'That email address or claim code is not right, or the code has expired. Check both, or ask QRquick for a new code.';
+    case 'username_taken':
+      return 'That username is already taken. Choose another.';
+    case 'password_breached':
+    case 'username_required':
+    case 'username_length':
+    case 'username_chars':
+    case 'username_reserved':
+    case 'weak_password':
+    case 'password_rejected':
+      return err.message || 'Check the username and password, then try again.';
+    case 'terms_required':
+      return 'Accept the current Terms and Privacy Policy to continue.';
+    case 'rate_limited':
+      return 'Too many attempts. Wait an hour, then try again.';
+    case 'not_configured':
+      return NOT_CONFIGURED_TEXT;
+    default:
+      return err?.message || SERVER_TEXT;
+  }
+}
+
 // Turns a failed sign-in into one sentence. The wrong-username and wrong-password cases read the same
 // on purpose, so the screen does not reveal which usernames exist.
 export function signInErrorMessage(err) {

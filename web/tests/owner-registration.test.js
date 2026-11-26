@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  claimErrorMessage,
   passwordChecklist,
   recoveryCodesText,
   regenerateErrorMessage,
@@ -74,4 +75,14 @@ test('the saved-codes text holds every code once and names the account', () => {
   assert.match(text, /Account: ada_01/);
   for (const code of codes) assert.equal(text.split(code).length, 2, `${code} appears once`);
   assert.match(text, /^10\. /m);
+});
+
+test('claim messages: every refusal of the code or email reads the same, other errors name the problem', () => {
+  assert.equal(claimErrorMessage(serverError('claim_failed')), claimErrorMessage(serverError('claim_failed', 'x')));
+  assert.match(claimErrorMessage(serverError('claim_failed')), /not right, or the code has expired/);
+  assert.match(claimErrorMessage(serverError('username_taken')), /already taken/);
+  assert.equal(claimErrorMessage(serverError('password_breached', 'Pick another password.')), 'Pick another password.');
+  assert.match(claimErrorMessage(serverError('terms_required')), /Accept/);
+  assert.match(claimErrorMessage(serverError('rate_limited')), /Wait an hour/);
+  assert.match(claimErrorMessage(new TypeError('Failed to fetch')), /connect|connection|network/i);
 });

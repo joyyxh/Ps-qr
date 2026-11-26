@@ -12,6 +12,7 @@ import {
   signUpErrorMessage,
   signInErrorMessage,
   resetErrorMessage,
+  claimErrorMessage,
   regenerateErrorMessage,
   passwordChecklist,
   recoveryCodesText,
@@ -469,7 +470,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
 
   // The side screens of sign in have their own addresses, so Back (on Android and in the browser)
   // returns to sign in instead of leaving the app.
-  const SIGN_IN_SCREENS = ['register', 'forgot'];
+  const SIGN_IN_SCREENS = ['register', 'forgot', 'claim'];
   // Set just before a jump to the Security page, so that page can say what happened. Shown once.
   let securityNotice = '';
 
@@ -487,6 +488,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     setTabs(null);
     if (mode === 'register') return renderRegister(notice);
     if (mode === 'forgot') return renderForgot(notice);
+    if (mode === 'claim') return renderClaim(notice);
     return renderSignInForm(notice);
   }
 
@@ -556,6 +558,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         </form>
         <p><button type="button" class="link" data-switch="forgot">Forgot password? Use a recovery code</button></p>
         <p><button type="button" class="link" data-switch="register">New owner? Create an account</button></p>
+        <p><button type="button" class="link" data-switch="claim">Already have a shop with an email sign-in? Move it to a username</button></p>
       </section>`
     );
     on('#auth-form', 'submit', onSignInSubmit);
@@ -630,6 +633,98 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     form.addEventListener('input', () => paintChecks(form));
     paintChecks(form);
     bindAuthChrome();
+  }
+
+  // For owners who signed in with an email before. QRquick gives each one a one-time claim code after checking who
+  // they are. The shop, orders and services stay exactly as they are.
+  async function renderClaim(notice = '') {
+    setTabs(null);
+    show('<p class="muted">Loading…</p>');
+    let policies;
+    try {
+      policies = await auth.policies();
+    } catch (err) {
+      show(
+        `<section class="card">
+          <h1>Move your shop to a username</h1>
+          <p class="error" role="alert">${escapeHtml(claimErrorMessage(err))}</p>
+          <p><button type="button" data-action="retry-policies">Try again</button></p>
+          <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+        </section>`
+      );
+      on('[data-action="retry-policies"]', 'click', () => renderClaim(notice));
+      bindAuthChrome();
+      return;
+    }
+    show(
+      `<section class="card">
+        <h1>Move your shop to a username</h1>
+        <p class="muted small">Use this if you signed in with an email address before. Ask QRquick for a claim code first. Your shop, services and orders stay exactly as they are. After this you sign in with the username and password you choose here, not the email.</p>
+        <form id="auth-form" class="grid" novalidate>
+          <label>Your old sign-in email
+            <input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" />
+          </label>
+          <label>Claim code
+            <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="30" placeholder="XXXX-XXXX-XXXX-XXXX" />
+          </label>
+          <label>New username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" aria-describedby="username-hint" />
+          </label>
+          <p id="username-hint" class="muted small">3 to 24 characters: letters a to z, numbers and single underscores. Start with a letter.</p>
+          ${passwordField('password', 'New password', 'new-password')}
+          <ul class="checklist" data-rules aria-label="Password rules"></ul>
+          ${passwordField('confirm', 'Confirm new password', 'new-password')}
+          <p class="small" data-match aria-live="polite"></p>
+          <label class="check">
+            <input type="checkbox" name="accept" />
+            <span>I have read and accept the <a href="#/terms" target="_blank" rel="noopener">${escapeHtml(policies.terms.title)}</a> (version ${escapeHtml(policies.terms.version)}) and the <a href="#/privacy" target="_blank" rel="noopener">${escapeHtml(policies.privacy.title)}</a> (version ${escapeHtml(policies.privacy.version)}).</span>
+          </label>
+          <button type="submit" data-label="Move my shop">Move my shop</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+      </section>`
+    );
+    const form = app.querySelector('#auth-form');
+    form.addEventListener('submit', (event) => onClaimSubmit(event, policies));
+    form.addEventListener('input', () => paintChecks(form));
+    paintChecks(form);
+    bindAuthChrome();
+  }
+
+  async function onClaimSubmit(event, policies) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const email = String(form.elements.email.value ?? '').trim();
+    const code = normalizeRecoveryCode(form.elements.code.value);
+    const name = checkUsername(form.elements.username.value);
+    const password = form.elements.password.value;
+    setError(form, '');
+    if (!/^[^\s@]+@[^\s@]+$/.test(email)) return setError(form, 'Enter the email address you used to sign in before.');
+    if (code === null) return setError(form, 'Enter the claim code. It has 16 letters and numbers, in four groups of four.');
+    if (!name.ok) return setError(form, name.message);
+    if (!checkPassword(password, name.username).ok) {
+      return setError(form, 'Your password does not meet all the rules yet. The list above shows what is missing.');
+    }
+    if (password !== form.elements.confirm.value) {
+      return setError(form, 'The passwords do not match. Type the same password in both boxes.');
+    }
+    if (!form.elements.accept.checked) return setError(form, 'Accept the Terms and the Privacy Policy to continue.');
+    setBusy(form, true);
+    try {
+      await auth.claim({
+        email,
+        claimCode: code,
+        username: name.username,
+        password,
+        accept: { terms: policies.terms.version, privacy: policies.privacy.version },
+      });
+      clearPasswords(form);
+      go([]);
+    } catch (err) {
+      setError(form, claimErrorMessage(err));
+      setBusy(form, false);
+    }
   }
 
   async function onRegisterSubmit(event, policies) {

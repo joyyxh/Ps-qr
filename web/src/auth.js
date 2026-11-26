@@ -118,6 +118,19 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
       return publicPending();
     },
 
+    // Moves an existing email owner to a username account. Needs the one-time claim code QRquick gave the owner.
+    // The shop, orders and services stay attached. The new recovery codes wait here like those of a new account.
+    async claim({ email, claimCode, username, password, accept }) {
+      const data = await owner('claim', { body: { email, claim_code: claimCode, username, password, accept } });
+      pending = {
+        purpose: 'signup',
+        username: data.username,
+        recoveryCodes: data.recovery_codes ?? [],
+        session: data.session ? sessionFrom(data.session, data.username) : null,
+      };
+      return publicPending();
+    },
+
     // Signs in with a username and password. Nothing is stored unless the server accepts them.
     async signIn(username, password) {
       const data = await owner('signin', { body: { username, password } });

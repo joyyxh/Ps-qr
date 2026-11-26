@@ -29,7 +29,7 @@ if (config?.ownerApp) document.body.classList.add('owner-app');
 
 // Android Back (MainActivity asks the page first). On a sign-in side screen, Back returns to the owner sign-in
 // screen instead of closing the app. The WebView history cannot be relied on for this on every device.
-const OWNER_SIDE_SCREEN = /^#\/owner\/(register|forgot)$/;
+const OWNER_SIDE_SCREEN = /^#\/owner\/(register|forgot|claim)$/;
 window.qrquickBack = () => {
   if (!config?.ownerApp || !OWNER_SIDE_SCREEN.test(window.location.hash)) return false;
   window.location.hash = '#/owner';
@@ -39,7 +39,7 @@ window.qrquickBack = () => {
 // Called by MainActivity when the app comes back to the front. A create-account or forgot-password form that was
 // left open is closed, so the app reopens on the protected sign-in screen.
 window.qrquickResume = () => {
-  if (config?.ownerApp && /^#\/owner\/(register|forgot)$/.test(window.location.hash)) window.location.hash = '#/owner';
+  if (config?.ownerApp && /^#\/owner\/(register|forgot|claim)$/.test(window.location.hash)) window.location.hash = '#/owner';
 };
 
 let api = null;

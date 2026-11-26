@@ -108,6 +108,36 @@ test('sign-up failure keeps the server code and stores nothing', async () => {
   assert.equal(store.load(), null);
 });
 
+test('a claim sends the old email, the code, the new username and password, and holds the new codes like a sign-up', async () => {
+  const { auth, calls, store } = makeAuth({
+    [`POST ${FUNCTION}/claim`]: json(200, { username: 'ravi_prints', recovery_codes: CODES, session: tokens('ravi_prints') }),
+  });
+  const pending = await auth.claim({
+    email: 'ravi@example.com',
+    claimCode: 'KMNPQRSTUVWXYZ23',
+    username: 'ravi_prints',
+    password: 'Correct-Horse-9',
+    accept: { terms: 'v1', privacy: 'v1' },
+  });
+  assert.deepEqual(Object.keys(calls[0].body).sort(), ['accept', 'claim_code', 'email', 'password', 'username']);
+  assert.equal(calls[0].body.claim_code, 'KMNPQRSTUVWXYZ23');
+  assert.equal(calls[0].headers.Authorization, undefined, 'no session is needed to claim');
+  assert.equal(pending.recoveryCodes.length, 10);
+  assert.equal(store.load(), null, 'the session is kept only after the owner confirms the codes');
+});
+
+test('a refused claim keeps the server code and stores nothing', async () => {
+  const { auth, store } = makeAuth({
+    [`POST ${FUNCTION}/claim`]: json(401, { code: 'claim_failed', message: 'no' }),
+  });
+  await assert.rejects(
+    auth.claim({ email: 'a@b.c', claimCode: 'KMNPQRSTUVWXYZ23', username: 'ravi_prints', password: 'Correct-Horse-9', accept: {} }),
+    (err) => err.code === 'claim_failed' && err.status === 401
+  );
+  assert.equal(store.load(), null);
+  assert.equal(auth.pendingCodes(), null);
+});
+
 test('sign-in stores the session with the username and no email', async () => {
   const { auth, store } = makeAuth({
     [`POST ${FUNCTION}/signin`]: json(200, { username: 'ada_01', session: tokens('ada_01') }),
