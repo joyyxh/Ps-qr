@@ -35,4 +35,9 @@ only 0021 to 0023 would fail or leave a mixed schema. The plan is the whole chai
 Risks: migration 0022's guard refuses *new* email-style rows on `auth.users` (existing legacy rows can still sign in by email), but the new app has no email sign-in, so legacy owners need their claim codes before the new app ships. Deploy the `owner-auth` version with `/claim` at step 6. The breach check fails closed, so a
 HaveIBeenPwned outage pauses sign-ups. Unsigned installers show a warning on Windows.
 
+Effect, data risk and rollback of every migration: `MIGRATION_REFERENCE.md`. The legacy-owner facts below were read
+from production on 2026-11-27 (read-only): 9 auth accounts, of which 3 own shops: owner A (no password, never signed in, 1 shop, 1 order),
+owner B (no password, never signed in, 2 shop memberships, 5 orders) and owner C (password, last sign-in 2026-11-21, 1 shop, 1 order). Six
+other accounts own nothing (see `DECISIONS.md`, item 7).
+
 Exact SQL is the files in `supabase/migrations/` (0010, 0015 to 0025), applied unchanged.

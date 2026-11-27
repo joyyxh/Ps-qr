@@ -68,3 +68,21 @@ re-issue the owner access by hand with the admin API (set the old email, set `ow
 Whether legacy owners must claim before the new app ships (they cannot sign in to the new app with an email) or the old
 app version stays available to them for a period. Either way the **email provider stays enabled**, because the username
 accounts depend on it.
+
+## The two owners without a password (checked read-only on production, 2026-11-27)
+
+Owner A (1 shop, 1 order) and owner B (2 shop memberships, 5 orders) have no password, have never signed in, and their
+email address was never confirmed. Owner C (1 shop, 1 order) has a password and last signed in on 2026-11-21.
+
+What this changes:
+- The email address on file is **not proof of identity** for A and B: nobody has ever received a message at it. The claim
+  code is therefore the only proof, and the proof it carries is whatever you verify out of band in step 1.
+- Do not issue a code until you have confirmed the person by a channel you already trust for that shop (the shop's phone,
+  an order you can match). If you cannot confirm them, do not issue a code. The account stays as it is.
+- The claim asks for the old email and the code. If the owner does not remember which address was used, read it to them
+  over the same trusted channel; do not send it with the code.
+- Order of work: C first (has a password and recent activity, so they can confirm easily), then A, then B.
+- After each claim: compare the shop and order counts with the numbers above, and confirm the user id is unchanged.
+  Expected: A 1 shop / 1 order, B 2 shops / 5 orders, C 1 shop / 1 order.
+
+Do not issue a code to any of the six accounts that own no shop. They are listed in `DECISIONS.md`, item 7.

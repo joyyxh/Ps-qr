@@ -53,6 +53,7 @@ jobs:
       - name: Swap in NSIS 3.11 and rebuild
         if: matrix.variant == 'nsis-3.11'
         shell: pwsh
+        working-directory: desktop
         run: |
           $ErrorActionPreference = 'Stop'
           $cache = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\nsis'
@@ -71,15 +72,12 @@ jobs:
               Copy-Item "$src\$d" "$nsisDir\$d" -Recurse -Force
             }
           }
-          Copy-Item "$src\makensis.exe" "$nsisDir\Bin\makensis.exe" -Force -ErrorAction SilentlyContinue
-          Copy-Item "$src\NSIS.exe" "$nsisDir\NSIS.exe" -Force -ErrorAction SilentlyContinue
-          Copy-Item "$src\makensisw.exe" "$nsisDir\makensisw.exe" -Force -ErrorAction SilentlyContinue
+          Get-ChildItem "$nsisDir" | Format-Table Name
+          Get-ChildItem "$nsisDir\Bin" | Format-Table Name
           & "$nsisDir\Bin\makensis.exe" /VERSION
-          Remove-Item desktop\dist\*.exe -Force
-          Push-Location desktop
+          Remove-Item dist\*.exe -Force
           npx electron-builder --win nsis --x64 --publish never
-          Pop-Location
-          Get-ChildItem desktop\dist\*.exe | Format-Table Name, Length
+          Get-ChildItem dist\*.exe | Format-Table Name, Length
 
       - name: Build MSI
         if: matrix.variant == 'msi'
@@ -109,7 +107,8 @@ jobs:
               $msi = (Get-ChildItem dist -Filter '*.msi' | Select-Object -First 1).FullName
               $log = Join-Path $env:RUNNER_TEMP "msi-$n.log"
               $code = (Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/l*v', "`"$log`"") -Wait -PassThru).ExitCode
-              $ok = Test-Path (Join-Path $env:LOCALAPPDATA 'Programs\QRquick\QRquick.exe')
+              $found = Get-ChildItem -Path $env:LOCALAPPDATA, $env:ProgramFiles, ${env:ProgramFiles(x86)} -Filter 'QRquick.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              $ok = [bool]$found; if ($found) { Write-Host "MSI installed at $($found.FullName)" }
               if ($code -ne 0) { Get-Content $log -Tail 40 | Write-Host }
               Start-Process msiexec.exe -ArgumentList @('/x', "`"$msi`"", '/qn') -Wait | Out-Null
             } else {
