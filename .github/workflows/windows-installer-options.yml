@@ -1,0 +1,125 @@
+name: Windows installer options (diagnostic)
+
+# Diagnostic only. Builds the same TEST installer three ways (NSIS 3.0.4.1 as shipped by electron-builder,
+# NSIS 3.11 swapped in, and an MSI) on separate fresh runners and records, for each fresh runner, the exit code
+# of the FIRST silent install and of a second one. The crash seen so far happens on the first run on a fresh
+# runner, so one replica gives one sample. Publishes nothing. Runs only when this file changes, or manually.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - '.github/workflows/windows-installer-options.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  options:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [nsis-baseline, nsis-3.11, msi]
+        replica: [1, 2, 3, 4, 5, 6, 7, 8]
+    name: ${{ matrix.variant }} r${{ matrix.replica }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      BUILD_SHA: diag
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build (baseline and NSIS 3.11)
+        if: matrix.variant != 'msi'
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run copy-web:staging-package
+          # first build downloads electron-builder's NSIS into its cache
+          npx electron-builder --win nsis --x64 --publish never
+          ls -l dist/*.exe
+
+      - name: Swap in NSIS 3.11 and rebuild
+        if: matrix.variant == 'nsis-3.11'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cache = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\nsis'
+          Get-ChildItem $cache | Format-Table Name
+          $nsisDir = (Get-ChildItem $cache -Directory | Where-Object { $_.Name -like 'nsis-3*' } | Select-Object -First 1).FullName
+          Write-Host "electron-builder NSIS dir: $nsisDir"
+          & "$nsisDir\Bin\makensis.exe" /VERSION
+          $zip = Join-Path $env:RUNNER_TEMP 'nsis-3.11.zip'
+          Invoke-WebRequest -Uri 'https://sourceforge.net/projects/nsis/files/NSIS%203/3.11/nsis-3.11.zip/download' -OutFile $zip -UserAgent 'curl/8'
+          Write-Host "sha256 $((Get-FileHash $zip -Algorithm SHA256).Hash)"
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'nsis311')
+          $src = (Get-ChildItem (Join-Path $env:RUNNER_TEMP 'nsis311') -Directory | Select-Object -First 1).FullName
+          foreach ($d in 'Bin','Stubs','Plugins','Include','Contrib') {
+            if (Test-Path "$src\$d") {
+              if (Test-Path "$nsisDir\$d") { Remove-Item "$nsisDir\$d" -Recurse -Force }
+              Copy-Item "$src\$d" "$nsisDir\$d" -Recurse -Force
+            }
+          }
+          Copy-Item "$src\makensis.exe" "$nsisDir\Bin\makensis.exe" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$src\NSIS.exe" "$nsisDir\NSIS.exe" -Force -ErrorAction SilentlyContinue
+          Copy-Item "$src\makensisw.exe" "$nsisDir\makensisw.exe" -Force -ErrorAction SilentlyContinue
+          & "$nsisDir\Bin\makensis.exe" /VERSION
+          Remove-Item desktop\dist\*.exe -Force
+          Push-Location desktop
+          npx electron-builder --win nsis --x64 --publish never
+          Pop-Location
+          Get-ChildItem desktop\dist\*.exe | Format-Table Name, Length
+
+      - name: Build MSI
+        if: matrix.variant == 'msi'
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run copy-web:staging-package
+          npx electron-builder --win msi --x64 --publish never
+          ls -l dist/*.msi
+
+      - name: Install twice and record
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $variant = '${{ matrix.variant }}'
+          Write-Host "VM uptime (s): $([int]((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds)"
+          function Crash-Info($since) {
+            Start-Sleep -Seconds 20
+            $e = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; StartTime = $since } -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($e) { return (($e.Message -split "`n" | Where-Object { $_ -match 'Faulting (application|module) name|Fault offset' }) -join ' | ') } else { return '' }
+          }
+          $results = @()
+          foreach ($n in 1, 2) {
+            $since = (Get-Date).AddSeconds(-2)
+            if ($variant -eq 'msi') {
+              $msi = (Get-ChildItem dist -Filter '*.msi' | Select-Object -First 1).FullName
+              $log = Join-Path $env:RUNNER_TEMP "msi-$n.log"
+              $code = (Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/l*v', "`"$log`"") -Wait -PassThru).ExitCode
+              $ok = Test-Path (Join-Path $env:LOCALAPPDATA 'Programs\QRquick\QRquick.exe')
+              if ($code -ne 0) { Get-Content $log -Tail 40 | Write-Host }
+              Start-Process msiexec.exe -ArgumentList @('/x', "`"$msi`"", '/qn') -Wait | Out-Null
+            } else {
+              $exe = (Get-ChildItem dist -Filter 'QRquick-*-setup.exe' | Select-Object -First 1).FullName
+              $target = Join-Path $env:RUNNER_TEMP ("inst-$n")
+              $code = (Start-Process -FilePath $exe -ArgumentList @('/S', "/D=$target") -Wait -PassThru).ExitCode
+              $ok = Test-Path (Join-Path $target 'QRquick.exe')
+            }
+            $info = if ($code -ne 0) { Crash-Info $since } else { '' }
+            $results += "install$n exit=$code installed=$ok $info"
+          }
+          Write-Host ("RESULT {0} r${{ matrix.replica }}: {1}" -f $variant, ($results -join ' ;; '))
+          "RESULT $variant r${{ matrix.replica }}: $($results -join ' ;; ')" | Out-File -Append $env:GITHUB_STEP_SUMMARY
