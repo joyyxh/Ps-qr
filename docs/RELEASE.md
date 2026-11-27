@@ -161,3 +161,30 @@ Pull request #3 is not part of this release and is not merged by it.
   test shop, order or payment functions on a real account.
 - Artifacts expire after 30 days (packages) and 14 days (smoke results). Download and store the
   release files before they expire.
+
+## Windows installer: known first-run crash (status: mitigated in CI, NOT release-ready)
+
+**Symptom.** On some fresh GitHub Windows Server 2025 runners the NSIS installer exits with
+`-1073741819` (0xC0000005, access violation) the first time it runs. The Application Error event
+names `System.dll` at offset `0x1581` (the NSIS 3.0.4.1 `System` plug-in, used by electron-builder
+25.1.8 and 26.18.0). Defender real-time protection was off and logged nothing.
+
+**What is established.** A second or third run of the same installer, 15 s later, succeeds. It is not
+caused by file age, path, builder version, or Defender. In diagnostic 4, about 4 of 6 fresh runners
+crashed on the first run.
+
+**What is not established.** The trigger inside NSIS or the runner image is unknown. The mitigation
+tests were inconclusive.
+
+**CI behaviour.** `desktop-owner-app.yml` retries up to five times, 15 s apart, only when the exit
+code is `-1073741819` and the event shows `System.dll` with fault offset `0x1581`. Any other failure
+fails at once. The job summary states how many known crashes occurred before the install that was tested.
+
+**Evidence on commit c0e1876:** six runs, all green (45829256242, 46000406821, 46000420893,
+46000434451, 46000447401, 46000460440). Crashes absorbed before the tested install: 0, 2, 1, 2, 1, 3.
+So five of six runs needed a retry.
+
+**What this does not show.** A retry in CI does not show that a customer's PC will not hit the same
+crash. Do not call the Windows installer release-ready until it has been installed on a physical
+Windows 11 machine (`docs/PHYSICAL_ACCEPTANCE.md`). Options still open: a newer NSIS through
+`nsis.customNsisBinary`, an MSI target, and a code-signed build.
