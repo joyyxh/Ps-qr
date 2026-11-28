@@ -47,7 +47,9 @@ export function capabilitiesFromOptions(options) {
   return {
     capabilitiesKnown: known,
     colour: colourModes.some((mode) => COLOUR_MODES.includes(mode)),
-    duplex: duplexModes.some((mode) => /two-sided|^Duplex/i.test(mode)),
+    // This workflow requests long-edge duplex. Do not claim support for a PPD
+    // driver that exposes only DuplexTumble (short-edge) or an unknown mode.
+    duplex: duplexModes.includes('two-sided-long-edge') || duplexModes.includes('DuplexNoTumble'),
     papers: options.PageSize ?? null,
     colourModes,
     duplexModes,
@@ -64,7 +66,19 @@ export function buildLpArgs({ printer, file, copies, colour, duplex, paper, titl
   const modes = colour ? COLOUR_MODES : GREY_MODES;
   const mode = modes.find((candidate) => capabilities.colourModes.includes(candidate));
   if (mode) args.push('-o', `ColorModel=${mode}`);
-  if (duplex) args.push('-o', 'sides=two-sided-long-edge');
+  if (duplex) {
+    // IPP uses the `sides` option; legacy PPD drivers use `Duplex`.
+    // Select only a long-edge mode that was explicitly reported by this printer.
+    if (capabilities.duplexModes?.includes('two-sided-long-edge')) {
+      args.push('-o', 'sides=two-sided-long-edge');
+    } else if (capabilities.duplexModes?.includes('DuplexNoTumble')) {
+      args.push('-o', 'Duplex=DuplexNoTumble');
+    } else {
+      const err = new Error('This printer does not report a supported long-edge double-sided option.');
+      err.code = 'unsupported_setting';
+      throw err;
+    }
+  }
   args.push('--', file);
   return args;
 }

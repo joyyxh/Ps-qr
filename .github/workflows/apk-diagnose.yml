@@ -1,0 +1,46 @@
+name: APK diagnostics
+
+# Diagnoses earlier QRquick debug APKs. It lists the artifacts of recent Android APK runs,
+# inspects their signing, manifest, native libraries and bundled config, installs them on an
+# Android emulator and records what the package manager says. The findings are posted as an
+# "APK diagnostics" check run so they can be read through the GitHub REST API.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - '.github/workflows/apk-diagnose.yml'
+      - '.github/scripts/apk-diagnose-*.sh'
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the earlier APK artifacts
+        run: bash .github/scripts/apk-diagnose-download.sh
+
+      - name: Inspect the APKs
+        run: bash .github/scripts/apk-diagnose-inspect.sh
+
+      - name: Install the APKs on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: bash .github/scripts/apk-diagnose-emulator.sh
+
+      - name: Post the diagnostics
+        if: always()
+        run: bash .github/scripts/apk-diagnose-report.sh

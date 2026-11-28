@@ -1,0 +1,11 @@
+{
+  "name": "qrquick-admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "QRquick private platform admin panel (static, no build step). Not the owner app and not the public site.",
+  "scripts": {
+    "test": "node --test tests/validate.test.js tests/licence-api.test.js tests/read-api.test.js tests/read-model.test.js tests/auth.test.js tests/guards.test.js tests/security.test.js",
+    "start": "python3 -m http.server 5174"
+  }
+}

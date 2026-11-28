@@ -2,6 +2,9 @@ import { createApi } from './api.js';
 import { createAuth } from './auth.js';
 import { createOwnerApi } from './owner-api.js';
 import { createOwnerPages } from './owner.js';
+import { renderLegalPage } from './legal.js';
+import { isPhotoFile } from './photo-edit.js';
+import { openPhotoEditor } from './photo-editor.js';
 import { browserSessionStorage, createSessionStore } from './session.js';
 import {
   buildItem,
@@ -24,6 +27,21 @@ const THEME_KEY = 'qrquick.theme';
 
 if (config?.ownerApp) document.body.classList.add('owner-app');
 
+// Android Back (MainActivity asks the page first). On a sign-in side screen, Back returns to the owner sign-in
+// screen instead of closing the app. The WebView history cannot be relied on for this on every device.
+const OWNER_SIDE_SCREEN = /^#\/owner\/(register|forgot|claim)$/;
+window.qrquickBack = () => {
+  if (!config?.ownerApp || !OWNER_SIDE_SCREEN.test(window.location.hash)) return false;
+  window.location.hash = '#/owner';
+  return true;
+};
+
+// Called by MainActivity when the app comes back to the front. A create-account or forgot-password form that was
+// left open is closed, so the app reopens on the protected sign-in screen.
+window.qrquickResume = () => {
+  if (config?.ownerApp && /^#\/owner\/(register|forgot|claim)$/.test(window.location.hash)) window.location.hash = '#/owner';
+};
+
 let api = null;
 let owner = null;
 let shop = null;
@@ -40,26 +58,12 @@ if (!config?.supabaseUrl || !config?.publishableKey) {
   api = createApi(config);
   const auth = createAuth({ config, store: createSessionStore(browserSessionStorage()) });
   owner = createOwnerPages({ app, auth, ownerApi: createOwnerApi({ config, auth }), config });
-  startApp(auth);
+  startApp();
 }
 
-async function startApp(auth) {
+function startApp() {
   applyTheme(loadTheme());
   bindThemePicker();
-  const callback = await auth.consumeCallback(window.location.hash);
-  if (callback.handled) {
-    // Access and refresh tokens arrive in the fragment. Remove them before
-    // rendering anything so they are not retained in browser history.
-    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
-    if (callback.error) {
-      app.innerHTML = `<section class="card"><h1>Email confirmation failed</h1>
-        <p class="error">${escapeHtml(callback.error.message)}</p>
-        <p><a class="button" href="#/owner">Return to owner sign in</a></p></section>`;
-      window.addEventListener('hashchange', route);
-      return;
-    }
-    window.location.hash = callback.type === 'recovery' ? '#/owner/reset' : '#/owner';
-  }
   window.addEventListener('hashchange', route);
   route();
 }
@@ -70,13 +74,23 @@ function route() {
   const parts = window.location.hash.replace(/^#\/?/, '').split('/').map(safeDecode);
   const [kind = '', value = ''] = parts;
 
+  // The terms and privacy pages are public: they open without signing in, in the owner app too.
+  if (kind === 'terms' || kind === 'privacy') return renderLegalPage(app, kind, { ownerApp: Boolean(config?.ownerApp) });
+
   if (config?.ownerApp && kind !== 'owner') return owner.render([]);
 
   if (!kind || kind === 'home') return renderHome();
   if (kind === 'scan') return renderScan();
   if (kind === 's' && value) return renderShop(value);
   if (kind === 'track') return renderTrack(value);
-  if (kind === 'owner') return owner.render(parts.slice(1));
+  if (kind === 'owner') {
+    // The email verification and password reset screens were removed. Their addresses go to sign in.
+    if (value === 'verify' || value === 'reset') {
+      window.location.hash = '#/owner';
+      return;
+    }
+    return owner.render(parts.slice(1));
+  }
   return renderNotFound();
 }
 
@@ -122,6 +136,12 @@ function renderHome() {
           <a class="button button-large" href="#/scan">Scan shop QR <span aria-hidden="true">↗</span></a>
           <a class="button secondary button-large" href="#/owner">Add your shop</a>
         </div>
+        <ol class="step-strip" aria-label="How QRquick works, in four steps">
+          <li><span>1</span><div><b>Scan</b><small>the shop QR</small></div></li>
+          <li><span>2</span><div><b>Upload</b><small>your file</small></div></li>
+          <li><span>3</span><div><b>Pay</b><small>cash or UPI</small></div></li>
+          <li><span>4</span><div><b>Pick up</b><small>when ready</small></div></li>
+        </ol>
       </div>
       <div class="qr-home-art" aria-hidden="true"><span class="qr-art-square">▦</span><span class="qr-art-paper">▤</span></div>
     </section>
@@ -281,7 +301,7 @@ function shopTemplate() {
         <label class="field-label">Copies
           <input name="copies" type="number" min="1" max="100" value="1" inputmode="numeric" required />
         </label>
-        <div class="choice-grid"><label class="choice-card"><input name="colour" id="colour" type="checkbox" ${shopOffersColour(shop) ? '' : 'disabled'} /><span><strong>Colour</strong><small>Vibrant colour printing</small></span></label><label class="choice-card"><input name="duplex" id="duplex" type="checkbox" ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /><span><strong>Double-sided</strong><small>Save paper on every sheet</small></span></label></div>
+        <div class="choice-grid"><label class="choice-card"><input name="colour" id="colour" type="checkbox" ${shopOffersColour(shop) ? '' : 'disabled'} /><span><strong>Colour${shopOffersColour(shop) ? '' : ' (not offered at this shop)'}</strong><small>Vibrant colour printing</small></span></label><label class="choice-card"><input name="duplex" id="duplex" type="checkbox" ${shopOffersDoubleSided(shop) ? '' : 'disabled'} /><span><strong>Double-sided${shopOffersDoubleSided(shop) ? '' : ' (not offered at this shop)'}</strong><small>Save paper on every sheet</small></span></label></div>
         <button type="submit" id="add-item" disabled>Add file to order <span aria-hidden="true">→</span></button>
       </form>
       <p class="muted small">Your file is stored privately and only this shop can open it. Automatic deletion is not switched on yet.</p>
@@ -325,9 +345,10 @@ function shopTemplate() {
 }
 
 // The features this shop has switched on, for example "Colour printing, Stapling".
+// Passport photos are ordered from the services list, so they are not repeated here.
 function offeredFeaturesHtml() {
   const labels = catalog
-    .filter((feature) => shop.features?.[feature.key] === true)
+    .filter((feature) => feature.key !== 'passport_photos' && shop.features?.[feature.key] === true)
     .map((feature) => escapeHtml(feature.label));
   return labels.length ? `<p class="small"><strong>Also offered here:</strong> ${labels.join(', ')}</p>` : '';
 }
@@ -414,9 +435,27 @@ async function onFileChosen(event) {
     return;
   }
 
+  // A JPEG or PNG can be cropped and adjusted first. The customer may also keep it as it is.
+  let toUpload = file;
+  if (isPhotoFile(file)) {
+    const edited = await openPhotoEditor(file);
+    if (seq !== uploadSeq) return; // the customer picked another file meanwhile
+    if (!edited) {
+      input.value = '';
+      return;
+    }
+    const editProblem = checkUploadFile(edited);
+    if (editProblem) {
+      input.value = '';
+      setText('item-error', editProblem);
+      return;
+    }
+    toUpload = edited;
+  }
+
   setText('upload-status', 'Uploading and checking the file…');
   try {
-    const upload = await api.uploadFile(shop.slug, file);
+    const upload = await api.uploadFile(shop.slug, toUpload);
     if (seq !== uploadSeq) return; // the customer picked another file meanwhile
     pendingUpload = upload;
     setText('upload-status', `${upload.original_name} · ${plural(upload.page_count, 'page')} · ready to add`);
@@ -628,9 +667,13 @@ async function lookupOrder(code) {
       out.innerHTML = '<p class="error">No order found with that code.</p>';
       return;
     }
+    const shopAndDate = [order.shop_name, new Date(order.created_at).toLocaleString('en-IN')]
+      .filter(Boolean)
+      .map(escapeHtml)
+      .join(' · ');
     out.innerHTML = `
       <div class="status">
-        <p class="muted">${escapeHtml(order.shop_name)} · ${escapeHtml(new Date(order.created_at).toLocaleString('en-IN'))}</p>
+        <p class="muted">${shopAndDate}</p>
         <p class="code">${escapeHtml(order.tracking_code)}</p>
         <p><strong>${escapeHtml(statusLabel(order.status))}</strong></p>
         <p>Total ${formatPaise(order.total_paise)}</p>

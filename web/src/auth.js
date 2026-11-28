@@ -1,6 +1,10 @@
-// Email and password sign-in through Supabase Auth. Uses only the publishable
-// key. The password is sent once, to Supabase, and is never stored in the
-// browser. Only the session tokens are kept (see session.js).
+// Owner sign-in with a username and password. The owner-auth function does the checks,
+// the reservation of the username, the rate limits and the Terms check. This module sends
+// the password once, over HTTPS, and keeps only the session tokens (see session.js).
+//
+// Email is not used. The password, a recovery code and the internal address behind each
+// account are never stored in the browser. Recovery codes wait in memory only, until the
+// owner confirms they are saved.
 
 import { apiError, readJson } from './http.js';
 import { isFresh, toSession } from './session.js';
@@ -9,63 +13,17 @@ import { isFresh, toSession } from './session.js';
 // Any other failure (for example no network) keeps the session for a retry.
 const REJECTED_REFRESH_STATUSES = [400, 401, 403];
 
-// Supabase's email-confirmation link returns the access and refresh tokens in
-// the URL fragment. Keep this parser separate from the hash router: a token
-// fragment starts with `#access_token=`, while application routes start with
-// `#/owner` or `#/s/...`.
-export function parseAuthCallbackHash(hash) {
-  const raw = String(hash ?? '');
-  if (!raw.startsWith('#') || raw.startsWith('#/')) return { handled: false };
-  const params = new URLSearchParams(raw.slice(1));
-  if (!params.has('access_token') && !params.has('error')) return { handled: false };
-
-  const error = params.get('error_description') || params.get('error');
-  if (error) return { handled: true, error: new Error(error) };
-
-  const accessToken = params.get('access_token');
-  const refreshToken = params.get('refresh_token');
-  if (!accessToken || !refreshToken) {
-    return { handled: true, error: new Error('The confirmation link is incomplete or has expired.') };
-  }
-  return {
-    handled: true,
-    type: params.get('type') || '',
-    tokenResponse: {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      expires_in: Number(params.get('expires_in') || 3600),
-    },
-  };
-}
-
-function authRedirectUrl(config, location = globalThis.location) {
-  const configured = String(config?.authRedirectUrl ?? '').trim() || String(config?.publicBaseUrl ?? '').trim();
-  if (configured) {
-    try {
-      const url = new URL(configured);
-      if (url.protocol === 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
-        url.hash = '';
-        return url.toString().replace(/\/$/, '') + '/';
-      }
-    } catch {
-      // Fall through to the current-page HTTPS check.
-    }
-  }
-  if (location?.protocol === 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) {
-    return `${location.origin}${location.pathname}`.replace(/#.*$/, '');
-  }
-  return '';
-}
-
 export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs = () => Date.now() }) {
   const base = config.supabaseUrl.replace(/\/$/, '');
+  const functionUrl = `${base}/functions/v1/owner-auth`;
   let session = store.load();
   let refreshing = null;
-  // The session of a verified registration, held in memory only until the owner's
-  // password is saved (completeSignup). It is never stored, and getSession never returns it.
-  let pendingSignup = null;
+  // Recovery codes of a new account or a reset, shown once. Held in memory until the owner
+  // confirms they are saved (acknowledgeCodes). A reload ends the wait, and the owner can
+  // then sign in with the password and make a new set.
+  let pending = null;
 
-  async function call(path, body, accessToken = null) {
+  async function gotrue(path, body, accessToken = null) {
     const headers = { apikey: config.publishableKey, 'Content-Type': 'application/json' };
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     const response = await fetchImpl(`${base}/auth/v1/${path}`, {
@@ -78,30 +36,22 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
     return data;
   }
 
-  async function currentUser(accessToken) {
-    const response = await fetchImpl(`${base}/auth/v1/user`, {
-      headers: { apikey: config.publishableKey, Authorization: `Bearer ${accessToken}` },
+  async function owner(action, { method = 'POST', body, accessToken = null } = {}) {
+    const headers = { apikey: config.publishableKey, 'Content-Type': 'application/json' };
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    const response = await fetchImpl(`${functionUrl}/${action}`, {
+      method,
+      headers,
+      body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
     });
     const data = await readJson(response);
-    if (!response.ok) throw apiError(response, data, 'The confirmation link is no longer valid');
+    if (!response.ok) throw apiError(response, data, 'Request failed');
     return data;
   }
 
-  // Sets the password of the account behind an access token. Used by password
-  // recovery and by registration, which saves the password the owner chose.
-  async function putPassword(accessToken, password) {
-    const response = await fetchImpl(`${base}/auth/v1/user`, {
-      method: 'PUT',
-      headers: {
-        apikey: config.publishableKey,
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ password }),
-    });
-    const data = await readJson(response);
-    if (!response.ok) throw apiError(response, data, 'Password update failed');
-    return data;
+  // The username is kept on the session, because it is what the owner signs in with.
+  function sessionFrom(tokens, username) {
+    return toSession({ ...tokens, user: { id: tokens.user?.id, username } }, nowMs());
   }
 
   function remember(next) {
@@ -114,13 +64,23 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
     return next;
   }
 
+  function publicPending() {
+    return {
+      purpose: pending.purpose,
+      username: pending.username,
+      recoveryCodes: pending.recoveryCodes,
+      signedIn: pending.session !== null,
+    };
+  }
+
   async function refresh() {
     if (!refreshing) {
       const refreshToken = session.refresh_token;
+      const username = session.user?.username ?? '';
       refreshing = (async () => {
         try {
-          const data = await call('token?grant_type=refresh_token', { refresh_token: refreshToken });
-          return remember(toSession(data, nowMs()));
+          const data = await gotrue('token?grant_type=refresh_token', { refresh_token: refreshToken });
+          return remember(sessionFrom(data, username));
         } catch (err) {
           if (REJECTED_REFRESH_STATUSES.includes(err.status)) return remember(null);
           throw err;
@@ -132,139 +92,111 @@ export function createAuth({ config, store, fetchImpl = globalThis.fetch, nowMs 
     return refreshing;
   }
 
+  // A session that is safe to use right now, refreshed if needed. Null when the owner must sign in again.
+  async function currentSession() {
+    if (!session) return null;
+    if (isFresh(session, nowMs())) return session;
+    return refresh();
+  }
+
   return {
-    // Registers an owner with email and password. Supabase emails a one-time
-    // code (and a link) to confirm the address. The owner must enter the code
-    // before any session exists, so the reply never carries a session here.
-    // A session in the reply means email confirmation is switched off for the
-    // project. The owner would then skip verification, so refuse and keep nothing.
-    async signUp(email, password) {
-      const redirect = authRedirectUrl(config);
-      const body = { email, password };
-      // Do not send localhost or a Capacitor origin to Supabase. When this is
-      // a deployed HTTPS page, the current page is a safe fallback; the APK
-      // receives the deployed URL through PRINTNEST_PUBLIC_URL.
-      if (redirect) body.redirect_to = redirect;
-      const data = await call('signup', body);
-      if (data?.access_token) {
-        const error = new Error(
-          'Email confirmation is turned off for this project, so no verification code is sent. Ask QRquick to turn it on.'
-        );
-        error.code = 'confirmation_disabled';
-        throw error;
-      }
-      return { confirmationNeeded: true, session: null };
+    // The current Terms and Privacy versions. A sign-up must send them back.
+    async policies() {
+      return owner('policies', { method: 'GET' });
     },
 
-    // Checks the code from the registration email. A correct code proves the
-    // address, but the owner has not chosen a password yet. The session is kept in
-    // memory only, and nothing is stored, until completeSignup saves the password.
-    // A wrong or expired code is refused with a 4xx status.
-    async verifySignupCode(email, token) {
-      const data = await call('verify', { type: 'signup', email, token });
-      pendingSignup = toSession(data, nowMs());
-      return { verified: true };
+    // Creates an owner account. The server returns ten recovery codes and, normally, a session.
+    // The codes wait here until acknowledgeCodes, and the session is not kept before then.
+    async signUp({ username, password, accept }) {
+      const data = await owner('signup', { body: { username, password, accept } });
+      pending = {
+        purpose: 'signup',
+        username: data.username,
+        recoveryCodes: data.recovery_codes ?? [],
+        session: data.session ? sessionFrom(data.session, data.username) : null,
+      };
+      return publicPending();
     },
 
-    // True while a verified owner still has to choose a password.
-    hasPendingSignup() {
-      return pendingSignup !== null;
+    // Moves an existing email owner to a username account. Needs the one-time claim code QRquick gave the owner.
+    // The shop, orders and services stay attached. The new recovery codes wait here like those of a new account.
+    async claim({ email, claimCode, username, password, accept }) {
+      const data = await owner('claim', { body: { email, claim_code: claimCode, username, password, accept } });
+      pending = {
+        purpose: 'signup',
+        username: data.username,
+        recoveryCodes: data.recovery_codes ?? [],
+        session: data.session ? sessionFrom(data.session, data.username) : null,
+      };
+      return publicPending();
     },
 
-    // Drops a verified sign-up that is not finished, for example when the owner
-    // chooses Forgot password instead.
-    abandonSignup() {
-      pendingSignup = null;
+    // Signs in with a username and password. Nothing is stored unless the server accepts them.
+    async signIn(username, password) {
+      const data = await owner('signin', { body: { username, password } });
+      return remember(sessionFrom(data.session, data.username));
     },
 
-    // Saves the password the owner chose, then opens the account. Supabase keeps the
-    // first password of an address that was never verified, so this step is what
-    // makes the owner's own password the one that works. If the password cannot be
-    // saved, nothing is stored and the owner stays signed out.
-    async completeSignup(password) {
-      if (!pendingSignup) {
-        const error = new Error('Your confirmation has ended. Use Forgot password to choose a password.');
-        error.code = 'signup_expired';
-        throw error;
-      }
-      const pending = pendingSignup;
-      try {
-        await putPassword(pending.access_token, password);
-      } catch (err) {
-        // The confirmation was refused (expired or revoked): the owner must start again.
-        if (err.status === 401 || err.status === 403) {
-          pendingSignup = null;
-          err.code = 'signup_expired';
-          err.message = 'Your email is confirmed, but the password could not be saved in time. Use Forgot password to choose one.';
-        }
-        throw err;
-      }
-      pendingSignup = null;
-      return remember(pending);
+    // Sets a new password with a recovery code. The old sessions of the account end. The
+    // new codes wait here until acknowledgeCodes, like the codes of a new account.
+    async resetPassword({ username, recoveryCode, newPassword }) {
+      const data = await owner('reset', {
+        body: { username, recovery_code: recoveryCode, new_password: newPassword },
+      });
+      remember(null);
+      pending = {
+        purpose: 'reset',
+        username: data.username,
+        recoveryCodes: data.recovery_codes ?? [],
+        session: data.session ? sessionFrom(data.session, data.username) : null,
+      };
+      return publicPending();
     },
 
-    // Sends a new registration code. Supabase limits how often a code can be sent.
-    async resendSignupCode(email) {
-      return call('resend', { type: 'signup', email });
+    // Makes a new set of codes for the signed-in owner. Needs the current password. The
+    // session stays open. The old codes stop working at once.
+    async regenerateCodes(currentPassword) {
+      // A fresh access token, so a session that has been open for a while still works.
+      const current = await currentSession();
+      if (!current) throw Object.assign(new Error('Sign in again to continue.'), { status: 401, code: 'session_required' });
+      const data = await owner('codes/regenerate', {
+        body: { current_password: currentPassword },
+        accessToken: current.access_token,
+      });
+      return { username: data.username, recoveryCodes: data.recovery_codes ?? [] };
     },
 
-    // Password sign-in for owners who have verified their email. An owner who
-    // has not verified yet is refused by Supabase with code email_not_confirmed,
-    // and no session is stored.
-    async signIn(email, password) {
-      const data = await call('token?grant_type=password', { email, password });
-      return remember(toSession(data, nowMs()));
+    // The codes that still wait to be confirmed, or null.
+    pendingCodes() {
+      return pending ? publicPending() : null;
     },
 
-    async recoverPassword(email) {
-      const redirect = authRedirectUrl(config);
-      const body = { email };
-      if (redirect) body.redirect_to = redirect;
-      return call('recover', body);
+    hasPendingCodes() {
+      return pending !== null;
     },
 
-    async updatePassword(password) {
-      if (!session?.access_token) throw new Error('Your recovery link has expired. Request a new one.');
-      return putPassword(session.access_token, password);
-    },
-
-    async consumeCallback(hash) {
-      const parsed = parseAuthCallbackHash(hash);
-      if (!parsed.handled || parsed.error) return parsed;
-      try {
-        const user = await currentUser(parsed.tokenResponse.access_token);
-        const next = toSession({ ...parsed.tokenResponse, user }, nowMs());
-        // A confirmation link proves the address, like the code does. The owner must still
-        // choose a password (completeSignup) before the session is kept.
-        if (parsed.type === 'signup') {
-          pendingSignup = next;
-          return { handled: true, type: 'signup', pending: true };
-        }
-        return { handled: true, type: parsed.type, session: remember(next) };
-      } catch (error) {
-        return { handled: true, error };
-      }
+    // The owner has saved the codes. Keeps the session from a new account or a reset, if the
+    // server returned one, and ends the wait.
+    async acknowledgeCodes() {
+      if (!pending) return null;
+      const next = pending.session;
+      pending = null;
+      return next ? remember(next) : null;
     },
 
     async signOut() {
       const token = session?.access_token;
-      pendingSignup = null;
+      pending = null;
       remember(null);
       if (token) {
         try {
-          await call('logout', {}, token);
+          await gotrue('logout?scope=local', {}, token);
         } catch {
           // Already signed out in this browser. The server token expires on its own.
         }
       }
     },
 
-    // A session that is safe to use right now, refreshed if needed. Returns
-    // null when the owner must sign in again.
-    async getSession() {
-      if (!session) return null;
-      if (isFresh(session, nowMs())) return session;
-      return refresh();
-    },
+    getSession: currentSession,
   };
 }

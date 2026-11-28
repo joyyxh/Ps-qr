@@ -9,12 +9,13 @@
 //   The database stores and enforces them.
 
 import {
-  accountErrorMessage,
-  isEmailAddress,
-  isNewPassword,
-  isOtpCode,
-  otpErrorMessage,
-  resendWaitSeconds,
+  signUpErrorMessage,
+  signInErrorMessage,
+  resetErrorMessage,
+  claimErrorMessage,
+  regenerateErrorMessage,
+  passwordChecklist,
+  recoveryCodesText,
   CANCEL_REASONS,
   cancelReasonLabel,
   checkPaymentQrFile,
@@ -43,19 +44,30 @@ import {
   printAgentFunctionUrl,
   printerOptionLabel,
   printFailureText,
+  passportNeedsService,
+  autoPrintSummary,
   printingNotice,
   printJobLabel,
   retryOptions,
 } from './logic.js';
 import { createStatsPages } from './owner-stats.js';
+import { createLicencePages } from './owner-licence.js';
 import { PRINTER_RETRY_MS, browserVisibility, createOrderRefresher, printerRetryDue } from './order-refresh.js';
 import { qrCanvas, qrSvg } from './qr.js';
+import { checkPassword, checkUsername, normalizeRecoveryCode, normalizeUsername } from './owner-rules.js';
 
 const UNIT_OPTIONS = [
   { value: 'per_side', label: 'Per printed side' },
   { value: 'per_sheet', label: 'Per sheet (double-sided halves the sheets)' },
   { value: 'per_copy', label: 'Per copy (one flat charge)' },
 ];
+
+// Quick-start names for photo services. The owner still types the price; nothing is priced for them.
+const PHOTO_PRESETS = {
+  passport: { name: 'Passport photo sheet', pricingUnit: 'per_copy' },
+  'photo-4x6': { name: 'Photo print 4 × 6 in', pricingUnit: 'per_copy' },
+};
+
 
 const CONNECTION_MESSAGE = 'Could not reach the server. Check your internet connection and try again.';
 
@@ -64,6 +76,9 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   let managed = null; // { shop, services } for the shop page on screen
   let orderView = null; // { shop, orders, showAll, printing, jobsByItem, pairing } for the orders page on screen
   const statsPages = createStatsPages({ app, ownerApi, messageFor });
+  // The read-only Stage 7E licence view is available to shop owners in both web and Android builds.
+  const licenceEnabled = true;
+  const licencePages = createLicencePages({ app, ownerApi, enabled: licenceEnabled });
 
   // Automatic refresh of the orders page (order-refresh.js). The page is only redrawn when the data changed.
   let navigation = 0; // counts page changes, so a slow load cannot draw over a page the owner has left
@@ -84,6 +99,264 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     onStatus: onLiveStatus,
     visibility: browserVisibility(),
   });
+
+  // ---------- owner tabs: Home, Orders, Prices, Stats, More ----------
+  // The tab bar is outside the page (index.html), so it stays on screen while a tab's page is redrawn.
+  // activeSlug is the shop the tabs open. Home keeps it, and each shop page sets it.
+  const tabbar = document.getElementById('owner-tabbar');
+  let activeSlug = null;
+  const TAB_ICONS = {
+    home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
+    orders: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
+    prices: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><path d="M7.5 8h.01"/></svg>',
+    stats: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-8M12 20V5M19 20v-11"/></svg>',
+    more: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg>',
+  };
+
+  // active: the tab to mark as current, or null to hide the bar (signed-out screens).
+  // slug: the shop the tabs open. Leave it out to keep the current shop.
+  function setTabs(active, slug) {
+    if (slug !== undefined) activeSlug = slug;
+    if (!tabbar) return;
+    if (!active) {
+      tabbar.hidden = true;
+      tabbar.innerHTML = '';
+      document.body.classList.remove('has-tabbar');
+      return;
+    }
+    const shopBase = activeSlug ? `#/owner/shop/${encodeURIComponent(activeSlug)}` : '#/owner/new';
+    const tabs = [
+      ['home', 'Home', '#/owner'],
+      ['orders', 'Orders', activeSlug ? `${shopBase}/orders` : shopBase],
+      ['prices', 'Prices', shopBase],
+      ['stats', 'Stats', activeSlug ? `${shopBase}/stats` : shopBase],
+      ['more', 'More', activeSlug ? `${shopBase}/more` : shopBase],
+    ];
+    tabbar.innerHTML = tabs
+      .map(
+        ([key, label, href]) =>
+          `<a href="${href}" data-tab="${key}"${key === active ? ' aria-current="page"' : ''}>${TAB_ICONS[key]}<span>${label}</span></a>`
+      )
+      .join('');
+    tabbar.hidden = false;
+    document.body.classList.add('has-tabbar');
+  }
+
+  // Counts for the Home summary. A failed read shows a dash instead of a wrong number.
+  async function homeStats(shop) {
+    const [orders, printing] = await Promise.allSettled([ownerApi.listOrders(shop.id), ownerApi.printStatus(shop.id)]);
+    return {
+      open: orders.status === 'fulfilled' ? orders.value.filter((order) => isOpenOrder(order.status)).length : null,
+      agents: printing.status === 'fulfilled' && printing.value ? (printing.value.agents ?? []).length : null,
+    };
+  }
+
+  // The Prices tab: the services editor, the features the shop offers and the cash rule.
+  function pricesHtml(shop, services, editing, notice, error, catalog) {
+    const rows = services
+      .map((service) => {
+        const bw = service.bw_price_paise === null ? '–' : formatPaise(service.bw_price_paise);
+        const colour = service.colour_price_paise === null ? '–' : formatPaise(service.colour_price_paise);
+        const hidden = service.is_active ? '' : ' <span class="muted small">(hidden from customers)</span>';
+        return `
+          <tr>
+            <td>${escapeHtml(service.name)}${hidden}</td>
+            <td>${escapeHtml(unitLabel(service.pricing_unit))}</td>
+            <td class="num">${bw}</td>
+            <td class="num">${colour}</td>
+            <td><button type="button" class="link" data-edit="${escapeHtml(service.id)}">Edit</button></td>
+          </tr>`;
+      })
+      .join('');
+
+    const serviceTable = services.length
+      ? `<div class="table-wrap">
+           <table class="breakdown">
+             <thead><tr><th>Service</th><th>Charged</th><th class="num">B&amp;W</th><th class="num">Colour</th><th></th></tr></thead>
+             <tbody>${rows}</tbody>
+           </table>
+         </div>`
+      : '<p class="muted">No services yet. Add one below.</p>';
+
+    const selectedUnit = editing?.pricing_unit ?? 'per_side';
+    const unitOptions = UNIT_OPTIONS.map(
+      (option) =>
+        `<option value="${option.value}"${option.value === selectedUnit ? ' selected' : ''}>${escapeHtml(option.label)}</option>`
+    ).join('');
+
+    return `
+      <section class="card page-head">
+        <p class="eyebrow">PRICES</p>
+        <h1>${escapeHtml(shop.name)}</h1>
+        <p class="${shop.is_open ? 'badge ok' : 'badge closed'}">${shop.is_open ? 'Open for orders' : 'Closed for orders'}. Open or close it on the More tab.</p>
+        <p class="muted small">Changes apply to new orders. Existing orders keep their prices.</p>
+        <p class="notice" data-notice>${escapeHtml(notice)}</p>
+        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
+      </section>
+
+      <section class="card">
+        <h2>Services and prices</h2>
+        ${passportNeedsService(shop, services) ? '<p class="banner" role="status">Passport photos is switched on, but customers cannot order it yet. Add a Passport photo sheet below with its price.</p>' : ''}
+        ${serviceTable}
+        <h3>${editing ? 'Edit service' : 'Add a service'}</h3>
+        ${editing ? '' : '<p class="muted small">Quick start: <button type="button" class="link" data-preset="passport">Passport photo sheet</button> · <button type="button" class="link" data-preset="photo-4x6">Photo print 4 × 6 in</button>. Fill in the price yourself.</p>'}
+        <form id="service-form" class="grid">
+          <input type="hidden" name="serviceId" value="${escapeHtml(editing?.id ?? '')}" />
+          <label>Service name
+            <input name="name" maxlength="80" required value="${escapeHtml(editing?.name ?? '')}" />
+          </label>
+          <label>Charged
+            <select name="pricingUnit">${unitOptions}</select>
+          </label>
+          <label>Black and white price in rupees (leave empty if not offered)
+            <input name="bwPrice" inputmode="decimal" placeholder="for example 2 or 2.50"
+                   value="${escapeHtml(paiseToRupeesInput(editing?.bw_price_paise))}" />
+          </label>
+          <label>Colour price in rupees (leave empty if not offered)
+            <input name="colourPrice" inputmode="decimal" placeholder="for example 10"
+                   value="${escapeHtml(paiseToRupeesInput(editing?.colour_price_paise))}" />
+          </label>
+          <label class="check">
+            <input name="isActive" type="checkbox" ${editing?.is_active === false ? '' : 'checked'} />
+            Show this service to customers
+          </label>
+          <button type="submit" data-label="${editing ? 'Save service' : 'Add service'}">
+            ${editing ? 'Save service' : 'Add service'}
+          </button>
+          ${editing ? '<button type="button" class="link" data-action="cancel-edit">Cancel editing</button>' : ''}
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>
+
+      ${featuresCard(shop, catalog)}
+
+      ${cashPolicyCard(shop)}`;
+  }
+
+  // The More tab: shop status, the shop QR code, shop details, the UPI QR code, printing,
+  // the account and sign out. Every control here uses the same handlers as before (bindManager).
+  function moreHtml(user, shop, printing, notice, error) {
+    const address = customerAddress(shop.slug);
+    const slugPath = encodeURIComponent(shop.slug);
+    const qrContent = address.problem
+      ? `<p class="banner" role="alert">${escapeHtml(address.problem)} QR generation is disabled until a verified HTTPS customer URL is configured.</p>`
+      : `<div class="qr-box">${qrSvg(address.url)}</div>
+         <div class="qr-text">
+           <p class="muted small">Print this code and place it at your counter. Customers scan it to open their page, upload files and place an order.</p>
+           <button type="button" data-action="download-qr">Download QR as PNG</button>
+         </div>`;
+    const agents = printing?.agents ?? [];
+    const printerLine = !printing
+      ? 'Printing status is not available right now.'
+      : agents.length
+        ? `${agents.length} printing ${agents.length === 1 ? 'computer is' : 'computers are'} connected.`
+        : 'No computer is connected for printing yet.';
+    return `
+      <section class="card page-head">
+        <p class="eyebrow">MORE</p>
+        <h1>${escapeHtml(shop.name)}</h1>
+        <p class="${shop.is_open ? 'badge ok' : 'badge closed'}">
+          ${shop.is_open ? 'Open for orders' : 'Closed. Customers can see prices but cannot order.'}
+        </p>
+        <p><button type="button" data-action="toggle-open" data-label="${shop.is_open ? 'Close shop' : 'Open shop'}">
+          ${shop.is_open ? 'Close shop' : 'Open shop'}
+        </button></p>
+        <p class="notice" data-notice>${escapeHtml(notice)}</p>
+        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
+      </section>
+
+      <section class="card">
+        <h2>Shop QR code</h2>
+        <label>Customer page address
+          <input readonly value="${escapeHtml(address.url)}" />
+        </label>
+        <div class="qr-row">${qrContent}</div>
+      </section>
+
+      <section class="card">
+        <h2>Shop details</h2>
+        <form id="details-form" class="grid">
+          <label>Shop name
+            <input name="name" maxlength="120" required value="${escapeHtml(shop.name)}" />
+          </label>
+          <label>Phone
+            <input name="phone" type="tel" maxlength="20" value="${escapeHtml(shop.phone ?? '')}" />
+          </label>
+          <label>Address
+            <input name="address" maxlength="200" value="${escapeHtml(shop.address ?? '')}" />
+          </label>
+          <button type="submit" data-label="Save details">Save details</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>
+
+      ${paymentQrCard(shop)}
+
+      <section class="card">
+        <h2>Printing computer</h2>
+        <p class="muted small">${escapeHtml(printerLine)}</p>
+        <p><a class="button secondary" href="#/owner/shop/${slugPath}/printer">Connect or check printing</a></p>
+      </section>
+
+      <section class="card">
+        <h2>Account</h2>
+        <p class="small"><span class="muted">Signed in as</span> <strong>${escapeHtml(user?.username ?? '')}</strong></p>
+        <p><a class="button secondary" href="#/owner/security">Recovery codes</a></p>
+        ${shop.role === 'owner' && licenceEnabled ? `<p><a class="button secondary" href="#/owner/shop/${slugPath}/licence">Licence status</a></p>` : ''}
+        <p><button type="button" class="danger" data-action="signout">Sign out</button></p>
+      </section>`;
+  }
+
+  // The printing computer page, reached from More. It uses the same pairing and revoke handlers as Orders.
+  function printerPageHtml(shop, notice, error) {
+    return `
+      <section class="card page-head">
+        <p class="small"><a href="#/owner/shop/${encodeURIComponent(shop.slug)}/more">← More</a></p>
+        <p class="eyebrow">PRINTING</p>
+        <h1>Printing computer</h1>
+        <p class="muted small">Connect the computer attached to your printer. After you approve an order, its files print there automatically. An order counts as sent when the computer picks it up.</p>
+        <p class="notice" data-notice>${escapeHtml(notice)}</p>
+        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
+      </section>
+      <section class="card">${printPanelHtml()}</section>
+      <p><button type="button" class="secondary" data-action="refresh-printer">Refresh status</button></p>`;
+  }
+
+  function bindPrinterPage() {
+    on('[data-print-action="pair"]', 'click', onPairPrinter);
+    onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
+    onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
+    onAll('[data-auto-print]', 'change', onAutoPrintChange);
+    on('[data-action="refresh-printer"]', 'click', refreshPrinter);
+  }
+
+  async function refreshPrinter() {
+    const printing = await readPrinterStatus(orderView.shop.id);
+    orderView.printing = printing;
+    renderOrders(printing ? {} : { error: 'Printing status is not available right now. Try again.' });
+  }
+
+  async function openPrinter(shop) {
+    const nav = navigation;
+    const printing = await readPrinterStatus(shop.id);
+    if (nav !== navigation) return;
+    orderView = { mode: 'printer', shop, orders: [], printing, showAll: false, jobsByItem: new Map(), pairing: null };
+    renderOrders();
+  }
+
+  async function openMore(user, shop) {
+    const nav = navigation;
+    const printing = await readPrinterStatus(shop.id);
+    if (nav !== navigation) return;
+    managed = { view: 'more', user, shop, services: [], catalog: [], printing };
+    renderMore();
+  }
+
+  function renderMore({ notice = '', error = '' } = {}) {
+    const { user, shop, printing } = managed;
+    show(moreHtml(user, shop, printing, notice, error));
+    bindManager();
+  }
 
   // ---------- navigation and shared helpers ----------
 
@@ -142,6 +415,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   }
 
   async function signOut() {
+    licencePages.close(); // no licence data is kept after sign-out, and a check still running is dropped
     await auth.signOut();
     go([]);
   }
@@ -151,16 +425,22 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
   async function render(parts = []) {
     navigation += 1;
     liveOrders.stop(); // leaving a page ends its automatic refresh
+    licencePages.close(); // leaving the licence page drops its data and any check still running
     current = parts;
     show('<p class="muted">Loading…</p>');
     const [page = '', value = '', section = ''] = parts;
     try {
-      // A verified owner who has not chosen a password yet goes no further (see completeSignup).
-      if (auth.hasPendingSignup()) return renderSetPassword();
+      // Recovery codes of a new account or a reset are shown once, before anything else opens.
+      const pending = auth.pendingCodes();
+      if (pending) return renderRecoveryCodes({ ...pending, onDone: finishPendingCodes });
       const session = await auth.getSession();
-      if (!session) return renderSignIn('signin');
-      if (page === 'reset') return renderResetPassword();
-      if (page === 'new') return renderNewShop();
+      // Protected: every owner page needs a session. Signed-out screens show no tabs.
+      if (!session) return renderSignIn(signInScreen(page));
+      if (page === 'security') return renderSecurity(session.user);
+      if (page === 'new') {
+        setTabs('home');
+        return renderNewShop();
+      }
       if (page === 'shop' && value) return await renderShopManager(session.user, value, section);
       return await renderShopList(session.user);
     } catch (err) {
@@ -183,29 +463,84 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('[data-action="retry"]', 'click', () => render(current));
   }
 
-  // ---------- sign in, registration and verification ----------
-  // An owner signs in with email and password. A new owner registers with email and
-  // password, then enters the one-time code emailed to them before the account opens.
-  // An owner whose email is still unverified is sent a new code when they sign in.
-  // Customers never reach these screens.
+  // ---------- sign in, registration, recovery codes (auth.js) ----------
+  // An owner signs in with a username and password. A new owner picks a username and password and
+  // accepts the Terms and Privacy Policy. Ten recovery codes are shown once; a forgotten password is
+  // reset with one of them. Email is not used anywhere in this flow. Customers never reach these screens.
 
-  let pendingEmail = ''; // the address waiting for a verification code
-  let pendingSentAt = 0; // when the last verification code was sent, in milliseconds
-  let pendingPassword = ''; // the password typed at registration, kept in memory until the code is accepted
-  let resendTimer = null;
+  // The side screens of sign in have their own addresses, so Back (on Android and in the browser)
+  // returns to sign in instead of leaving the app.
+  const SIGN_IN_SCREENS = ['register', 'forgot', 'claim'];
+  // Set just before a jump to the Security page, so that page can say what happened. Shown once.
+  let securityNotice = '';
 
-  function clearResendTimer() {
-    if (resendTimer) clearInterval(resendTimer);
-    resendTimer = null;
+  function signInScreen(page) {
+    return SIGN_IN_SCREENS.includes(page) ? page : 'signin';
+  }
+
+  function goAuth(mode) {
+    const hash = mode === 'signin' ? '#/owner' : `#/owner/${mode}`;
+    if (window.location.hash === hash) renderSignIn(mode);
+    else window.location.hash = hash;
   }
 
   function renderSignIn(mode = 'signin', notice = '') {
-    clearResendTimer();
-    pendingPassword = '';
+    setTabs(null);
     if (mode === 'register') return renderRegister(notice);
-    if (mode === 'verify' && pendingEmail) return renderVerify(notice);
-    if (mode === 'forgot') return renderForgotPassword(notice);
+    if (mode === 'forgot') return renderForgot(notice);
+    if (mode === 'claim') return renderClaim(notice);
     return renderSignInForm(notice);
+  }
+
+  // A password box with a Show / Hide button. The button only changes the box type. The value stays on this page.
+  function passwordField(name, label, autocomplete) {
+    const id = `auth-${name}`;
+    return `<div class="field">
+        <label for="${id}">${escapeHtml(label)}</label>
+        <span class="password-field">
+          <input id="${id}" name="${name}" type="password" autocomplete="${autocomplete}" autocapitalize="none" spellcheck="false" />
+          <button type="button" class="link" data-toggle-password="${id}" aria-pressed="false">Show</button>
+        </span>
+      </div>`;
+  }
+
+  function bindAuthChrome() {
+    onAll('[data-switch]', 'click', (event) => goAuth(event.currentTarget.dataset.switch));
+    onAll('[data-toggle-password]', 'click', togglePassword);
+  }
+
+  function togglePassword(event) {
+    const button = event.currentTarget;
+    const input = app.querySelector(`#${button.dataset.togglePassword}`);
+    if (!input) return;
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    button.textContent = reveal ? 'Hide' : 'Show';
+    button.setAttribute('aria-pressed', String(reveal));
+  }
+
+  // Redraws the live password checklist and the "passwords match" line from what is typed.
+  function paintChecks(form) {
+    const password = form.elements.password?.value ?? '';
+    const username = normalizeUsername(form.elements.username?.value ?? '');
+    const list = form.querySelector('[data-rules]');
+    if (list) {
+      list.innerHTML = passwordChecklist(password, username)
+        .map(({ label, met }) => `<li class="${met ? 'met' : ''}"><span class="rule-mark" aria-hidden="true">${met ? '✓' : '○'}</span> ${escapeHtml(label)}</li>`)
+        .join('');
+    }
+    const match = form.querySelector('[data-match]');
+    if (match) {
+      const confirm = form.elements.confirm?.value ?? '';
+      if (confirm === '') match.textContent = '';
+      else match.textContent = confirm === password ? 'The passwords match.' : 'The passwords do not match yet.';
+    }
+  }
+
+  function clearPasswords(form) {
+    for (const name of ['password', 'confirm', 'current']) {
+      if (form.elements[name]) form.elements[name].value = '';
+    }
   }
 
   function renderSignInForm(notice = '') {
@@ -213,70 +548,79 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       `<section class="card">
         <h1>Shop owner sign in</h1>
         <p class="muted small">Only shop owners sign in here. Customers do not need an account.</p>
-        <form id="auth-form" class="grid">
-          <label>Email
-            <input name="email" type="email" autocomplete="email" required />
+        <form id="auth-form" class="grid" novalidate>
+          <label>Username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" />
           </label>
-          <label>Password
-            <input name="password" type="password" autocomplete="current-password" required />
-          </label>
+          ${passwordField('password', 'Password', 'current-password')}
           <button type="submit" data-label="Sign in">Sign in</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
         </form>
-        <p><button type="button" class="link" data-switch="forgot">Forgot password?</button></p>
+        <p><button type="button" class="link" data-switch="forgot">Forgot password? Use a recovery code</button></p>
         <p><button type="button" class="link" data-switch="register">New owner? Create an account</button></p>
+        <p><button type="button" class="link" data-switch="claim">Already have a shop with an email sign-in? Move it to a username</button></p>
       </section>`
     );
     on('#auth-form', 'submit', onSignInSubmit);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    bindAuthChrome();
   }
 
   async function onSignInSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = new FormData(form);
-    const email = String(data.get('email') ?? '').trim();
-    const password = String(data.get('password') ?? '');
+    const username = String(form.elements.username.value ?? '').trim();
+    const password = form.elements.password.value;
     setError(form, '');
+    if (username === '') return setError(form, 'Enter your username.');
+    if (password === '') return setError(form, 'Enter your password.');
     setBusy(form, true);
     try {
-      await auth.signIn(email, password);
+      await auth.signIn(username, password);
+      clearPasswords(form);
       go([]);
     } catch (err) {
-      if (err.code === 'email_not_confirmed') {
-        return startVerification(email, 'Your email is not verified yet. We have sent you a new code.');
-      }
-      setError(form, accountErrorMessage(err));
+      clearPasswords(form);
+      setError(form, signInErrorMessage(err));
       setBusy(form, false);
     }
   }
 
-  // An owner who has not verified yet gets a new code, then the code screen.
-  async function startVerification(email, notice) {
-    pendingEmail = email;
-    pendingPassword = ''; // this owner did not register here, so there is no password to save
+  // Loads the current Terms and Privacy versions first. Sign-up cannot be sent without them.
+  async function renderRegister(notice = '') {
+    setTabs(null);
+    show('<p class="muted">Loading…</p>');
+    let policies;
     try {
-      await auth.resendSignupCode(email);
-      pendingSentAt = Date.now();
-      renderVerify(notice);
+      policies = await auth.policies();
     } catch (err) {
-      if (err.status === 429) pendingSentAt = Date.now(); // a code went out a moment ago
-      renderVerify(err.status === 429 ? 'A code was sent a moment ago. Enter it, or wait a minute to resend.' : otpErrorMessage(err, 'resend'));
+      show(
+        `<section class="card">
+          <h1>Create an owner account</h1>
+          <p class="error" role="alert">${escapeHtml(signUpErrorMessage(err))}</p>
+          <p><button type="button" data-action="retry-policies">Try again</button></p>
+          <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+        </section>`
+      );
+      on('[data-action="retry-policies"]', 'click', () => renderRegister(notice));
+      bindAuthChrome();
+      return;
     }
-  }
-
-  function renderRegister(notice = '') {
     show(
       `<section class="card">
         <h1>Create an owner account</h1>
-        <p class="muted small">Only shop owners register here. Customers do not need an account.
-           We will email a one-time code to confirm your address.</p>
-        <form id="auth-form" class="grid">
-          <label>Email
-            <input name="email" type="email" autocomplete="email" required />
+        <p class="muted small">Only shop owners register here. Customers do not need an account. No email address is needed.</p>
+        <form id="auth-form" class="grid" novalidate>
+          <label>Username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" aria-describedby="username-hint" />
           </label>
-          <label>Password (at least 8 characters)
-            <input name="password" type="password" minlength="8" autocomplete="new-password" required />
+          <p id="username-hint" class="muted small">3 to 24 characters: letters a to z, numbers and single underscores. Start with a letter. Usernames are not case sensitive.</p>
+          ${passwordField('password', 'Password', 'new-password')}
+          <ul class="checklist" data-rules aria-label="Password rules"></ul>
+          ${passwordField('confirm', 'Confirm password', 'new-password')}
+          <p class="small" data-match aria-live="polite"></p>
+          <label class="check">
+            <input type="checkbox" name="accept" />
+            <span>I have read and accept the <a href="#/terms" target="_blank" rel="noopener">${escapeHtml(policies.terms.title)}</a> (version ${escapeHtml(policies.terms.version)}) and the <a href="#/privacy" target="_blank" rel="noopener">${escapeHtml(policies.privacy.title)}</a> (version ${escapeHtml(policies.privacy.version)}).</span>
           </label>
           <button type="submit" data-label="Create account">Create account</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
@@ -284,276 +628,361 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         <p><button type="button" class="link" data-switch="signin">Already have an account? Sign in</button></p>
       </section>`
     );
-    on('#auth-form', 'submit', onRegisterSubmit);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    const form = app.querySelector('#auth-form');
+    form.addEventListener('submit', (event) => onRegisterSubmit(event, policies));
+    form.addEventListener('input', () => paintChecks(form));
+    paintChecks(form);
+    bindAuthChrome();
   }
 
-  async function onRegisterSubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const email = String(data.get('email') ?? '').trim();
-    const password = String(data.get('password') ?? '');
-    if (!isEmailAddress(email)) return setError(form, 'Enter a valid email address.');
-    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
-    setError(form, '');
-    setBusy(form, true);
+  // For owners who signed in with an email before. QRquick gives each one a one-time claim code after checking who
+  // they are. The shop, orders and services stay exactly as they are.
+  async function renderClaim(notice = '') {
+    setTabs(null);
+    show('<p class="muted">Loading…</p>');
+    let policies;
     try {
-      await auth.signUp(email, password);
-      pendingEmail = email;
-      pendingSentAt = Date.now(); // signing up has just emailed the first code
-      pendingPassword = password;
-      renderVerify('');
+      policies = await auth.policies();
     } catch (err) {
-      setError(form, accountErrorMessage(err));
-      setBusy(form, false);
-    }
-  }
-
-  function renderVerify(notice = '') {
-    show(
-      `<section class="card">
-        <h1>Check your email</h1>
-        <p>Enter the one-time code we emailed to <strong>${escapeHtml(pendingEmail)}</strong>.
-           It can take a minute to arrive, and it may be in your spam folder. Next you will
-           choose the password you use to sign in.</p>
-        <form id="auth-form" class="grid">
-          <label>Verification code
-            <input name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required />
-          </label>
-          <button type="submit" data-label="Verify email">Verify email</button>
-          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
-        </form>
-        <p><button type="button" class="link" data-action="resend">Resend code</button></p>
-        <p class="muted small">Already verified? <button type="button" class="link" data-switch="signin">Sign in with your password</button></p>
-      </section>`
-    );
-    on('#auth-form', 'submit', onVerifySubmit);
-    on('[data-action="resend"]', 'click', onResendCode);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
-    startResendCountdown();
-  }
-
-  // The resend button stays disabled, with a countdown, until the cooldown ends.
-  function startResendCountdown() {
-    const button = app.querySelector('[data-action="resend"]');
-    if (!button) return;
-    const update = () => {
-      if (!button.isConnected) return clearResendTimer();
-      const wait = resendWaitSeconds(pendingSentAt, Date.now());
-      button.disabled = wait > 0;
-      button.textContent = wait > 0 ? `Resend code in ${wait} s` : 'Resend code';
-      if (wait <= 0) clearResendTimer();
-    };
-    clearResendTimer();
-    update();
-    if (button.disabled) resendTimer = setInterval(update, 1000);
-  }
-
-  async function onResendCode(event) {
-    const button = event.currentTarget;
-    button.disabled = true;
-    button.textContent = 'Sending…';
-    try {
-      await auth.resendSignupCode(pendingEmail);
-      pendingSentAt = Date.now();
-      renderVerify('A new code is on its way.');
-    } catch (err) {
-      if (err.status === 429) pendingSentAt = Date.now();
-      renderVerify(otpErrorMessage(err, 'resend'));
-    }
-  }
-
-  async function onVerifySubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const token = String(new FormData(form).get('token') ?? '').replace(/\s+/g, '');
-    if (!isOtpCode(token)) return setError(form, 'Enter the code from the email. It has 6 to 10 digits.');
-    setError(form, '');
-    setBusy(form, true);
-    try {
-      await auth.verifySignupCode(pendingEmail, token);
-    } catch (err) {
-      setError(form, otpErrorMessage(err, 'verify'));
-      setBusy(form, false);
+      show(
+        `<section class="card">
+          <h1>Move your shop to a username</h1>
+          <p class="error" role="alert">${escapeHtml(claimErrorMessage(err))}</p>
+          <p><button type="button" data-action="retry-policies">Try again</button></p>
+          <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+        </section>`
+      );
+      on('[data-action="retry-policies"]', 'click', () => renderClaim(notice));
+      bindAuthChrome();
       return;
     }
-    clearResendTimer();
-    pendingEmail = '';
-    // The password typed at registration is saved now, so the owner's own password is the
-    // one that works. An owner who came here from sign-in chooses one on the next screen.
-    const password = pendingPassword;
-    pendingPassword = '';
-    if (!password) return renderSetPassword();
-    return finishSignup(password);
-  }
-
-  // Saves the password and opens the account. A failure is shown on the password screen.
-  async function finishSignup(password) {
-    try {
-      await auth.completeSignup(password);
-    } catch (err) {
-      return signupFailed(err);
-    }
-    return go([]);
-  }
-
-  // A confirmation that has ended sends the owner to Forgot password. Any other failure
-  // keeps the owner on the password screen to try again.
-  function signupFailed(err) {
-    if (err.code === 'signup_expired') return renderSignIn('forgot', err.message);
-    return renderSetPassword(accountErrorMessage(err));
-  }
-
-  // The password step: after the code or the confirmation link, before the account opens.
-  // Nothing stays signed in until a password is saved.
-  function renderSetPassword(notice = '') {
-    clearResendTimer();
-    show(`<section class="card">
-      <h1>Choose your password</h1>
-      <p class="muted small">Your email is confirmed. Choose the password you will use to sign in from now on.
-         It replaces any password set before the confirmation. Use at least 8 characters.</p>
-      <form id="set-password-form" class="grid">
-        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <button type="submit" data-label="Save password">Save password</button>
-        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
-      </form>
-      <p class="muted small">Cannot save a password? <button type="button" class="link" data-switch="forgot">Use Forgot password</button></p>
-    </section>`);
-    on('#set-password-form', 'submit', onSetPasswordSubmit);
-    onAll('[data-switch]', 'click', (event) => {
-      auth.abandonSignup();
-      renderSignIn(event.currentTarget.dataset.switch);
-    });
-  }
-
-  async function onSetPasswordSubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const password = String(data.get('password') ?? '');
-    if (!isNewPassword(password)) return setError(form, 'Use a password with at least 8 characters.');
-    if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
-    setError(form, '');
-    setBusy(form, true);
-    return finishSignup(password);
-  }
-
-  // ---------- password reset (a separate flow, unchanged) ----------
-
-  function renderForgotPassword(notice = '') {
     show(
       `<section class="card">
-        <h1>Reset your password</h1>
-        <p class="muted small">We email a reset link to owners who have a password.</p>
-        <form id="auth-form" class="grid">
-          <label>Email
-            <input name="email" type="email" autocomplete="email" required />
+        <h1>Move your shop to a username</h1>
+        <p class="muted small">Use this if you signed in with an email address before. Ask QRquick for a claim code first. Your shop, services and orders stay exactly as they are. After this you sign in with the username and password you choose here, not the email.</p>
+        <form id="auth-form" class="grid" novalidate>
+          <label>Your old sign-in email
+            <input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" />
           </label>
-          <button type="submit" data-label="Send reset link">Send reset link</button>
+          <label>Claim code
+            <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="30" placeholder="XXXX-XXXX-XXXX-XXXX" />
+          </label>
+          <label>New username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" aria-describedby="username-hint" />
+          </label>
+          <p id="username-hint" class="muted small">3 to 24 characters: letters a to z, numbers and single underscores. Start with a letter.</p>
+          ${passwordField('password', 'New password', 'new-password')}
+          <ul class="checklist" data-rules aria-label="Password rules"></ul>
+          ${passwordField('confirm', 'Confirm new password', 'new-password')}
+          <p class="small" data-match aria-live="polite"></p>
+          <label class="check">
+            <input type="checkbox" name="accept" />
+            <span>I have read and accept the <a href="#/terms" target="_blank" rel="noopener">${escapeHtml(policies.terms.title)}</a> (version ${escapeHtml(policies.terms.version)}) and the <a href="#/privacy" target="_blank" rel="noopener">${escapeHtml(policies.privacy.title)}</a> (version ${escapeHtml(policies.privacy.version)}).</span>
+          </label>
+          <button type="submit" data-label="Move my shop">Move my shop</button>
           <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
         </form>
         <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
       </section>`
     );
-    on('#auth-form', 'submit', onForgotSubmit);
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
+    const form = app.querySelector('#auth-form');
+    form.addEventListener('submit', (event) => onClaimSubmit(event, policies));
+    form.addEventListener('input', () => paintChecks(form));
+    paintChecks(form);
+    bindAuthChrome();
+  }
+
+  async function onClaimSubmit(event, policies) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const email = String(form.elements.email.value ?? '').trim();
+    const code = normalizeRecoveryCode(form.elements.code.value);
+    const name = checkUsername(form.elements.username.value);
+    const password = form.elements.password.value;
+    setError(form, '');
+    if (!/^[^\s@]+@[^\s@]+$/.test(email)) return setError(form, 'Enter the email address you used to sign in before.');
+    if (code === null) return setError(form, 'Enter the claim code. It has 16 letters and numbers, in four groups of four.');
+    if (!name.ok) return setError(form, name.message);
+    if (!checkPassword(password, name.username).ok) {
+      return setError(form, 'Your password does not meet all the rules yet. The list above shows what is missing.');
+    }
+    if (password !== form.elements.confirm.value) {
+      return setError(form, 'The passwords do not match. Type the same password in both boxes.');
+    }
+    if (!form.elements.accept.checked) return setError(form, 'Accept the Terms and the Privacy Policy to continue.');
+    setBusy(form, true);
+    try {
+      await auth.claim({
+        email,
+        claimCode: code,
+        username: name.username,
+        password,
+        accept: { terms: policies.terms.version, privacy: policies.privacy.version },
+      });
+      clearPasswords(form);
+      go([]);
+    } catch (err) {
+      setError(form, claimErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
+
+  async function onRegisterSubmit(event, policies) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const name = checkUsername(form.elements.username.value);
+    const password = form.elements.password.value;
+    setError(form, '');
+    if (!name.ok) return setError(form, name.message);
+    if (!checkPassword(password, name.username).ok) {
+      return setError(form, 'Your password does not meet all the rules yet. The list above shows what is missing.');
+    }
+    if (password !== form.elements.confirm.value) {
+      return setError(form, 'The passwords do not match. Type the same password in both boxes.');
+    }
+    if (!form.elements.accept.checked) {
+      return setError(form, 'Accept the Terms and the Privacy Policy to create an account.');
+    }
+    setBusy(form, true);
+    try {
+      await auth.signUp({
+        username: name.username,
+        password,
+        accept: { terms: policies.terms.version, privacy: policies.privacy.version },
+      });
+      clearPasswords(form);
+      // The recovery codes screen opens first (see render).
+      go([]);
+    } catch (err) {
+      // The passwords stay in the boxes, so the owner only changes what the message asks for.
+      setError(form, signUpErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
+
+  function renderForgot(notice = '') {
+    setTabs(null);
+    show(
+      `<section class="card">
+        <h1>Reset your password</h1>
+        <p class="muted small">Use one of the recovery codes you saved when you created the account or last made new codes. Each code works once. Other devices stay signed in for up to an hour after the reset.</p>
+        <form id="auth-form" class="grid" novalidate>
+          <label>Username
+            <input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" />
+          </label>
+          <label>Recovery code
+            <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="30" placeholder="XXXX-XXXX-XXXX-XXXX" />
+          </label>
+          <p class="muted small">Type the code with or without the dashes. Capital and small letters are the same.</p>
+          ${passwordField('password', 'New password', 'new-password')}
+          <ul class="checklist" data-rules aria-label="Password rules"></ul>
+          ${passwordField('confirm', 'Confirm new password', 'new-password')}
+          <p class="small" data-match aria-live="polite"></p>
+          <button type="submit" data-label="Reset password">Reset password</button>
+          <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
+        </form>
+        <p class="muted small">No recovery code left, or none of them work? The password cannot be reset here. Ask QRquick for help.</p>
+        <p><button type="button" class="link" data-switch="signin">Back to sign in</button></p>
+      </section>`
+    );
+    const form = app.querySelector('#auth-form');
+    form.addEventListener('submit', onForgotSubmit);
+    form.addEventListener('input', () => paintChecks(form));
+    paintChecks(form);
+    bindAuthChrome();
   }
 
   async function onForgotSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const email = String(new FormData(form).get('email') ?? '').trim();
+    const username = normalizeUsername(form.elements.username.value);
+    const code = normalizeRecoveryCode(form.elements.code.value);
+    const password = form.elements.password.value;
     setError(form, '');
+    if (username === '') return setError(form, 'Enter your username.');
+    if (code === null) return setError(form, 'Enter a recovery code. It has 16 letters and numbers, in four groups of four.');
+    if (!checkPassword(password, username).ok) {
+      return setError(form, 'Your new password does not meet all the rules yet. The list above shows what is missing.');
+    }
+    if (password !== form.elements.confirm.value) return setError(form, 'The new passwords do not match.');
     setBusy(form, true);
     try {
-      await auth.recoverPassword(email);
-      showResetSent(email);
+      await auth.resetPassword({ username, recoveryCode: code, newPassword: password });
+      clearPasswords(form);
+      go([]);
     } catch (err) {
-      setError(form, accountErrorMessage(err));
+      // The passwords stay in the boxes. A password the server refused is still the owner's to change.
+      setError(form, resetErrorMessage(err));
       setBusy(form, false);
     }
   }
 
-  // The same message whether or not the address has an account, so the form cannot be
-  // used to find which emails are registered.
-  function showResetSent(email) {
+  // Shows recovery codes once. They are kept nowhere in the browser. onDone runs after the owner
+  // confirms that they are saved.
+  function renderRecoveryCodes({ purpose, username, recoveryCodes, onDone }) {
+    setTabs(null);
+    const intro =
+      purpose === 'reset'
+        ? 'Your password has been changed. Save these new recovery codes before you continue. The old codes no longer work.'
+        : purpose === 'regenerate'
+          ? 'These are your new recovery codes. The codes you had before no longer work. Save these before you leave this page.'
+          : 'Your account is ready. Save these recovery codes before you continue. Each one can reset your password once if you forget it.';
+    const warning =
+      purpose === 'regenerate'
+        ? 'Leaving this page hides these codes for good. You would then need to make a new set.'
+        : 'Do not reload or leave this page before you save them. They are kept nowhere, so after a reload you would sign in and make a new set.';
+    const text = recoveryCodesText(username, recoveryCodes);
     show(
       `<section class="card">
-        <h1>Check your email</h1>
-        <p>If <strong>${escapeHtml(email)}</strong> has an owner account with a password, we have emailed a reset link. Open it on this device to choose a new password.</p>
-        <p><button type="button" class="link" data-switch="signin">Go to sign in</button></p>
+        <h1>Save your recovery codes</h1>
+        <p>${escapeHtml(intro)}</p>
+        <p class="banner" role="note">${escapeHtml(warning)}</p>
+        <p class="muted small">Account: <strong>${escapeHtml(username)}</strong></p>
+        <ol class="recovery-codes">
+          ${recoveryCodes.map((code) => `<li><code>${escapeHtml(code)}</code></li>`).join('')}
+        </ol>
+        <p class="muted small">Keep them private. Anyone with one of these codes can reset this account's password. Only a scrambled form of each code is stored, so they cannot be shown again.</p>
+        <p class="button-row">
+          <button type="button" class="secondary" data-action="copy-codes">Copy codes</button>
+          <button type="button" class="secondary" data-action="download-codes">Download as text</button>
+        </p>
+        <p class="error" data-error role="alert"></p>
+        <label class="check">
+          <input type="checkbox" data-saved />
+          <span>I have saved these codes somewhere safe.</span>
+        </label>
+        <p><button type="button" data-action="codes-done" disabled data-label="Continue">Continue</button></p>
       </section>`
     );
-    onAll('[data-switch]', 'click', (event) => renderSignIn(event.currentTarget.dataset.switch));
-  }
-
-  function renderResetPassword(notice = '') {
-    show(`<section class="card">
-      <h1>Choose a new password</h1>
-      <p class="muted small">Use at least 8 characters. This recovery link is short-lived.</p>
-      <form id="reset-form" class="grid">
-        <label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <label>Repeat password<input name="repeat" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <button type="submit">Save new password</button>
-        <p class="error" data-error role="alert">${escapeHtml(notice)}</p>
-      </form>
-    </section>`);
-    on('#reset-form', 'submit', async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const data = new FormData(form);
-      const password = String(data.get('password') ?? '');
-      if (password !== String(data.get('repeat') ?? '')) return setError(form, 'The passwords do not match.');
-      setBusy(form, true);
+    const done = app.querySelector('[data-action="codes-done"]');
+    app.querySelector('[data-saved]').addEventListener('change', (event) => {
+      done.disabled = !event.currentTarget.checked;
+    });
+    on('[data-action="copy-codes"]', 'click', async () => {
       try {
-        await auth.updatePassword(password);
-        await auth.signOut();
-        renderSignIn('signin', 'Password changed. Sign in with your new password.');
-      } catch (err) {
-        setError(form, friendlyAuthError(err));
-        setBusy(form, false);
+        await navigator.clipboard.writeText(text);
+        setError(app, 'The codes are copied. Paste them somewhere safe.');
+      } catch {
+        setError(app, 'Could not copy from this screen. Select the codes and copy them by hand, or use Download as text.');
       }
+    });
+    on('[data-action="download-codes"]', 'click', () => {
+      try {
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `qrquick-recovery-codes-${username}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch {
+        setError(app, 'Could not download the file. Select the codes and copy them by hand.');
+      }
+    });
+    done.addEventListener('click', () => {
+      done.disabled = true;
+      onDone();
     });
   }
 
-  function friendlyAuthError(err) {
-    if (err instanceof TypeError) return CONNECTION_MESSAGE;
-    if (/invalid login/i.test(err.message)) return 'That email and password do not match an account.';
-    if (/already (registered|exists)/i.test(err.message)) {
-      return 'An account with this email already exists. Sign in instead.';
-    }
-    return err.message;
+  // The owner has saved the codes of a new account or a reset. The server gave a session with
+  // both, so the owner goes straight in. Without one, the owner signs in with the new password.
+  async function finishPendingCodes() {
+    const session = await auth.acknowledgeCodes();
+    if (session) return go([]);
+    return renderSignIn('signin', 'Sign in with your username and new password.');
   }
 
-  // ---------- your shops ----------
+  function leaveRegeneratedCodes() {
+    securityNotice = 'New recovery codes are saved. The old codes no longer work.';
+    go(['security']);
+  }
+
+  // Signed in: make a new set of codes. The current password is needed, so a stolen open session alone is not enough.
+  function renderSecurity(user) {
+    setTabs('more');
+    const notice = securityNotice;
+    securityNotice = '';
+    show(
+      `<section class="card page-head">
+        <p class="eyebrow">MORE</p>
+        <h1>Recovery codes</h1>
+        <p class="small"><span class="muted">Signed in as</span> <strong>${escapeHtml(user?.username ?? '')}</strong></p>
+      </section>
+      <section class="card">
+        <h2>Make new recovery codes</h2>
+        <p class="muted small">Recovery codes reset your password if you forget it. Making a new set stops every code you had before from working. Enter your current password to continue.</p>
+        <form id="codes-form" class="grid" novalidate>
+          ${passwordField('current', 'Current password', 'current-password')}
+          <button type="submit" data-label="Make new codes">Make new codes</button>
+          <p class="error" data-error role="alert"></p>
+        </form>
+      </section>
+      <p class="notice" data-notice>${escapeHtml(notice)}</p>`
+    );
+    on('#codes-form', 'submit', onCodesSubmit);
+    bindAuthChrome();
+  }
+
+  async function onCodesSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const password = form.elements.current.value;
+    setError(form, '');
+    if (password === '') return setError(form, 'Enter your current password.');
+    setBusy(form, true);
+    try {
+      const made = await auth.regenerateCodes(password);
+      clearPasswords(form);
+      renderRecoveryCodes({
+        purpose: 'regenerate',
+        username: made.username,
+        recoveryCodes: made.recoveryCodes,
+        onDone: leaveRegeneratedCodes,
+      });
+    } catch (err) {
+      clearPasswords(form);
+      if (err.code === 'session_required') {
+        await auth.signOut();
+        return renderSignIn('signin', regenerateErrorMessage(err));
+      }
+      setError(form, regenerateErrorMessage(err));
+      setBusy(form, false);
+    }
+  }
 
   async function renderShopList(user) {
     const shops = await ownerApi.listMyShops(user.id);
-    const openCount = shops.filter((shop) => shop.is_open).length;
+    const shop = shops.find((item) => item.slug === activeSlug) ?? shops[0] ?? null;
+    setTabs('home', shop ? shop.slug : null);
+    const stats = shop ? await homeStats(shop) : null;
     const items = shops
       .map(
-        (shop) => `
+        (item) => `
         <li class="owner-shop-card">
-          <div class="between"><a href="#/owner/shop/${encodeURIComponent(shop.slug)}"><strong>${escapeHtml(shop.name)}</strong></a><span class="shop-status ${shop.is_open ? 'is-open' : ''}">${shop.is_open ? 'Open' : 'Closed'}</span></div>
-          <span class="muted small">/${escapeHtml(shop.slug)}</span>
-          <div class="owner-shop-actions"><a class="button secondary" href="#/owner/shop/${encodeURIComponent(shop.slug)}">Manage shop</a><a href="#/owner/shop/${encodeURIComponent(shop.slug)}/orders">View orders →</a></div>
+          <div class="between"><a href="#/owner/shop/${encodeURIComponent(item.slug)}"><strong>${escapeHtml(item.name)}</strong></a><span class="shop-status ${item.is_open ? 'is-open' : ''}">${item.is_open ? 'Open' : 'Closed'}</span></div>
+          <span class="muted small">/${escapeHtml(item.slug)}</span>
+          <div class="owner-shop-actions"><a class="button secondary" href="#/owner/shop/${encodeURIComponent(item.slug)}">Prices and shop</a><a href="#/owner/shop/${encodeURIComponent(item.slug)}/orders">View orders →</a></div>
         </li>`
       )
       .join('');
 
     show(
-      `<section class="owner-dashboard-head">
-        <div><p class="eyebrow">OWNER DASHBOARD</p><h1>Good to see you.</h1><p class="muted">Here’s what’s happening with your print shops today.</p></div>
-        <button type="button" class="button secondary" data-action="signout">Sign out</button>
+      `<section class="page-head">
+        <p class="eyebrow">QRQUICK OWNER</p>
+        <h1>Home</h1>
+        <p class="muted">${shop ? `Today at ${escapeHtml(shop.name)}.` : 'Create your shop to start taking orders.'}</p>
       </section>
-      <section class="owner-summary-grid"><article class="card"><span class="muted small">Your shops</span><strong>${shops.length}</strong><span class="muted small">${openCount} currently open</span></article><article class="card"><span class="muted small">Needs you now</span><strong>—</strong><span class="muted small">Orders appear here</span></article><article class="card"><span class="muted small">Account</span><strong class="summary-email">${escapeHtml(user.email)}</strong><span class="muted small">Owner access</span></article></section>
-      <section class="card owner-shops-section"><div class="between"><div><p class="eyebrow">YOUR SHOPS</p><h2>Manage your print counters</h2></div><a class="button" href="#/owner/new">+ Create a shop</a></div>
+      <section class="stat-row" aria-label="Today at a glance">
+        <article class="card stat"><span class="muted small">Needs you now</span><strong>${stats?.open ?? '—'}</strong><span class="muted small">open orders</span></article>
+        <article class="card stat"><span class="muted small">Shop</span><strong>${shop ? (shop.is_open ? 'Open' : 'Closed') : '—'}</strong><span class="muted small">${shop ? escapeHtml(shop.name) : 'No shop yet'}</span></article>
+        <article class="card stat"><span class="muted small">Printing computers</span><strong>${stats?.agents ?? '—'}</strong><span class="muted small">connected</span></article>
+      </section>
+      <section class="card owner-shops-section"><div class="between"><div><p class="eyebrow">YOUR SHOPS</p><h2>${shops.length > 1 ? 'Your shops' : 'Your shop'}</h2></div><a class="button" href="#/owner/new">+ Create a shop</a></div>
         ${shops.length ? `<ul class="list owner-shop-list">${items}</ul>` : '<div class="empty-state"><p class="muted">You do not have a shop yet.</p><a class="button" href="#/owner/new">Create your first shop</a></div>'}
       </section>`
     );
-    on('[data-action="signout"]', 'click', signOut);
   }
 
   // ---------- create a shop ----------
@@ -621,6 +1050,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     const shops = await ownerApi.listMyShops(user.id);
     const shop = shops.find((item) => item.slug === slug);
     if (!shop) {
+      setTabs('home', null);
       show(
         `<section class="card">
           <h1>Shop not found</h1>
@@ -630,148 +1060,45 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       );
       return;
     }
-    if (section === 'orders') return renderOrdersFor(shop);
-    if (section === 'stats') return statsPages.open(shop);
+    if (section === 'orders') {
+      setTabs('orders', shop.slug);
+      return renderOrdersFor(shop);
+    }
+    if (section === 'stats') {
+      setTabs('stats', shop.slug);
+      return statsPages.open(shop);
+    }
+    if (section === 'licence' && licenceEnabled) {
+      setTabs('more', shop.slug);
+      return licencePages.open(shop);
+    }
+    if (section === 'more') {
+      setTabs('more', shop.slug);
+      return openMore(user, shop);
+    }
+    if (section === 'printer') {
+      setTabs('more', shop.slug);
+      return openPrinter(shop);
+    }
 
+    setTabs('prices', shop.slug);
     const [services, catalog] = await Promise.all([
       ownerApi.listServices(shop.id),
       ownerApi.listFeatureCatalog(),
     ]);
-    managed = { shop, services, catalog };
+    managed = { view: 'prices', user, shop, services, catalog };
     renderManager();
   }
 
   function renderManager({ editingId = null, notice = '', error = '' } = {}) {
+    if (managed.view === 'more') return renderMore({ notice, error });
     const { shop, services, catalog } = managed;
     const editing = services.find((service) => service.id === editingId) ?? null;
-    show(managerHtml(shop, services, editing, notice, error, catalog));
+    show(pricesHtml(shop, services, editing, notice, error, catalog));
     bindManager();
   }
 
-  function managerHtml(shop, services, editing, notice, error, catalog) {
-    const address = customerAddress(shop.slug);
-    const qrContent = address.problem
-      ? `<p class="banner" role="alert">${escapeHtml(address.problem)} QR generation is disabled until a verified HTTPS customer URL is configured.</p>`
-      : `<div class="qr-box">${qrSvg(address.url)}</div>
-         <div class="qr-text">
-           <p class="muted small">Print this code and place it at your counter. Customers scan it to open their page, upload files and place an order.</p>
-           <button type="button" data-action="download-qr">Download QR as PNG</button>
-         </div>`;
-    const featuresBlock = featuresCard(shop, catalog);
-    const paymentBlock = paymentQrCard(shop);
-    const cashBlock = cashPolicyCard(shop);
-    const rows = services
-      .map((service) => {
-        const bw = service.bw_price_paise === null ? '–' : formatPaise(service.bw_price_paise);
-        const colour = service.colour_price_paise === null ? '–' : formatPaise(service.colour_price_paise);
-        const hidden = service.is_active ? '' : ' <span class="muted small">(hidden from customers)</span>';
-        return `
-          <tr>
-            <td>${escapeHtml(service.name)}${hidden}</td>
-            <td>${escapeHtml(unitLabel(service.pricing_unit))}</td>
-            <td class="num">${bw}</td>
-            <td class="num">${colour}</td>
-            <td><button type="button" class="link" data-edit="${escapeHtml(service.id)}">Edit</button></td>
-          </tr>`;
-      })
-      .join('');
 
-    const serviceTable = services.length
-      ? `<div class="table-wrap">
-           <table class="breakdown">
-             <thead><tr><th>Service</th><th>Charged</th><th class="num">B&amp;W</th><th class="num">Colour</th><th></th></tr></thead>
-             <tbody>${rows}</tbody>
-           </table>
-         </div>`
-      : '<p class="muted">No services yet. Add one below.</p>';
-
-    const selectedUnit = editing?.pricing_unit ?? 'per_side';
-    const unitOptions = UNIT_OPTIONS.map(
-      (option) =>
-        `<option value="${option.value}"${option.value === selectedUnit ? ' selected' : ''}>${escapeHtml(option.label)}</option>`
-    ).join('');
-
-    return `
-      <section class="card">
-        <p class="small"><a href="#/owner">← Your shops</a></p>
-        <h1>${escapeHtml(shop.name)}</h1>
-        <p class="muted small">Web address: /s/${escapeHtml(shop.slug)}</p>
-        <p class="${shop.is_open ? 'badge ok' : 'badge closed'}">
-          ${shop.is_open ? 'Open for orders' : 'Closed. Customers can see prices but cannot order.'}
-        </p>
-        <p><a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/orders">Orders</a>
-           <a class="button" href="#/owner/shop/${encodeURIComponent(shop.slug)}/stats">Statistics</a></p>
-        <p><button type="button" data-action="toggle-open" data-label="${shop.is_open ? 'Close shop' : 'Open shop'}">
-          ${shop.is_open ? 'Close shop' : 'Open shop'}
-        </button></p>
-        <p class="notice" data-notice>${escapeHtml(notice)}</p>
-        <p class="error" data-error-top role="alert">${escapeHtml(error)}</p>
-      </section>
-
-      <section class="card">
-        <h2>Customer page and QR code</h2>
-        <label>Customer page address
-          <input readonly value="${escapeHtml(address.url)}" />
-        </label>
-        ${address.problem ? `<p class="banner" role="alert">${escapeHtml(address.problem)}</p>` : ''}
-        <div class="qr-row">${qrContent}</div>
-      </section>
-
-      <section class="card">
-        <h2>Shop details</h2>
-        <form id="details-form" class="grid">
-          <label>Shop name
-            <input name="name" maxlength="120" required value="${escapeHtml(shop.name)}" />
-          </label>
-          <label>Phone
-            <input name="phone" type="tel" maxlength="20" value="${escapeHtml(shop.phone ?? '')}" />
-          </label>
-          <label>Address
-            <input name="address" maxlength="200" value="${escapeHtml(shop.address ?? '')}" />
-          </label>
-          <button type="submit" data-label="Save details">Save details</button>
-          <p class="error" data-error role="alert"></p>
-        </form>
-      </section>
-
-      ${featuresBlock}
-
-      ${paymentBlock}
-
-      ${cashBlock}
-
-      <section class="card">
-        <h2>Services and prices</h2>
-        ${serviceTable}
-        <h3>${editing ? 'Edit service' : 'Add a service'}</h3>
-        <form id="service-form" class="grid">
-          <input type="hidden" name="serviceId" value="${escapeHtml(editing?.id ?? '')}" />
-          <label>Service name
-            <input name="name" maxlength="80" required value="${escapeHtml(editing?.name ?? '')}" />
-          </label>
-          <label>Charged
-            <select name="pricingUnit">${unitOptions}</select>
-          </label>
-          <label>Black and white price in rupees (leave empty if not offered)
-            <input name="bwPrice" inputmode="decimal" placeholder="for example 2 or 2.50"
-                   value="${escapeHtml(paiseToRupeesInput(editing?.bw_price_paise))}" />
-          </label>
-          <label>Colour price in rupees (leave empty if not offered)
-            <input name="colourPrice" inputmode="decimal" placeholder="for example 10"
-                   value="${escapeHtml(paiseToRupeesInput(editing?.colour_price_paise))}" />
-          </label>
-          <label class="check">
-            <input name="isActive" type="checkbox" ${editing?.is_active === false ? '' : 'checked'} />
-            Show this service to customers
-          </label>
-          <button type="submit" data-label="${editing ? 'Save service' : 'Add service'}">
-            ${editing ? 'Save service' : 'Add service'}
-          </button>
-          ${editing ? '<button type="button" class="link" data-action="cancel-edit">Cancel editing</button>' : ''}
-          <p class="error" data-error role="alert"></p>
-        </form>
-      </section>`;
-  }
 
   // Yes/no switches for each feature. Customers only see the features that are on.
   function featuresCard(shop, catalog) {
@@ -850,12 +1177,14 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('#cash-policy-form', 'submit', onSaveCashPolicy);
     on('[data-action="remove-payment-qr"]', 'click', onRemovePaymentQr);
     on('#service-form', 'submit', onSaveService);
+    onAll('[data-preset]', 'click', applyPhotoPreset);
     on('[data-action="toggle-open"]', 'click', onToggleOpen);
     on('[data-action="cancel-edit"]', 'click', () => renderManager());
     onAll('[data-edit]', 'click', (event) => renderManager({ editingId: event.currentTarget.dataset.edit }));
     const pageAddress = app.querySelector('input[readonly]');
     pageAddress?.addEventListener('focus', () => pageAddress.select());
     on('[data-action="download-qr"]', 'click', () => downloadQr(managed.shop.slug));
+    on('[data-action="signout"]', 'click', signOut);
   }
 
   // Saves the shop's QR code as a PNG for printing. It is drawn in the browser
@@ -920,6 +1249,16 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     }
   }
 
+  // Fills the add-service form from a quick-start preset. The owner still sets the price and saves.
+  function applyPhotoPreset(event) {
+    const preset = PHOTO_PRESETS[event.currentTarget.dataset.preset];
+    const form = document.getElementById('service-form');
+    if (!preset || !form) return;
+    form.elements.name.value = preset.name;
+    form.elements.pricingUnit.value = preset.pricingUnit;
+    form.elements.bwPrice?.focus();
+  }
+
   async function onSaveService(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -958,7 +1297,10 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     try {
       const saved = await ownerApi.saveFeatures(managed.shop.id, features);
       managed.shop = { ...managed.shop, features: saved };
-      renderManager({ notice: 'Features saved. Customers now see the updated list.' });
+      const notice = passportNeedsService(managed.shop, managed.services)
+        ? 'Features saved. Passport photos needs a priced service on the Prices tab before customers can order it.'
+        : 'Features saved. Customers now see the updated list.';
+      renderManager({ notice });
     } catch (err) {
       setError(form, messageFor(err));
       setBusy(form, false);
@@ -1045,7 +1387,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     const nav = navigation;
     const { orders, printing } = await loadOrderView(shop.id);
     if (nav !== navigation) return; // the owner has left this page while it loaded
-    orderView = { shop, orders, printing, showAll: false, jobsByItem: new Map(), pairing: null };
+    orderView = { mode: 'orders', shop, orders, printing, showAll: false, jobsByItem: new Map(), pairing: null };
     liveState = 'live'; // a message from an earlier visit must not show on a fresh page
     renderOrders();
     liveOrders.start();
@@ -1079,6 +1421,11 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
       error = kept?.error ?? '';
     } else {
       feedback = notice || error ? { notice, error, at: Date.now() } : null;
+    }
+    if (orderView.mode === 'printer') {
+      show(printerPageHtml(orderView.shop, notice, error));
+      bindPrinterPage();
+      return;
     }
     const { shop, orders, showAll } = orderView;
     orderView.jobsByItem = latestJobsByItem(orderView.printing?.jobs ?? []);
@@ -1202,6 +1549,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     on('[data-print-action="pair"]', 'click', onPairPrinter);
     onAll('[data-print-action="revoke"]', 'click', onRevokePrinter);
     onAll('[data-agent-printer]', 'change', onAgentPrinterChange);
+    onAll('[data-auto-print]', 'change', onAutoPrintChange);
     onAll('[data-send-order]', 'click', onSendToPrint);
     onAll('[data-retry-job]', 'click', onRetryJob);
   }
@@ -1352,6 +1700,29 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
     );
   }
 
+  // The switch that sends approved, paid orders to the printer without a press of Send to printer.
+  // Off unless the owner turns it on. Turning it off does not cancel jobs already queued.
+  function autoPrintHtml() {
+    const enabled = orderView.shop?.auto_print_enabled === true;
+    return `<label class="auto-print-switch">
+        <input type="checkbox" data-auto-print${enabled ? ' checked' : ''} />
+        <span>Send paid orders to the printer automatically</span>
+      </label>
+      <p class="muted small">${escapeHtml(autoPrintSummary(enabled))}</p>`;
+  }
+
+  async function onAutoPrintChange(event) {
+    const input = event.currentTarget;
+    const enabled = input.checked;
+    input.disabled = true;
+    await runOrderChange(async () => {
+      const saved = await ownerApi.setAutoPrint(orderView.shop.id, enabled);
+      orderView.shop.auto_print_enabled = saved?.auto_print_enabled === true;
+    }, enabled
+      ? 'Automatic sending is on for this shop.'
+      : 'Automatic sending is off. Press Send to printer for each order.');
+  }
+
   // The printing computers and the pairing box. Only the shop owner can pair, rename or remove them.
   function printPanelHtml() {
     const printing = orderView.printing;
@@ -1375,6 +1746,7 @@ export function createOwnerPages({ app, auth, ownerApi, config = window.PRINTNES
         <strong>Printing computers</strong>
         ${notice ? `<p class="notice">${escapeHtml(notice)}</p>` : ''}
         ${rows || '<p class="muted small">No computer is connected for printing yet.</p>'}
+        ${printing.is_owner ? autoPrintHtml() : ''}
         ${printing.is_owner
           ? '<div class="actions"><button type="button" data-print-action="pair">Connect a printing computer</button></div>'
           : ''}

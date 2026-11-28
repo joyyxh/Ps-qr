@@ -1,0 +1,389 @@
+name: Desktop owner app (Windows and Linux)
+
+# Builds the QRquick owner desktop app for Windows x64 (an NSIS installer) and Linux x64 (an AppImage) from the
+# same web/ source as the website and the Android app. Every run builds both, checks the packages, and runs the
+# smoke test on each. The packages are uploaded as run artifacts; this workflow creates no GitHub release.
+#
+# Every package from this workflow is a TEST build for the qrquick-staging project (publishable key only). The
+# production project has no username sign-in yet (migrations 0021 and 0022 and the owner-auth function are on
+# staging only), so the production web app is not packed: desktop/scripts/copy-web.mjs refuses it.
+#
+# Kinds of run:
+#   TEST (every push, and a manual run with no inputs). Named TEST. Not for distribution. The Windows installer
+#        is unsigned.
+#   test_signing=true (manual only). Signs the Windows build with a throwaway self-signed certificate, to test the
+#        signing step. Named TEST. Windows does not trust that certificate.
+#   RELEASE (release=true) is refused. It needs owner approval and a production build. See docs/RELEASE.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'RELEASE: sign the Windows app with the QRquick code-signing certificate from the repository secrets'
+        required: false
+        type: boolean
+        default: false
+      test_signing:
+        description: 'TEST ONLY: sign the Windows app with a throwaway self-signed certificate made in this run'
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - 'desktop/**'
+      - 'web/**'
+      - '.github/workflows/desktop-owner-app.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: ubuntu-latest
+            platform: linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      # Electron-builder signs only with the certificate this workflow passes in (CSC_LINK), never one it finds.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # The packages are the staging TEST build, so they point at the staging project. Test builds only, never released.
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Record the version, the build id and the distribution label
+        env:
+          WANT_RELEASE: ${{ inputs.release }}
+          WANT_TEST_SIGNING: ${{ inputs.test_signing }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          if [ "$WANT_RELEASE" = "true" ]; then
+            echo 'A RELEASE build is refused. The production project does not have username sign-in yet (migrations 0021 and 0022 and the owner-auth function are on staging only). Owner approval is needed first.' >&2
+            exit 1
+          fi
+          DIST=TEST
+          if [ "$WANT_TEST_SIGNING" = "true" ]; then SIGNING=test-cert; else SIGNING=none; fi
+          {
+            echo "APP_VERSION=$VERSION"
+            echo "BUILD_SHA=$SHORT_SHA"
+            echo "BUILD_ID=$VERSION-$SHORT_SHA"
+            echo "DIST_LABEL=$DIST"
+            echo "SIGNING_MODE=$SIGNING"
+          } >> "$GITHUB_ENV"
+          echo "Build id: $VERSION-$SHORT_SHA (commit $GITHUB_SHA). Distribution: $DIST. Windows signing: $SIGNING."
+
+      - name: Install the Electron shell and the packager (pinned in desktop/package.json)
+        run: npm install --no-audit --no-fund
+
+      - name: Copy the shared web app as the TEST build for the staging project
+        run: npm run copy-web:staging-package
+
+      - name: Install Playwright 1.63.0 for the smoke test (outside the repository)
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
+
+      - name: Install the virtual display and Electron libraries (Linux)
+        if: matrix.platform == 'linux-x64'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libgtk-3-0 libasound2t64 libxss1 libgbm1 libxkbcommon0 libdrm2 libxcomposite1 libxdamage1 libxrandr2 libcups2 libatk-bridge2.0-0 libx11-xcb1
+
+      - name: Prepare the Windows signing certificate (Windows; skipped for unsigned test builds)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        env:
+          WIN_CSC_BASE64: ${{ secrets.WIN_CSC_BASE64 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:SIGNING_MODE -eq 'none') {
+            Write-Host 'Unsigned test build: no certificate is prepared, so electron-builder will not sign.'
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'qrquick-codesign.pfx'
+          if ($env:SIGNING_MODE -eq 'release-cert') {
+            if (-not $env:WIN_CSC_BASE64 -or -not $env:WIN_CSC_KEY_PASSWORD) {
+              throw 'The Windows code-signing secrets (WIN_CSC_BASE64, WIN_CSC_KEY_PASSWORD) are not set. A release installer is not built unsigned. See docs/RELEASE.md.'
+            }
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WIN_CSC_BASE64))
+            $password = $env:WIN_CSC_KEY_PASSWORD
+            Write-Host 'The QRquick code-signing certificate is ready for this run.'
+          } else {
+            # A throwaway self-signed certificate for testing the signing step. Windows does not trust it.
+            $password = [guid]::NewGuid().ToString('N')
+            $cert = New-SelfSignedCertificate -Subject 'CN=QRquick TEST ONLY' -Type CodeSigningCert `
+              -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddDays(2) -KeyExportPolicy Exportable
+            Export-PfxCertificate -Cert $cert -FilePath $pfx -Password (ConvertTo-SecureString -String $password -AsPlainText -Force) | Out-Null
+            Write-Host 'A throwaway test certificate was made for this run.'
+          }
+          "CSC_LINK=$pfx" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CSC_KEY_PASSWORD=$password" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build the Windows installer and unpacked app
+        if: matrix.platform == 'windows-x64'
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Build the Linux AppImage and unpacked app
+        if: matrix.platform == 'linux-x64'
+        run: npx electron-builder --linux --x64 --publish never
+
+      - name: Check the packages are the staging TEST build only, with no production reference and no secrets
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.platform }}" = 'windows-x64' ]; then
+            UNPACKED="dist/win-unpacked"
+            test -s dist/QRquick-*-win-x64-setup.exe
+          else
+            UNPACKED="dist/linux-unpacked"
+            test -s dist/QRquick-*-linux-x64.AppImage
+          fi
+          RES="$UNPACKED/resources/app-web"
+          test -f "$RES/index.html"
+          test -f "$RES/src/app.js"
+          grep -q 'TEST BUILD ONLY' "$RES/config.js"
+          # config.js is JavaScript (supabaseUrl: '...'), so accept either quote style or a JSON-style key.
+          grep -Eq "supabaseUrl[\"']?[[:space:]]*:[[:space:]]*[\"']https://nbzojqlqkrydcjtogwrb[.]supabase[.]co[\"']" "$RES/config.js"
+          grep -Eq "ownerApp[\"']?[[:space:]]*:[[:space:]]*true" "$RES/config.js"
+          grep -Eq "publicBaseUrl[\"']?[[:space:]]*:[[:space:]]*[\"']https://joyyxh[.]github[.]io/Ps-qr/[\"']" "$RES/config.js"
+          # The production project is not in the package, and no secret key is.
+          if grep -rIl "qvnwqrevgyootaaunrto" "$RES" > /dev/null; then echo 'the production project is in the packaged web copy' >&2; exit 1; fi
+          if grep -rIEl 'sb_secret_|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.' "$RES" > /dev/null; then echo 'a secret-looking key is in the packaged web copy' >&2; exit 1; fi
+          if grep -aq "qvnwqrevgyootaaunrto\|sb_secret_" "$UNPACKED/resources/app.asar"; then echo 'the production project or a secret key is in app.asar' >&2; exit 1; fi
+          test -f "$UNPACKED/resources/app.asar"
+          echo "Packaged web copy: $(find "$RES" -type f | wc -l) files, staging TEST build, ownerApp true."
+
+      - name: Check the Windows signature (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'The Windows installer was not built.' }
+          $files = @($installer.FullName)
+          $msiFile = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64.msi' | Select-Object -First 1
+          if (-not $msiFile) { throw 'The Windows MSI was not built.' }
+          $files += $msiFile.FullName
+          $exe = Join-Path (Get-Location) 'dist/win-unpacked/QRquick.exe'
+          if (Test-Path $exe) { $files += $exe }
+          foreach ($file in $files) {
+            $sig = Get-AuthenticodeSignature -FilePath $file
+            Write-Host "$(Split-Path $file -Leaf): $($sig.Status) - $($sig.StatusMessage)"
+            if ($env:SIGNING_MODE -eq 'release-cert') {
+              if ($sig.Status -ne 'Valid') { throw "The release file $file is not validly signed (status $($sig.Status))." }
+            } elseif ($env:SIGNING_MODE -eq 'test-cert') {
+              if (-not $sig.SignerCertificate) { throw "The test file $file was not signed." }
+            } else {
+              if ($sig.SignerCertificate) { throw "The unsigned test file $file unexpectedly has a signature." }
+            }
+          }
+
+      - name: Run the Linux AppImage itself (it starts and stays running for 25 seconds)
+        if: matrix.platform == 'linux-x64'
+        run: |
+          set -euo pipefail
+          APPIMAGE="$(ls dist/QRquick-*-linux-x64.AppImage | head -n 1)"
+          chmod +x "$APPIMAGE"
+          set +e
+          APPIMAGE_EXTRACT_AND_RUN=1 timeout 25 xvfb-run -a "$APPIMAGE" --no-sandbox > "$RUNNER_TEMP/appimage.log" 2>&1
+          CODE=$?
+          set -e
+          # 124 means the app was still running when the timeout stopped it: the expected result.
+          if [ "$CODE" != 124 ]; then
+            echo "The AppImage exited early with code $CODE." >&2
+            cat "$RUNNER_TEMP/appimage.log" >&2
+            exit 1
+          fi
+          pkill -f 'qrquick-linux-x64.AppImage' || true
+          echo 'The AppImage started and was still running after 25 seconds.'
+
+      - name: Smoke test the Linux app (the packaged staging TEST build)
+        if: matrix.platform == 'linux-x64'
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright/index.js
+        run: |
+          set -euo pipefail
+          xvfb-run -a env QRQUICK_EXECUTABLE="$PWD/dist/linux-unpacked/qrquick" QRQUICK_MODE=staging-package \
+            QRQUICK_SMOKE_OUT="$RUNNER_TEMP/desktop-smoke-linux-package" node tests/smoke.cjs
+
+      - name: Install the Windows installer silently (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'The Windows installer was not built.' }
+          $target = Join-Path $env:RUNNER_TEMP 'QRquick-install'
+          # Known fault, found by .github/workflows/windows-installer-diagnose.yml: on a freshly started runner the
+          # NSIS installer (NSIS 3.0.4.1, shipped inside electron-builder 25 and 26 alike) sometimes dies with an access
+          # violation, exit -1073741819 (0xC0000005), in its own System.dll plug-in at offset 0x1581, before it writes
+          # anything. The same file installs fine on the next try. This step retries ONLY that exact signature, at
+          # most five attempts 15 seconds apart, and says so in the job summary. Any other exit code, or a different fault, fails
+          # at once, and five crashes in a row fail the job.
+          $crashCode = -1073741819
+          $attempt = 0
+          $crashes = 0
+          while ($true) {
+            $attempt++
+            $started = Get-Date
+            if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+            $process = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$target") -Wait -PassThru
+            Write-Host "Attempt ${attempt}: installer exit code $($process.ExitCode). Installer size: $((Get-Item $installer.FullName).Length) bytes."
+            if ($process.ExitCode -ne $crashCode) { break }
+            # Windows writes the Application Error event a few seconds after the crash. Wait for it, up to 45 seconds.
+            $events = @()
+            for ($waited = 0; $waited -lt 45 -and $events.Count -eq 0; $waited += 3) {
+              $events = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; StartTime = $started.AddSeconds(-2) } -ErrorAction SilentlyContinue |
+                Where-Object { $_.Message -match 'setup\.exe' })
+              if ($events.Count -eq 0) { Start-Sleep -Seconds 3 }
+            }
+            $text = ($events | ForEach-Object { $_.Message -replace '\s+', ' ' }) -join ' || '
+            Write-Host "Crash events: $text"
+            $known = $text -match 'Faulting module name: System\.dll' -and $text -match 'Fault offset: 0x0*1581\b'
+            if (-not $known) { throw "The installer crashed with an unrecognised fault. It is not retried. Events: $text" }
+            $crashes++
+            if ($attempt -ge 5) { throw "The installer crashed with the known System.dll fault on all $attempt attempts." }
+            Write-Host "::warning title=Installer crash (known NSIS System.dll fault)::Attempt $attempt crashed. Trying again."
+            Start-Sleep -Seconds 15
+          }
+          "Windows installer: $crashes known crash(es) before the install that was tested (attempts: $attempt)." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Write-Host "Installer attempts: $attempt, known crashes: $crashes."
+          # The installer can return before its files are written (it may hand off to a child process), so wait for
+          # the app and its uninstaller to appear, up to three minutes.
+          $deadline = (Get-Date).AddSeconds(180)
+          while ((Get-Date) -lt $deadline -and -not ((Test-Path (Join-Path $target 'QRquick.exe')) -and (Test-Path (Join-Path $target 'Uninstall QRquick.exe')))) {
+            Start-Sleep -Seconds 3
+          }
+          if (-not (Test-Path (Join-Path $target 'QRquick.exe'))) {
+            $found = Get-ChildItem -Path $env:RUNNER_TEMP, "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'QRquick.exe' -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName
+            Write-Host "QRquick.exe was found at: $(if ($found) { $found -join '; ' } else { 'no location under RUNNER_TEMP or LOCALAPPDATA\Programs' })"
+            $contents = if (Test-Path $target) { (Get-ChildItem $target | Select-Object -ExpandProperty Name) -join ', ' } else { 'the target folder does not exist' }
+            Write-Host "Target folder contents: $contents"
+            throw "The installer did not install QRquick.exe into $target (installer exit code $($process.ExitCode))."
+          }
+          "QRQUICK_INSTALL=$target" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Installed to $target"
+
+      - name: Smoke test the installed Windows app (the packaged staging TEST build)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}\pw\node_modules\playwright\index.js
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:QRQUICK_INSTALL 'QRquick.exe'
+          $env:QRQUICK_EXECUTABLE = $exe
+          $env:QRQUICK_MODE = 'staging-package'
+          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-package'
+          node tests/smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'The installed-build smoke test failed.' }
+
+      - name: Uninstall the Windows app silently and confirm it is removed (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $uninstaller = Join-Path $env:QRQUICK_INSTALL 'Uninstall QRquick.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'The uninstaller is missing.' }
+          Start-Process -FilePath $uninstaller -ArgumentList @('/S') -Wait
+          Start-Sleep -Seconds 3
+          if (Test-Path (Join-Path $env:QRQUICK_INSTALL 'QRquick.exe')) { throw 'QRquick.exe is still installed after uninstalling.' }
+          Write-Host 'Uninstalled.'
+
+      - name: MSI - install silently, smoke test the installed app, uninstall (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}\pw\node_modules\playwright\index.js
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = (Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64.msi' | Select-Object -First 1).FullName
+          $log = Join-Path $env:RUNNER_TEMP 'msi-install.log'
+          $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/l*v', "`"$log`"") -Wait -PassThru
+          Write-Host "MSI install exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { Get-Content $log -Tail 60 | Write-Host; throw "The MSI install failed (exit $($p.ExitCode))." }
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\qrquick-owner-desktop'
+          $exe = Join-Path $dir 'QRquick.exe'
+          if (-not (Test-Path $exe)) { throw "QRquick.exe not found at $exe after the MSI install." }
+          $env:QRQUICK_EXECUTABLE = $exe
+          $env:QRQUICK_MODE = 'staging-package'
+          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-msi'
+          node tests/smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'The MSI-installed smoke test failed.' }
+          $u = Start-Process msiexec.exe -ArgumentList @('/x', "`"$msi`"", '/qn') -Wait -PassThru
+          Write-Host "MSI uninstall exit code: $($u.ExitCode)"
+          Start-Sleep -Seconds 3
+          if (Test-Path $exe) { throw 'QRquick.exe is still present after the MSI uninstall.' }
+          "Windows MSI: installed, smoke test passed, uninstalled (install exit $($p.ExitCode), uninstall exit $($u.ExitCode))." | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          Write-Host 'MSI install, smoke test and uninstall passed.'
+
+      - name: Collect the package, the checksums and the build information
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          if [ "$PLATFORM" = 'windows-x64' ]; then
+            cp dist/QRquick-*-win-x64-setup.exe release/
+            cp dist/QRquick-*-win-x64.msi release/
+            case "$SIGNING_MODE" in
+              release-cert) SIGN_LINE='Code signing: Windows Authenticode, QRquick certificate (checked in this run)' ;;
+              test-cert) SIGN_LINE='Code signing: TEST ONLY, self-signed certificate that Windows does not trust. Not for distribution.' ;;
+              *) SIGN_LINE='Code signing: none (unsigned test build). Not for distribution.' ;;
+            esac
+          else
+            cp dist/QRquick-*-linux-x64.AppImage release/
+            SIGN_LINE='Code signing: none for the AppImage on Linux. Check the file against SHA256SUMS.'
+            if [ "$DIST_LABEL" = 'TEST' ]; then SIGN_LINE="$SIGN_LINE Not for distribution."; fi
+          fi
+          cat > "release/BUILD-INFO-$PLATFORM.txt" <<EOF
+          QRquick owner desktop app
+          Distribution: $DIST_LABEL
+          Version: $APP_VERSION
+          Build id: $BUILD_ID
+          Commit: $GITHUB_SHA
+          Platform: $PLATFORM
+          $SIGN_LINE
+          Supabase project: nbzojqlqkrydcjtogwrb (staging TEST build, not for distribution)
+          QR address: https://joyyxh.github.io/Ps-qr/
+          Built (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          (cd release && sha256sum * > "SHA256SUMS-$PLATFORM.txt")
+          cat "release/SHA256SUMS-$PLATFORM.txt"
+
+      - name: Upload the desktop app package, checksums and build information
+        uses: actions/upload-artifact@v4
+        with:
+          name: qrquick-desktop-${{ matrix.platform }}-${{ env.BUILD_ID }}-${{ env.DIST_LABEL }}
+          path: desktop/release
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload the smoke test results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-smoke-${{ matrix.platform }}-${{ env.BUILD_ID }}-${{ env.DIST_LABEL }}
+          path: ${{ runner.temp }}/desktop-smoke-*
+          if-no-files-found: warn
+          retention-days: 14

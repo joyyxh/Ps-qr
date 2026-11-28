@@ -1,0 +1,68 @@
+{
+  "name": "qrquick-owner-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QRquick owner desktop app for Windows and Linux: a thin Electron shell around the shared web/ app.",
+  "main": "main.js",
+  "scripts": {
+    "copy-web": "node scripts/copy-web.mjs",
+    "copy-web:staging-test": "node scripts/copy-web.mjs --staging-test",
+    "copy-web:staging-package": "node scripts/copy-web.mjs --staging-test --package",
+    "start": "npm run copy-web && electron .",
+    "dist:win": "npm run copy-web && electron-builder --win --x64 --publish never",
+    "dist:linux": "npm run copy-web && electron-builder --linux --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.printnest.qrquick.owner",
+    "productName": "QRquick",
+    "copyright": "QRquick",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "app-web",
+        "to": "app-web"
+      }
+    ],
+    "asar": true,
+    "publish": null,
+    "icon": "build/icon.png",
+    "win": {
+      "target": [
+        "nsis",
+        "msi",
+        "dir"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "QRquick-${version}-${env.BUILD_SHA}-win-x64-setup.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "dir"
+      ],
+      "category": "Office",
+      "executableName": "qrquick",
+      "artifactName": "QRquick-${version}-${env.BUILD_SHA}-linux-x64.${ext}"
+    },
+    "msi": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "QRquick-${version}-${env.BUILD_SHA}-win-x64.${ext}"
+    }
+  }
+}

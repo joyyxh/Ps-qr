@@ -1,0 +1,123 @@
+name: Windows installer crash diagnosis
+
+# Diagnostic only. Builds the TEST installer exactly as desktop-owner-app.yml does, then runs it repeatedly under
+# several conditions and records exit codes, Windows crash events (faulting module and offset) and Defender
+# state, to find why the silent install sometimes exits with -1073741819 (0xC0000005). Publishes nothing.
+# Runs only when this file changes, or manually.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - '.github/workflows/windows-installer-diagnose.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        builder: ['25.1.8']
+        replica: [1, 2, 3, 4, 5, 6]
+    name: diagnose (electron-builder ${{ matrix.builder }}, replica ${{ matrix.replica }})
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      BUILD_SHA: diag
+      STAGING_SUPABASE_URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      STAGING_PUBLISHABLE_KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the installer as the real workflow does
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          if [ "${{ matrix.builder }}" != "25.1.8" ]; then npm install --no-save --no-audit --no-fund "electron-builder@${{ matrix.builder }}"; fi
+          npx electron-builder --version
+          npm run copy-web:staging-package
+          npx electron-builder --win --x64 --publish never
+          ls -l dist/*.exe
+
+      - name: Turn on crash dumps and record the machine
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+          New-Item -Path $key -Force | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\dumps" | Out-Null
+          Set-ItemProperty -Path $key -Name DumpFolder -Value "$env:RUNNER_TEMP\dumps"
+          Set-ItemProperty -Path $key -Name DumpType -Value 2 -Type DWord
+          Get-ComputerInfo | Select-Object OsName, OsBuildNumber, OsVersion, CsTotalPhysicalMemory | Format-List
+          try { Get-MpComputerStatus | Select-Object AMServiceEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion | Format-List } catch { Write-Host "Defender status unavailable: $($_.Exception.Message)" }
+
+      - name: Find a crash window, then test mitigations inside it
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $installer = (Get-ChildItem dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1).FullName
+          Write-Host "VM uptime (s): $([int]((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds)"
+          Write-Host '--- system-wide process mitigations ---'
+          try { Get-ProcessMitigation -System | Format-List | Out-String | Write-Host } catch { Write-Host "unavailable: $($_.Exception.Message)" }
+          $log = @()
+          function Try-Install($label, $exePath) {
+            $target = Join-Path $env:RUNNER_TEMP ("inst-" + [guid]::NewGuid().ToString('N'))
+            $code = (Start-Process -FilePath $exePath -ArgumentList @('/S', "/D=$target") -Wait -PassThru).ExitCode
+            $ok = ($code -eq 0) -and (Test-Path (Join-Path $target 'QRquick.exe'))
+            $script:log += [pscustomobject]@{ T = (Get-Date).ToString('HH:mm:ss'); Case = $label; Exit = $code; Installed = $ok }
+            Write-Host ("{0} {1,-22} exit {2} installed={3}" -f (Get-Date).ToString('HH:mm:ss'), $label, $code, $ok)
+            return $code
+          }
+          # Phase 1: run the built installer every 3 s for up to 4 minutes until it crashes once.
+          $crashed = $false
+          $deadline = (Get-Date).AddMinutes(4)
+          while ((Get-Date) -lt $deadline -and -not $crashed) {
+            $c = Try-Install 'plain' $installer
+            if ($c -eq -1073741819) { $crashed = $true } else { Start-Sleep -Seconds 3 }
+          }
+          Write-Host "crash window found: $crashed"
+          if ($crashed) {
+            # Phase 2: still inside the window, try variants three times each, then plain again.
+            $copy = Join-Path $env:RUNNER_TEMP 'variant-setup.exe'; Copy-Item $installer $copy -Force
+            1..3 | ForEach-Object { Try-Install 'plain-again' $installer | Out-Null }
+            Set-ProcessMitigation -Name 'QRquick-1.0.0-diag-win-x64-setup.exe' -Disable UserShadowStack, StrictUserShadowStack -ErrorAction SilentlyContinue
+            1..3 | ForEach-Object { Try-Install 'cet-off' $installer | Out-Null }
+            Set-ProcessMitigation -Name 'QRquick-1.0.0-diag-win-x64-setup.exe' -Disable DEP, EmulateAtlThunks, CFG, ForceRelocateImages -ErrorAction SilentlyContinue
+            1..3 | ForEach-Object { Try-Install 'dep-cfg-aslr-off' $installer | Out-Null }
+            Set-ProcessMitigation -Name 'variant-setup.exe' -Disable UserShadowStack, DEP, CFG -ErrorAction SilentlyContinue
+            1..3 | ForEach-Object { Try-Install 'copy-all-off' $copy | Out-Null }
+            1..3 | ForEach-Object { Try-Install 'plain-late' $installer | Out-Null }
+          }
+          $log | Format-Table -AutoSize | Out-String | Write-Host
+          $log | Group-Object Case | ForEach-Object { "{0}: {1} of {2} crashed" -f $_.Name, @($_.Group | Where-Object { $_.Exit -eq -1073741819 }).Count, $_.Count } | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY" -Append
+
+      - name: Crash events, Defender detections and dumps
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host '--- Application Error / WER events (faulting module and offset) ---'
+          Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error','Windows Error Reporting' } -MaxEvents 40 -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match 'setup|QRquick|nsis|Uninstall' } |
+            ForEach-Object { "{0} {1}" -f $_.TimeCreated.ToString('s'), ($_.Message -replace '\s+', ' ').Substring(0, [math]::Min(420, $_.Message.Length)) }
+          Write-Host '--- Defender detections ---'
+          try { Get-MpThreatDetection | Select-Object InitialDetectionTime, ThreatID, Resources | Format-List } catch { Write-Host 'none or unavailable' }
+          Write-Host '--- dumps ---'
+          Get-ChildItem "$env:RUNNER_TEMP\dumps" -ErrorAction SilentlyContinue | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-crash-dumps-${{ matrix.builder }}-${{ matrix.replica }}
+          path: ${{ runner.temp }}/dumps
+          if-no-files-found: ignore
+          retention-days: 7

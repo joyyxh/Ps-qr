@@ -115,6 +115,20 @@ test('does not touch the printer when the server does not confirm the start', as
   assert.equal(state.pendingReports.length, 0);
 });
 
+test('does not print unless the server explicitly confirms the start', async (t) => {
+  for (const confirmation of [undefined, {}, { ok: false }]) {
+    const h = await harness(t, {
+      apiOverrides: { markPrinting: async () => confirmation },
+    });
+    await h.worker.processJob(job());
+    assert.equal(h.prints.length, 0);
+    assert.equal(h.reports.length, 0);
+    const state = await h.journal.read();
+    assert.equal(state.activeJob, null);
+    assert.equal(state.pendingReports.length, 0);
+  }
+});
+
 test('a printer error is reported once as failed and never retried by the agent', async (t) => {
   const err = Object.assign(new Error('spool refused'), { code: 'spooler_error' });
   const h = await harness(t, {

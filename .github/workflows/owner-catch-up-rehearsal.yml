@@ -1,0 +1,96 @@
+name: Owner catch-up rehearsal (PostgreSQL 17)
+
+# Rehearses the owner catch-up (migrations 0010, 0018, 0019, 0020) on PostgreSQL 17, the hosted major
+# version (supabase/deploy/owner_catch_up/RUNBOOK.md, gate G5). Runs on the feature branch only.
+#
+# Nothing here uses hosted Supabase, staging, production data, a physical printer or any credential.
+# The PostgreSQL service is a throwaway container for this job only. Its password protects nothing
+# outside the job.
+
+on:
+  push:
+    branches:
+      - stage7-implementation-2026-11-13
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse-pg17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-throwaway-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -h 127.0.0.1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGPASSWORD: ci-throwaway-password
+      REHEARSAL_OUT: /tmp/owner-catch-up/rehearsal
+      BASE_SUITE_OUT: /tmp/owner-catch-up/base-suites
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the PostgreSQL 17 client (PGDG) and put it first on PATH
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Confirm the server and client versions
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+        run: |
+          psql --version
+          psql -X -At -d postgres -c "select version()"
+
+      - name: Owner catch-up rehearsal on PostgreSQL 17 (rehearse.sh)
+        run: supabase/deploy/owner_catch_up/rehearse.sh 127.0.0.1 5432
+
+      - name: Print the PostgreSQL 17 values for RUNBOOK section 7
+        if: always()
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+        run: |
+          echo "--- fingerprint of 0001 to 0009 (function kind excluded from the RUNBOOK comparison):"
+          cat "$REHEARSAL_OUT/baseline.fingerprint" || true
+          echo "--- function digests of 0001 to 0009 (track_order, expired_customer_file_paths, place_order x2):"
+          grep -E '^(track_order|expired_customer_file_paths|place_order)\|' "$REHEARSAL_OUT/baseline.functions" || true
+          echo "--- function digests after the catch-up (same names):"
+          grep -E '^(track_order|expired_customer_file_paths|place_order)\|' "$REHEARSAL_OUT/caught_up.functions" || true
+
+      - name: "Catch-up check: the owner query fails, then succeeds (run_catch_up.sh)"
+        run: supabase/tests/owner_catch_up/run_catch_up.sh 127.0.0.1 5432
+
+      - name: Base SQL suites on PostgreSQL 17 (run_base_suites.sh)
+        run: supabase/tests/base/run_base_suites.sh 127.0.0.1 5432
+
+      - name: Full-chain rehearsal on PostgreSQL 17 (0010, 0015-0025, claim, rollback, restore)
+        env:
+          REHEARSAL_OUT: /tmp/owner-catch-up/full-chain
+        run: supabase/deploy/full_chain/rehearse_chain.sh 127.0.0.1 5432
+
+      - name: Upload the rehearsal snapshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-catch-up-pg17
+          path: |
+            /tmp/owner-catch-up
+          if-no-files-found: ignore
+          retention-days: 14

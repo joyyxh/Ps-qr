@@ -2,7 +2,23 @@
 // Supabase is replaced by an in-memory mock (page.route), so this checks the
 // front end only: rendering, navigation, which token each call carries, and
 // escaping. It does not test the database (see supabase/tests).
-const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+const path = require('path');
+const os = require('os');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+// Output folder for screenshots and PNGs. Set QRQUICK_SMOKE_OUT to choose it.
+const OUT_DIR = process.env.QRQUICK_SMOKE_OUT || path.join(os.tmpdir(), 'qrquick-smoke');
+require('fs').mkdirSync(OUT_DIR, { recursive: true });
+// A small PNG for the payment QR upload. Built in, so this script does not depend on qr-smoke output.
+const PICTURE = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64'
+);
+// CHROMIUM_PATH names a Chromium binary. Unset, Playwright uses its own browser.
+const launchOptions = () => {
+  const options = { args: ['--no-sandbox'] };
+  if (process.env.CHROMIUM_PATH) options.executablePath = process.env.CHROMIUM_PATH;
+  return options;
+};
 
 const BASE = 'http://127.0.0.1:5173/';
 const SHOP_ID = 'bbbbbbbb-0000-0000-0000-000000000001';
@@ -83,7 +99,7 @@ function newSession() {
     access_token: `owner-token-${tokenCounter}`,
     refresh_token: 'refresh-1',
     expires_in: 3600,
-    user: { id: 'owner-1', email: 'owner@example.com' },
+    user: { id: 'owner-1', username: 'owner_demo' },
   };
 }
 
@@ -125,15 +141,15 @@ async function handleSupabase(route) {
   const shopFields = (shop) => ({ ...shop });
 
   // ----- Auth -----
-  if (url.pathname === '/auth/v1/token') {
-    const grant = url.searchParams.get('grant_type');
-    if (grant === 'password') {
-      if (body.password !== 'correct-horse') {
-        return json(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
-      }
-      return json(200, newSession());
+  // Owner sign-in is username and password, through the owner-auth function (no email).
+  if (url.pathname === '/functions/v1/owner-auth/signin') {
+    if (body.username !== 'owner_demo' || body.password !== 'correct-horse') {
+      return json(401, { code: 'invalid_credentials', message: 'That username or password is not right.' });
     }
-    if (grant === 'refresh_token') return json(200, newSession());
+    return json(200, { username: 'owner_demo', session: newSession() });
+  }
+  if (url.pathname === '/auth/v1/token') {
+    if (url.searchParams.get('grant_type') === 'refresh_token') return json(200, newSession());
   }
   if (url.pathname === '/auth/v1/logout') return json(204, null);
 
@@ -237,6 +253,8 @@ async function handleSupabase(route) {
     shop.features = { ...shop.features, ...body.p_features };
     return json(200, shop.features);
   }
+  // The Home summary asks for the printing computers; this shop has none.
+  if (url.pathname === '/rest/v1/rpc/owner_print_status') return json(200, { is_owner: true, agents: [], jobs: [] });
   if (url.pathname === '/rest/v1/rpc/set_payment_qr') {
     const shop = state.shops.find((s) => s.id === body.p_shop_id);
     if (!shop) return json(403, { code: '42501', message: 'you do not have permission to change this shop' });
@@ -270,7 +288,7 @@ async function waitText(page, text, timeout = 8000) {
 }
 
 const fs = require('fs');
-const DIR = '/tmp/claude-0/-home-claude/0c86edef-9199-55e4-a183-f9fd34ea0c1b/scratchpad';
+const DIR = OUT_DIR;
 const SVC_POSTER = 'cccccccc-0000-0000-0000-000000000009';
 
 async function until(test, ms = 8000) {
@@ -283,7 +301,7 @@ async function until(test, ms = 8000) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  const browser = await chromium.launch(launchOptions());
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
@@ -294,16 +312,19 @@ async function until(test, ms = 8000) {
     if (msg.type() === 'error' && !/favicon/i.test(msg.text())) problems.push(`console: ${msg.text()}`);
   });
   await page.route(/supabase\.co/, handleSupabase);
+  // Google Fonts is stubbed: the page links it, and this check must not depend on outside network access.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
+    route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   // Later routes win: serve the stored picture from the mock, not a 404.
   await page.route(/supabase\.co\/storage\/v1\/object\/public\//, (route) =>
-    route.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(`${DIR}/qr-local-download.png`) })
+    route.fulfill({ status: 200, contentType: 'image/png', body: PICTURE })
   );
 
   try {
     // ----- owner: sign in and open the shop -----
     await page.goto(`${BASE}#/owner`);
     await page.locator('#auth-form').waitFor();
-    await page.fill('#auth-form input[name=email]', 'owner@example.com');
+    await page.fill('#auth-form input[name=username]', 'owner_demo');
     await page.fill('#auth-form input[name=password]', 'correct-horse');
     await page.click('#auth-form button[type=submit]');
     await waitText(page, 'Demo Xerox Centre');
@@ -336,7 +357,9 @@ async function until(test, ms = 8000) {
       Boolean(save) && save.body.p_features.colour_printing === false && save.body.p_features.double_sided === false && save.body.p_features.stapling === true
     );
 
-    // 3. Payment QR: none yet.
+    // 3. Payment QR: none yet. The UPI QR now lives on the More tab.
+    await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+    await waitText(page, 'Shop QR code');
     check('no payment QR yet', (await page.getByText('No payment QR yet').count()) === 1);
 
     // 4. A text file is refused before any request is sent.
@@ -350,7 +373,7 @@ async function until(test, ms = 8000) {
     );
 
     // 5. A PNG goes into the shop's own folder and is attached to the shop.
-    const picture = fs.readFileSync(`${DIR}/qr-local-download.png`);
+    const picture = PICTURE;
     await page.setInputFiles('#payment-qr-form input[name=qr]', { name: 'upi.png', mimeType: 'image/png', buffer: picture });
     await page.click('#payment-qr-form button[type=submit]');
     await waitText(page, 'Payment QR saved');
@@ -392,7 +415,7 @@ async function until(test, ms = 8000) {
       offered
     );
     check('customer page shows the payment QR', (await page.locator('img.payment-qr-preview').count()) === 1);
-    const footer = await page.locator('p', { hasText: 'PrintNest does not take any payment' }).count();
+    const footer = await page.locator('p', { hasText: 'QRquick does not take any payment' }).count();
     check('footer explains the payment QR', footer === 1);
 
     await page.selectOption('#service-select', SVC_DOC);
@@ -410,11 +433,33 @@ async function until(test, ms = 8000) {
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     check('customer page has no horizontal scroll at phone width', overflow <= 0, `overflow=${overflow}px`);
+    if (overflow > 0) {
+      // Diagnostic only: name the elements that reach past the phone width.
+      const offenders = await page.evaluate(() => {
+        const width = document.documentElement.clientWidth;
+        return [...document.querySelectorAll('body *')]
+          .filter((el) => el.getBoundingClientRect().right > width + 0.5)
+          .slice(0, 12)
+          .map((el) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''} right=${Math.round(el.getBoundingClientRect().right)} text=${JSON.stringify((el.textContent || '').trim().slice(0, 50))}`);
+      });
+      const stepper = await page.evaluate(() => {
+        const el = document.querySelector('.order-stepper');
+        if (!el) return 'no .order-stepper on the page';
+        const span = (n) => {
+          const r = n.getBoundingClientRect();
+          return `${Math.round(r.left)}..${Math.round(r.right)}`;
+        };
+        const cs = getComputedStyle(el);
+        return `stepper ${span(el)} font=${cs.fontSize} gap=${cs.columnGap} items=[${[...el.children].map(span).join(' ')}] parent=${span(el.parentElement)} grandparent=${span(el.parentElement.parentElement)}`;
+      });
+      console.log(`  ${stepper}`);
+      console.log(`  overflow offenders:\n    ${offenders.join('\n    ')}`);
+    }
     await page.screenshot({ path: `${DIR}/customer-features-phone.png`, fullPage: true });
 
     // 8. Owner removes the payment QR; the customer page stops showing it.
-    await page.goto(`${BASE}#/owner/shop/demo-xerox`);
-    await waitText(page, 'Printing features');
+    await page.goto(`${BASE}#/owner/shop/demo-xerox/more`);
+    await waitText(page, 'Shop QR code');
     await page.click('[data-action="remove-payment-qr"]');
     const removed = await until(() => state.requests.some((r) => r.path === '/rest/v1/rpc/set_payment_qr' && r.body.p_path === null));
     check('remove sends a null payment QR path', removed);

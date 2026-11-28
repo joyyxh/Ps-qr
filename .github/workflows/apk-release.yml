@@ -1,0 +1,72 @@
+name: Publish APK release
+
+# DISABLED until the owner approves a production release. It would copy the APK artifact of one Android APK run
+# into a GitHub prerelease, so the APK has a direct download link. Every APK from the Android APK workflow is a
+# staging TEST build, so the first step refuses to publish. Artifact links need a GitHub sign-in; release assets do not.
+# Runs when .github/apk-release-request.txt changes. Its first line is the Android APK run id.
+
+on:
+  push:
+    branches: [stage7-implementation-2026-11-13]
+    paths:
+      - '.github/apk-release-request.txt'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Refuse the publish (staging TEST builds are not for distribution)
+        run: |
+          echo 'Publishing is blocked. Every APK from the Android APK workflow is a TEST build for the staging project and must not be distributed. A release needs owner approval and a production build.' >&2
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Read the run id
+        run: |
+          set -euo pipefail
+          RUN_ID="$(head -n 1 .github/apk-release-request.txt | tr -d '[:space:]')"
+          case "$RUN_ID" in ''|*[!0-9]*) echo "The first line must be a run id." >&2; exit 1 ;; esac
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+
+      - name: Download the APK artifact
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -n qrquick-debug-apk -D "$RUNNER_TEMP/apk"
+          test -f "$RUNNER_TEMP/apk/app-debug.apk"
+
+      - name: Create or update the prerelease
+        run: |
+          set -euo pipefail
+          SHA="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .head_sha)"
+          SHORT="${SHA:0:7}"
+          TAG="qrquick-android-$SHORT"
+          ASSET="$RUNNER_TEMP/QRquick-$SHORT.apk"
+          cp "$RUNNER_TEMP/apk/app-debug.apk" "$ASSET"
+          SUM="$(sha256sum "$ASSET" | cut -d' ' -f1)"
+          BYTES="$(stat -c %s "$ASSET")"
+          NOTES="$RUNNER_TEMP/notes.md"
+          {
+            echo "QRquick Android debug build from commit \`$SHA\`."
+            echo
+            echo "- File: \`QRquick-$SHORT.apk\` ($BYTES bytes)"
+            echo "- SHA-256: \`$SUM\`"
+            echo "- Built by Android APK run $RUN_ID: https://github.com/$GITHUB_REPOSITORY/actions/runs/$RUN_ID"
+            echo
+            echo "Install it directly on an Android phone (allow installs from this source when asked)."
+            echo "This is a debug build. Each build is signed with its own key unless the repository sets the signing secret, so uninstall an older build before installing this one."
+          } > "$NOTES"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" -R "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "$ASSET" -R "$GITHUB_REPOSITORY" --target "$SHA" --prerelease \
+              --title "QRquick Android build $SHORT" --notes-file "$NOTES"
+          fi
+          echo "Direct link: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/QRquick-$SHORT.apk"

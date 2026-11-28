@@ -5,7 +5,7 @@
 // always go straight to the network, so order and shop data is never served
 // from a cache. Strategy: network first, cached copy only when offline.
 
-const CACHE = 'printnest-shell-v1';
+const CACHE = 'printnest-shell-v3';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

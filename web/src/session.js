@@ -56,7 +56,8 @@ export function toSession(tokenResponse, nowMs = Date.now()) {
     access_token: tokenResponse.access_token,
     refresh_token: tokenResponse.refresh_token,
     expires_at: tokenResponse.expires_at ?? nowSeconds + (tokenResponse.expires_in ?? 3600),
-    user: { id: tokenResponse.user.id, email: tokenResponse.user.email ?? '' },
+    // The username is what the owner signs in with. Email is not kept.
+    user: { id: tokenResponse.user.id, username: String(tokenResponse.user.username ?? '') },
   };
 }
 
