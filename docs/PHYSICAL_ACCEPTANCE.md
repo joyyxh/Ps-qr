@@ -41,3 +41,25 @@ New order appears and updates; statistics change; file download works; a second 
 ## E. Pass rule
 Every line passes on at least one real printer and two phones. A failure is filed with the device, the step
 and a screenshot with no passwords or codes visible.
+
+## F. Windows 11 installer acceptance (physical PC; required before Windows is called release-ready)
+
+Use a physical Windows 11 PC (not a virtual machine, not a CI runner) that has never had QRquick installed. A second run on a
+PC that is also joined to a company domain is a bonus. Test the **signed RELEASE MSI**. A TEST build does not count.
+
+Record for each step: pass or fail, the PC model, the Windows build (`winver`), and a screenshot of any failure.
+
+1. Download the MSI from the release page. Compute `Get-FileHash -Algorithm SHA256 <file>` and compare it with `SHA256SUMS`.
+2. Right-click the file, Properties, Digital Signatures: the signer is the QRquick publisher and the signature is valid. In PowerShell: `Get-AuthenticodeSignature <file>` shows `Valid`.
+3. Double-click the MSI (no command line). Note any SmartScreen or "unknown publisher" prompt and what it says. Install completes without an error dialog.
+4. Open Event Viewer, Windows Logs, Application: no `Application Error` entry for `msiexec.exe` at the install time.
+5. QRquick appears in the Start menu and in Settings, Apps. Open it. It starts within 10 seconds and shows the sign-in screen.
+6. Sign in (staging account for a TEST pass, a real owner for the RELEASE pass), open Orders, create and approve a test order.
+7. Reboot. Open QRquick again. Still installed, still works.
+8. Reinstall the same MSI over the installed copy: no error, one entry in Apps.
+9. Uninstall from Settings, Apps. The folder `%LOCALAPPDATA%\Programs\qrquick-owner-desktop` is gone and the Start menu entry is gone.
+10. Repeat steps 3 to 5 on a standard (non-administrator) Windows account.
+11. If automatic printing is sold: run the print agent test in section D on this PC.
+
+Pass rule: every step passes on one PC, steps 3 to 5 pass on the standard account too, and nothing in Event Viewer names QRquick or
+`msiexec.exe` as faulting. Any crash, even once, fails the test: do not retry and call it a pass. Keep the report with the commit hash and build id.
