@@ -1,0 +1,53 @@
+name: Rate-limit identity probe (staging, read-only traffic)
+
+# Diagnostic. Asks one question: can a caller dodge the per-connection limit on track_order (30 per minute,
+# already on staging since 0010) by sending their own X-Forwarded-For, X-Real-IP or CF-Connecting-IP header?
+# It sends anonymous RPC calls with the staging publishable key and a tracking code that does not exist.
+# It changes no schema, function, setting or secret. It only adds the rate_limits counter rows that any
+# anonymous visitor would add. Nothing here touches production.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      URL: https://nbzojqlqkrydcjtogwrb.supabase.co
+      KEY: sb_publishable_UpfLIYP73ohW6d33Wh7xgA_rFV6vgPd
+    steps:
+      - name: Run the four cases, 70 seconds apart
+        shell: bash
+        run: |
+          set -u
+          call() { # $1 = extra header or empty
+            if [ -n "$1" ]; then
+              curl -s -o /tmp/body -w '%{http_code}' -X POST "$URL/rest/v1/rpc/track_order" \
+                -H "apikey: $KEY" -H "Content-Type: application/json" -H "$1" -d '{"p_code":"ZZZZ-ZZZZ"}'
+            else
+              curl -s -o /tmp/body -w '%{http_code}' -X POST "$URL/rest/v1/rpc/track_order" \
+                -H "apikey: $KEY" -H "Content-Type: application/json" -d '{"p_code":"ZZZZ-ZZZZ"}'
+            fi
+          }
+          run_case() { # $1 name, $2 header template with %N%
+            limited=0; other=0; total=40
+            for i in $(seq 1 $total); do
+              h=""; [ -n "$2" ] && h="${2//%N%/$i}"
+              code=$(call "$h")
+              if grep -q 'Too many lookups' /tmp/body; then limited=$((limited+1)); else other=$((other+1)); fi
+            done
+            echo "CASE $1: $total calls, refused by the limit: $limited, not refused: $other"
+            echo "CASE $1: $total calls, refused by the limit: $limited, not refused: $other" >> "$GITHUB_STEP_SUMMARY"
+          }
+          echo "Runner egress address: $(curl -s https://api.ipify.org || echo unknown)"
+          run_case "A no header" ""
+          sleep 70
+          run_case "B different X-Forwarded-For on every call" "X-Forwarded-For: 10.9.0.%N%"
+          sleep 70
+          run_case "C different X-Real-IP on every call" "X-Real-IP: 10.8.0.%N%"
+          sleep 70
+          run_case "D different CF-Connecting-IP on every call" "CF-Connecting-IP: 10.7.0.%N%"
