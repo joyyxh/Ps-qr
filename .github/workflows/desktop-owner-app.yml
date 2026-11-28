@@ -181,6 +181,9 @@ jobs:
           $installer = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64-setup.exe' | Select-Object -First 1
           if (-not $installer) { throw 'The Windows installer was not built.' }
           $files = @($installer.FullName)
+          $msiFile = Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64.msi' | Select-Object -First 1
+          if (-not $msiFile) { throw 'The Windows MSI was not built.' }
+          $files += $msiFile.FullName
           $exe = Join-Path (Get-Location) 'dist/win-unpacked/QRquick.exe'
           if (Test-Path $exe) { $files += $exe }
           foreach ($file in $files) {
@@ -307,6 +310,33 @@ jobs:
           if (Test-Path (Join-Path $env:QRQUICK_INSTALL 'QRquick.exe')) { throw 'QRquick.exe is still installed after uninstalling.' }
           Write-Host 'Uninstalled.'
 
+      - name: MSI - install silently, smoke test the installed app, uninstall (Windows)
+        if: matrix.platform == 'windows-x64'
+        shell: pwsh
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}\pw\node_modules\playwright\index.js
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = (Get-ChildItem -Path dist -Filter 'QRquick-*-win-x64.msi' | Select-Object -First 1).FullName
+          $log = Join-Path $env:RUNNER_TEMP 'msi-install.log'
+          $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/l*v', "`"$log`"") -Wait -PassThru
+          Write-Host "MSI install exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { Get-Content $log -Tail 60 | Write-Host; throw "The MSI install failed (exit $($p.ExitCode))." }
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\qrquick-owner-desktop'
+          $exe = Join-Path $dir 'QRquick.exe'
+          if (-not (Test-Path $exe)) { throw "QRquick.exe not found at $exe after the MSI install." }
+          $env:QRQUICK_EXECUTABLE = $exe
+          $env:QRQUICK_MODE = 'staging-package'
+          $env:QRQUICK_SMOKE_OUT = Join-Path $env:RUNNER_TEMP 'desktop-smoke-windows-msi'
+          node tests/smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'The MSI-installed smoke test failed.' }
+          $u = Start-Process msiexec.exe -ArgumentList @('/x', "`"$msi`"", '/qn') -Wait -PassThru
+          Write-Host "MSI uninstall exit code: $($u.ExitCode)"
+          Start-Sleep -Seconds 3
+          if (Test-Path $exe) { throw 'QRquick.exe is still present after the MSI uninstall.' }
+          "Windows MSI: installed, smoke test passed, uninstalled (install exit $($p.ExitCode), uninstall exit $($u.ExitCode))." | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          Write-Host 'MSI install, smoke test and uninstall passed.'
+
       - name: Collect the package, the checksums and the build information
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -315,6 +345,7 @@ jobs:
           mkdir -p release
           if [ "$PLATFORM" = 'windows-x64' ]; then
             cp dist/QRquick-*-win-x64-setup.exe release/
+            cp dist/QRquick-*-win-x64.msi release/
             case "$SIGNING_MODE" in
               release-cert) SIGN_LINE='Code signing: Windows Authenticode, QRquick certificate (checked in this run)' ;;
               test-cert) SIGN_LINE='Code signing: TEST ONLY, self-signed certificate that Windows does not trust. Not for distribution.' ;;
