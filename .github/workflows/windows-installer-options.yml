@@ -76,7 +76,8 @@ jobs:
           Get-ChildItem "$nsisDir\Bin" | Format-Table Name
           & "$nsisDir\Bin\makensis.exe" /VERSION
           Remove-Item dist\*.exe -Force
-          npx electron-builder --win nsis --x64 --publish never -c.nsis.warningsAsErrors=false
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.build.nsis.warningsAsErrors=false;fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+          npx electron-builder --win nsis --x64 --publish never
           Get-ChildItem dist\*.exe | Format-Table Name, Length
 
       - name: Build MSI
